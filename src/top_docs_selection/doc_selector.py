@@ -13,7 +13,7 @@ from src.utils.utils import init_logger, keep_top_k_values
 
 class DocSelector(object):
     """
-    Class with different implementation to select the most representative documents per topic for a given topic model.
+    Class with different approaches to select the most representative documents per topic for a given topic model.
     """
 
     def __init__(
@@ -85,7 +85,11 @@ class DocSelector(object):
 
         return words_assigned
 
-    def _calculate_bhata(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
+    def _calculate_bhata(
+        self,
+        X: np.ndarray,
+        Y: np.ndarray
+    ) -> np.ndarray:
         """
         Calculate the Bhattacharyya distance between two distributions.
 
@@ -351,27 +355,27 @@ class DocSelector(object):
         Parameters
         ----------
         mat: numpy.ndarray
-            The input matrix of shape (D, K) where D is the number of rows and K is the number of columns.
+            The input matrix of shape (D, K) where D is the number of documents and K is the number of topics.
         n_parts: int
-            The number of segments to divide each column into.
+            The number of segments to divide each column (probabilities of each document for a given column = topic) into.
 
         Returns
         -------
         List[List[int]]: 
-            A list of lists containing the indices of the selected values for each column. Each inner list corresponds to a column and contains one selected index from each of the n_parts segments.
+            A list of lists containing the indices of the selected documents for each topics. Each inner list corresponds to a topics and contains one selected document from each of the n_parts segments.
         """
         selected_ids = []
 
         for col in range(mat.shape[1]):
             column_data = mat[:, col]
-            # Sort in descending order
+            # Sort in descending order keeping original indices
             sorted_indices = np.argsort(-column_data)
             sorted_data = column_data[sorted_indices]
 
             part_size = len(sorted_data) // n_parts
             this_col_ids = []
 
-            # Select one value from each part in sorted data
+            # Select one value from each part
             for i in range(n_parts):
                 start_index = i * part_size
                 end_index = (i + 1) * part_size if i < n_parts - \
@@ -381,7 +385,6 @@ class DocSelector(object):
                     selected_index = np.random.choice(part_indices)
                     this_col_ids.append(selected_index)
 
-            # Append the selected indices as a list to the result list
             selected_ids.append(this_col_ids)
 
         return selected_ids
@@ -399,7 +402,20 @@ class DocSelector(object):
             thr: tuple = None,
             ntop: int = 5) -> List[List[int]]:
         """
-        Get the top documents based on the specified method.
+        Get the top documents based on the specified method:
+        For each topic, keep:
+        * thetas: 
+            the ntop-documents with the highest thetas (doc-topic distrib)
+        * thetas_sample: 
+            the ntop-documents are selected based on probabilistic sampling. The thetas matrix is normalized such that the columns sum to 1. For each topic, documents are sampled according to their probabilities in the normalized thetas matrix.
+        * thetas_thr: 
+            the ntop-documents are selected based on a threshold. The thetas matrix is filtered such that only values within the specified threshold range are kept.
+        * sall: 
+            Top docs are selected based on the largest Bhattacharya    coefficient between  their normalized BoW and the betas.
+        * spart: 
+            Top docs are chosen by identifying those with the largest Bhattacharya coefficient between the BoW of the document, specific to the words generated for the topic, and the topic's betas.
+        * s3: 
+            For each topic, top docs are chosen by keeping those with the largest sum of the  eights that such a topic assigns to each word in the document.
 
         Parameters
         ----------

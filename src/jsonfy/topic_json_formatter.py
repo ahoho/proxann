@@ -12,7 +12,15 @@ from src.top_docs_selection.doc_selector import DocSelector
 from src.utils.utils import init_logger
 
 
-class TopicJsonFormatter(object):
+class TopicJsonFormatter:
+    """
+    Generates JSON output for topic models, including:
+
+    - Representative Documents (methods: 'thetas', 'thetas_sample', 'thetas_thr', 'sall', 'spart', 's3')
+    - Top Words for Each Topic
+    - Evaluation Documents and Their Probabilities
+    """
+    
     def __init__(
         self,
         logger: Optional[logging.Logger] = None,
@@ -30,39 +38,74 @@ class TopicJsonFormatter(object):
             Path for saving logs.
         """
         self._logger = logger if logger else init_logger(__name__, path_logs)
-
         self._doc_selector = DocSelector(self._logger, path_logs)
 
-        return
+    def get_model_eval_output(
+        self,
+        df: pd.DataFrame,
+        text_column: str,
+        keys: List[str],
+        **kwargs
+    ) -> dict:
+        """
+        Get the model evaluation output in JSON format.
 
-    def get_model_eval_output(self, df, text_column, keys, **kwargs):
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Dataframe containing the text data.
+        text_column : str
+            Column name in the dataframe that contains the text data.
+        keys : List[str]
+            List of keys or topic words.
+        kwargs : dict
+            Additional keyword arguments for document selection.
 
+        Returns
+        -------
+        dict
+            JSON formatted dictionary of the model evaluation output.
+        """
         exemplar_docs_ids = self._doc_selector.get_top_docs(**kwargs)
-        exemplar_docs = [[df[text_column].iloc[doc_id]
-                          for doc_id in k] for k in exemplar_docs_ids]
-        eval_docs_ids, eval_docs_probs = self._doc_selector.get_eval_docs(
-            **kwargs)
-        eval_docs = [[df[text_column].iloc[doc_id]
-                      for doc_id in k] for k in eval_docs_ids]
+        exemplar_docs = [[df[text_column].iloc[doc_id] for doc_id in k] for k in exemplar_docs_ids]
+        eval_docs_ids, eval_docs_probs = self._doc_selector.get_eval_docs(**kwargs)
+        eval_docs = [[df[text_column].iloc[doc_id] for doc_id in k] for k in eval_docs_ids]
         topic_ids = range(len(exemplar_docs_ids))
 
-        json_out = self.jsonfy(topic_ids, exemplar_docs,
-                               keys, eval_docs, eval_docs_probs)
-        
-        import pdb; pdb.set_trace()
+        json_out = self.jsonfy(topic_ids, exemplar_docs, keys, eval_docs, eval_docs_probs)
         return json_out
 
     def jsonfy(
         self,
-        topic_ids,
-        exemplar_docs,
-        topic_words,
-        eval_docs,
-        eval_docs_probs,
-        path_save=None
-    ):
+        topic_ids: List[int],
+        exemplar_docs: List[List[str]],
+        topic_words: List[str],
+        eval_docs: List[List[str]],
+        eval_docs_probs: List[List[float]],
+    ) -> dict:
+        """
+        Convert model evaluation output to JSON format.
+
+        Parameters
+        ----------
+        topic_ids : List[int]
+            List of topic IDs.
+        exemplar_docs : List[List[str]]
+            List of exemplar documents for each topic.
+        topic_words : List[str]
+            List of topic words.
+        eval_docs : List[List[str]]
+            List of evaluation documents for each topic.
+        eval_docs_probs : List[List[float]]
+            List of probabilities for the evaluation documents.
+
+        Returns
+        -------
+        dict
+            JSON formatted dictionary of the model evaluation output.
+        """
         dict_out = {}
-        for k, ed, tw, ed, edp in zip(topic_ids, exemplar_docs, topic_words, eval_docs, eval_docs_probs):
+        for k, ed, tw, edp in zip(topic_ids, exemplar_docs, topic_words, eval_docs, eval_docs_probs):
             dict_out[k] = {
                 "exemplar_docs": ed,
                 "topic_words": tw,
@@ -70,7 +113,6 @@ class TopicJsonFormatter(object):
                 "eval_docs_probs": edp
             }
         return dict_out
-
 
 def main():
 
@@ -217,7 +259,7 @@ def main():
         try:
             thr = float(args.thr.split(",")[0]), float(args.thr.split(",")[1])
         except Exception as e:
-            print("The threshold values introduced are not valid. Please, introduce something in the format (inf_thr, sup_thr). Exiting...")
+            print("-- -- The threshold values introduced are not valid. Please, introduce something in the format (inf_thr, sup_thr). Exiting...")
             sys.exit()
 
     for method in methods:

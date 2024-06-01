@@ -1,0 +1,17 @@
+bertopic==0.16.2
+gensim==4.3.2
+hdbscan==0.8.36
+matplotlib==3.9.0
+numpy==1.24.3
+pandas==2.0.3
+PyYAML==6.0
+PyYAML==6.0.1
+PyYAML==6.0.1
+scikit_learn==1.2.2
+scipy==1.10.1
+sentence_transformers==3.0.0
+tomotopy==0.12.7
+torch==2.3.0
+tqdm==4.65.0
+tqdm==4.66.4
+umap_learn==0.5.6

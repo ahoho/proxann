@@ -84,7 +84,7 @@ def init_logger(name: str, path_logs: Path) -> logging.Logger:
     logger.setLevel(logging.DEBUG)
     
     # Create path_logs dir if it does not exist
-    path_logs.mkdir(exist_ok=True)
+    path_logs.mkdir(parents=True, exist_ok=True)
 
     # Create handlers
     file_handler = logging.FileHandler(path_logs / f"{name}.log")

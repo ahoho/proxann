@@ -92,7 +92,11 @@ class TMTrainer(ABC):
         with yaml_path.open('w') as yaml_file:
             yaml.dump(params, yaml_file)
     
-    def _save_thr_fig(self, thetas: np.ndarray, plot_file: pathlib.Path) -> None:
+    def _save_thr_fig(
+        self,
+        thetas: np.ndarray,
+        plot_file: pathlib.Path
+    ) -> None:
         """
         Creates a figure to illustrate the effect of thresholding.
         
@@ -110,7 +114,13 @@ class TMTrainer(ABC):
         plt.savefig(plot_file)
         plt.close()
 
-    def _save_model_results(self, thetas: np.ndarray, betas: np.ndarray, vocab: List[str], keys: List[List[str]]) -> None:
+    def _save_model_results(
+        self,
+        thetas: np.ndarray,
+        betas: np.ndarray,
+        vocab: List[str],
+        keys: List[List[str]]
+    ) -> None:
         """
         Save the model results.
 
@@ -125,6 +135,7 @@ class TMTrainer(ABC):
         keys : List[List[str]]
             The top words for each topic.
         """
+        
         
         self._save_thr_fig(thetas, self.model_path.joinpath('thetasDist.pdf'))
         thetas = sparse.csr_matrix(thetas, copy=True)
@@ -187,7 +198,12 @@ class TMTrainer(ABC):
 
         return bow_mat
 
-    def _load_train_data(self, path_to_data: str, get_embeddings: bool = False, text_data: str = "tokenized_text") -> None:
+    def _load_train_data(
+        self,
+        path_to_data: str,
+        get_embeddings: bool = False,
+        text_data: str = "tokenized_text"
+    ) -> None:
         """
         Load the training data.
 
@@ -840,13 +856,10 @@ class BERTopicTrainer(TMTrainer):
             _, probs = self._model.fit_transform(texts)
 
         thetas_approx, _ = self._model.approximate_distribution(texts)
-        check_thetas = [(doc_id, thetas_approx[doc_id].shape) for doc_id in range(
-            len(thetas_approx)) if thetas_approx[doc_id].shape != (self.num_topics,)]
-        if len(check_thetas) > 0:
-            self._logger.warning(f"-- -- No all the thetas have the same shape: {check_thetas}",)
         self._logger.info(f"-- -- Thetas shape: {thetas_approx.shape}")
 
         betas = self._model.c_tf_idf_.toarray()
+        betas = betas[:1] #drout outlier topic and keep (K-1, V) matrix
         self._logger.info(f"-- -- Betas shape: {betas.shape}")
         vocab = self._model.vectorizer_model.get_feature_names_out()
 

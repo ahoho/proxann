@@ -18,12 +18,17 @@ Example structure:
 
 ```json
 {
-    "<topic_id>": {
-        "exemplar_docs": ["<top doc>", "<2nd top doc>", "<nth top doc>"],
-        "topic_words": ["<top word>", "<2nd top word>", "<nth top word>"],
-        "eval_docs": ["<high prob doc>", "<lower prob doc>", "<nth lower prob doc>"],
-        "eval_docs_probs": [0.99, 0.87, 0.73, 0.61, 0.22, 0.0]
-    }
+    <topic_id>: {
+        "topic_words": List[str], # sorted list, maybe limit to 100
+        "exemplar_docs": List[str], # probable documents for cluster (e.g, 5 high-theta docs)
+        "eval_docs": [
+            # stratified sample of 10 documents to evaluate for topic membership
+            # (ideally, probs closest to [1, 0.9, ..., 0.1, 0.0])
+            {"doc_id": int, "text": str, "prob": float, "assigned_to_k": int},
+            ...
+        ]
+    },
+    ...
 }
 ```
 
@@ -70,4 +75,3 @@ The ``bash_scripts`` folder contains one bash script per functionality on how to
 ## TODO
 
 - [ ] Revise S3.
-- [ ] Add saving of JSON to file.

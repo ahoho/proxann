@@ -5,18 +5,19 @@ cd "$(dirname "$0")/.."
 pwd
 
 # Train Mallet model
-: <<'END_COMMENT'
+
 python3 main.py train_tm \
     --corpus_file "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/train.metadata.jsonl" \
-    --model_path "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/models/trained/mallet_wiki_50" \
+    --model_path "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/models/trained/mallet_wiki_50_v2" \
     --trainer_type "MalletLda" \
     --num_topics 50 \
     --text_col "tokenized_text"
 
+: <<'END_COMMENT'
 # Train TomotopyLda model
 python3 main.py train_tm \
     --corpus_file "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/train.metadata.jsonl" \
-    --model_path "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/models/trained/tomotopy_wiki_50" \
+    --model_path "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/models/trained/tomotopy_wiki_50_v2" \
     --trainer_type "TomotopyLda" \
     --num_topics 50 \
     --text_col "tokenized_text"
@@ -45,7 +46,7 @@ python3 main.py train_tm \
     --trainer_type "BERTopic" \
     --num_topics 50 \
     --text_col "tokenized_text"
-END_COMMENT
+
 
 # Train Bertopic model (BERTopic default embeddings and preprocessed text)
 python3 main.py train_tm \
@@ -54,4 +55,4 @@ python3 main.py train_tm \
     --trainer_type "BERTopic" \
     --num_topics 50 \
     --text_col "tokenized_text"
-
+END_COMMENT

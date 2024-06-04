@@ -341,16 +341,17 @@ class DocSelector(object):
             sorted_docs_indices = np.argsort(doc_distr)[::-1]
             top = sorted_docs_indices[:topn].tolist()
             top_docs_per_topic.append(top)
-
         return top_docs_per_topic
 
     def _select_ids_nparts(
         self,
         mat: np.ndarray,
-        n_parts: int = 5
+        n_parts: int = 5,
+        bucket_by: str = 'values'
     ) -> List[List[int]]:
         """
-        Selects one random value from each of the n_parts segments of each column in the given matrix. If the number of rows is not evenly divisible by n_parts, the last segment will include the remaining elements.
+        Selects one random value from each of the n_parts segments of each column in the given matrix.
+        If the number of rows is not evenly divisible by n_parts, the last segment will include the remaining elements.
 
         Parameters
         ----------
@@ -358,49 +359,81 @@ class DocSelector(object):
             The input matrix of shape (D, K) where D is the number of documents and K is the number of topics.
         n_parts: int
             The number of segments to divide each column (probabilities of each document for a given column = topic) into.
+        bucket_by: str
+            The method to bucket the data. Options are 'rank', 'values', or 'closest_value'.
 
         Returns
         -------
-        List[List[int]]: 
-            A list of lists containing the indices of the selected documents for each topics. Each inner list corresponds to a topics and contains one selected document from each of the n_parts segments.
+        List[List[int]]:
+            A list of lists containing the indices of the selected documents for each topic. Each inner list corresponds to a topic and contains one selected document from each of the n_parts segments.
         """
         selected_ids = []
 
         for col in range(mat.shape[1]):
             column_data = mat[:, col]
-            # Sort in descending order keeping original indices
-            sorted_indices = np.argsort(-column_data)
-            sorted_data = column_data[sorted_indices]
+            this_col_ids = []  # Initialize this_col_ids here
 
-            part_size = len(sorted_data) // n_parts
-            this_col_ids = []
+            if bucket_by == 'rank':
+                # Sort in descending order keeping original indices
+                sorted_indices = np.argsort(-column_data)
+                sorted_data = column_data[sorted_indices]
 
-            # Select one value from each part
-            for i in range(n_parts):
-                start_index = i * part_size
-                end_index = (i + 1) * part_size if i < n_parts - \
-                    1 else len(sorted_data)
-                part_indices = sorted_indices[start_index:end_index]
-                if part_indices.size > 0:
-                    selected_index = np.random.choice(part_indices)
-                    this_col_ids.append(selected_index)
+                part_size = len(sorted_data) // n_parts
+
+                # Select one value from each part
+                for i in range(n_parts):
+                    start_index = i * part_size
+                    end_index = (i + 1) * part_size if i < n_parts - \
+                        1 else len(sorted_data)
+                    part_indices = sorted_indices[start_index:end_index]
+                    if part_indices.size > 0:
+                        selected_index = np.random.choice(part_indices)
+                        this_col_ids.append(selected_index)
+
+            elif bucket_by == 'values':
+                # Determine bin edges using histogram
+                bin_edges = np.histogram_bin_edges(column_data, bins=n_parts)
+
+                # Select one value from each bin
+                for i in range(len(bin_edges) - 1):
+                    bin_mask = (column_data >= bin_edges[i]) & (column_data < bin_edges[i + 1])
+                    part_indices = np.where(bin_mask)[0]
+                    if part_indices.size > 0:
+                        selected_index = np.random.choice(part_indices)
+                        this_col_ids.append(selected_index)
+                
+                # Sort such that probs are in descending order
+                this_col_ids = sorted(this_col_ids, key=lambda idx: column_data[idx], reverse=True)
+
+            elif bucket_by == 'closest_value':
+                max_mat_k = column_data.max()
+                step = max_mat_k / n_parts
+
+                for p in np.arange(max_mat_k, max_mat_k - step * n_parts, -step):
+                    idx = np.abs(column_data - p).argmin()
+                    this_col_ids.append(idx)
+                    column_data[idx] = 1e10  # Exclude from future selection
+                    if len(this_col_ids) == n_parts:
+                        break
+            else:
+                raise ValueError(f"Invalid bucket_by value: {bucket_by}")
 
             selected_ids.append(this_col_ids)
 
         return selected_ids
 
     def get_top_docs(
-            self,
-            method: str,
-            thetas: np.ndarray = None,
-            bow: np.ndarray = None,
-            betas: np.ndarray = None,
-            corpus: List[List[str]] = None,
-            vocab_w2id: dict = None,
-            model_path: str = None,
-            top_words: int = None,
-            thr: tuple = None,
-            ntop: int = 5) -> List[List[int]]:
+        self,
+        method: str,
+        thetas: np.ndarray = None,
+        bow: np.ndarray = None,
+        betas: np.ndarray = None,
+        corpus: List[List[str]] = None,
+        vocab_w2id: dict = None,
+        model_path: str = None,
+        top_words: int = None,
+        thr: tuple = None,
+        ntop: int = 5) -> List[List[int]]:
         """
         Get the top documents based on the specified method:
         For each topic, keep:
@@ -520,8 +553,12 @@ class DocSelector(object):
         eval_docs = self._select_ids_nparts(mat, ntop)
         eval_probs = [[thetas.T[k][doc_id] for doc_id in id_docs]
                       for k, id_docs in enumerate(eval_docs)]
+        assigned_to_k = self._get_assign_tpc(thetas)[eval_docs]
 
-        return eval_docs, eval_probs
+        return eval_docs, eval_probs, assigned_to_k
+
+    def _get_assign_tpc(self, thetas):
+        return np.argmax(thetas, axis=1)
 
 
 def main():
@@ -594,8 +631,7 @@ def main():
     )
     parser.add_argument(
         '--trained_with_thetas_eval',
-        type=bool,
-        default=True,
+        action='store_true',
         help="Whether the model given by model_path was trained using this code"
     )
     parser.add_argument(

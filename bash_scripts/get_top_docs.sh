@@ -9,4 +9,4 @@ python3 main.py get_top_docs \
     --corpus_path "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/train.metadata.jsonl" \
     --method "thetas,thetas_sample,sall,spart" \
     --top_words 100 \
-    --trained_with_thetas_eval True
+    --trained_with_thetas_eval

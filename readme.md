@@ -18,13 +18,22 @@ Example structure:
 
 ```json
 {
-    <topic_id>: {
-        "topic_words": List[str], # sorted list, maybe limit to 100
-        "exemplar_docs": List[str], # probable documents for cluster (e.g, 5 high-theta docs)
+    "<topic_id>": {
+        "topic_words": ["word1", "word2", "word3", ...], 
+        "exemplar_docs": ["doc1", "doc2", "doc3", ...], 
         "eval_docs": [
-            # stratified sample of 10 documents to evaluate for topic membership
-            # (ideally, probs closest to [1, 0.9, ..., 0.1, 0.0])
-            {"doc_id": int, "text": str, "prob": float, "assigned_to_k": int},
+            {
+                "doc_id": 1, 
+                "text": "Document text goes here.", 
+                "prob": 0.9, 
+                "assigned_to_k": 1
+            },
+            {
+                "doc_id": 2, 
+                "text": "Document text goes here.", 
+                "prob": 0.8, 
+                "assigned_to_k": 1
+            },
             ...
         ]
     },

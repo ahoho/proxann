@@ -162,6 +162,7 @@ cython_debug/
 
 # Custom
 src/train/Mallet-202108
-data/models/trained
+data/models
 data/logs
 *parquet
+*jsonl

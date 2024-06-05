@@ -500,7 +500,7 @@ class DocSelector(object):
         model_path: str = None,
         top_words: int = None,
         thr: Tuple[float, float] = None,
-        ntop: int = 5
+        ntop: int = 7
     ) -> Tuple[List[List[int]], List[List[float]]]:
         """
         Get the documents for evaluation. If we want N evaluation docs, we divide each column of the D x K matrix into N parts and select one element from each part. If the selected method is 'thetas_sample', the eval docs are selected as for the 'thetas' method.

@@ -124,15 +124,15 @@ class TopicJsonFormatter:
 
             eval_docs_list = [
                 {
-                    "doc_id": edids_d,
+                    "doc_id": int(edids_d),
                     "text": evtext_d,
-                    "prob": edprobs_d,
-                    "assigned_to_k": edast_b_d
+                    "prob": float(edprobs_d),
+                    "assigned_to_k": bool(edast_b_d)
                 }
                 for edids_d, evtext_d, edprobs_d, edast_b_d in zip(edids, evtext, edprobs, edast_b)
             ]
 
-            dict_out[k] = {
+            dict_out[int(k)] = {
                 "exemplar_docs": ed,
                 "topic_words": tw,
                 "eval_docs": eval_docs_list
@@ -149,11 +149,11 @@ def main():
                 wd = line.strip()
                 vocab_w2id[wd] = i
         return vocab_w2id
-    
+
     def display_json_snippet(json_obj, num_items=5, snippet_length=100, level=0, indent="  "):
         """
         Displays a snippet from each element in a JSON object, handling nested JSON objects.
-        
+
         Parameters
         ----------
         json_obj: dict or list
@@ -168,14 +168,15 @@ def main():
             String used for indentation.
         """
         current_indent = indent * level
-        
+
         if isinstance(json_obj, dict):
             for i, (key, value) in enumerate(json_obj.items()):
                 if i >= num_items:
                     break
                 if isinstance(value, (dict, list)):
                     print(f"{current_indent}{key}:")
-                    display_json_snippet(value, num_items, snippet_length, level + 1, indent)
+                    display_json_snippet(
+                        value, num_items, snippet_length, level + 1, indent)
                 else:
                     value_snippet = str(value)[:snippet_length]
                     print(f"{current_indent}{key}: {value_snippet}")
@@ -185,11 +186,11 @@ def main():
                     break
                 if isinstance(item, (dict, list)):
                     print(f"{current_indent}Item {i + 1}:")
-                    display_json_snippet(item, num_items, snippet_length, level + 1, indent)
+                    display_json_snippet(
+                        item, num_items, snippet_length, level + 1, indent)
                 else:
                     item_snippet = str(item)[:snippet_length]
                     print(f"{current_indent}Item {i + 1}: {item_snippet}")
-
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -279,7 +280,7 @@ def main():
     args = parser.parse_args()
 
     formatter = TopicJsonFormatter()
-    
+
     if args.trained_with_thetas_eval:
         model_path = pathlib.Path(args.model_path)
         try:
@@ -305,7 +306,7 @@ def main():
         try:
             bow = np.load(args.bow_path) if args.bow_path else None
         except Exception as e:
-            print(f"-- -- No BoW file found. Setting to None...")
+            # print(f"-- -- No BoW file found. Setting to None...")
             bow = None
         betas = np.load(args.betas_path) if args.betas_path else None
 
@@ -347,7 +348,6 @@ def main():
             print("-- -- The threshold values introduced are not valid. Please, introduce something in the format (inf_thr, sup_thr). Exiting...")
             sys.exit()
 
-    
     out = formatter.get_model_eval_output(
         df=df,
         text_column=args.text_column_disp,
@@ -363,12 +363,15 @@ def main():
         thr=thr,
         ntop=args.ntop)
 
-    print("Keys:")
-    print(list(out.keys()))
+    # print("Keys:")
+    # print(list(out.keys()))
 
-    print("\nSnippets from output:")
-    display_json_snippet(out, num_items=5, snippet_length=100)
-    #import pdb; pdb.set_trace()
+    # print("\nSnippets from output:")
+    # display_json_snippet(out, num_items=5, snippet_length=100)
+
+    # Return the JSON output
+    print(json.dumps(out, indent=2))
+
 
 if __name__ == "__main__":
     main()

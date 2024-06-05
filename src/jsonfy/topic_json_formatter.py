@@ -149,6 +149,47 @@ def main():
                 wd = line.strip()
                 vocab_w2id[wd] = i
         return vocab_w2id
+    
+    def display_json_snippet(json_obj, num_items=5, snippet_length=100, level=0, indent="  "):
+        """
+        Displays a snippet from each element in a JSON object, handling nested JSON objects.
+        
+        Parameters
+        ----------
+        json_obj: dict or list
+            The JSON object to display snippets from.
+        num_items: int
+            Number of items to display from the JSON object.
+        snippet_length: int
+            Length of the snippet to display from each item.
+        level: int
+            Current level of nesting.
+        indent: str
+            String used for indentation.
+        """
+        current_indent = indent * level
+        
+        if isinstance(json_obj, dict):
+            for i, (key, value) in enumerate(json_obj.items()):
+                if i >= num_items:
+                    break
+                if isinstance(value, (dict, list)):
+                    print(f"{current_indent}{key}:")
+                    display_json_snippet(value, num_items, snippet_length, level + 1, indent)
+                else:
+                    value_snippet = str(value)[:snippet_length]
+                    print(f"{current_indent}{key}: {value_snippet}")
+        elif isinstance(json_obj, list):
+            for i, item in enumerate(json_obj):
+                if i >= num_items:
+                    break
+                if isinstance(item, (dict, list)):
+                    print(f"{current_indent}Item {i + 1}:")
+                    display_json_snippet(item, num_items, snippet_length, level + 1, indent)
+                else:
+                    item_snippet = str(item)[:snippet_length]
+                    print(f"{current_indent}Item {i + 1}: {item_snippet}")
+
 
     def display_json_snippet(json_obj, num_items=5, snippet_length=100, level=0, indent="  "):
         """
@@ -280,7 +321,7 @@ def main():
     args = parser.parse_args()
 
     formatter = TopicJsonFormatter()
-
+    
     if args.trained_with_thetas_eval:
         model_path = pathlib.Path(args.model_path)
         try:

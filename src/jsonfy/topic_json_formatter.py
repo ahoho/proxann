@@ -71,6 +71,7 @@ class TopicJsonFormatter:
         exemplar_docs = [[df[text_column].iloc[doc_id]
                           for doc_id in k] for k in exemplar_docs_ids]
         eval_docs_ids, eval_docs_probs, assigned_to_k = self._doc_selector.get_eval_docs(
+            exemplar_docs=exemplar_docs_ids,
             **kwargs)
         eval_docs = [[df[text_column].iloc[doc_id]
                       for doc_id in k] for k in eval_docs_ids]

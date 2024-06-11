@@ -492,6 +492,7 @@ class DocSelector(object):
     def get_eval_docs(
         self,
         method: str,
+        exemplar_docs: List[int],
         thetas: np.ndarray = None,
         bow: np.ndarray = None,
         betas: np.ndarray = None,
@@ -509,6 +510,8 @@ class DocSelector(object):
         ----------
         method : str
             Method to use for selecting top documents.
+        exemplar_docs : List[int]
+            List of IDs of the exemplar documents.
         thetas : np.ndarray, optional
             Topic proportions for documents.
         bow : np.ndarray, optional
@@ -533,11 +536,15 @@ class DocSelector(object):
         Tuple[List[List[int]], List[List[float]]]: 
             A tuple containing a list of lists of the IDs of the selected documents for each topic and their corresponding probabilities.
         """
+        
+        # Modify thetas to remove the documents that have already been selected as exemplar docs
+        thetas_ = thetas.copy()
+        thetas_ = np.delete(thetas_, exemplar_docs, axis=0)
 
         if method == "thetas" or method == "thetas_sample":
-            mat = thetas.copy()
+            mat = thetas_
         elif method == "thetas_thr":
-            mat = thetas.copy()
+            mat = thetas_
             mask = (mat > thr[0]) & (mat < thr[1])
             mat = np.where(mask, mat, 0)
         elif method == "sall":
@@ -545,15 +552,15 @@ class DocSelector(object):
                 bow, betas, save_path=model_path).toarray()
         elif method == "spart":
             mat = self._calculate_spart(
-                bow, thetas, betas, save_path=model_path).toarray()
+                bow, thetas_, betas, save_path=model_path).toarray()
         elif method == "s3":
             mat = self._calculate_s3(
-                thetas, betas, corpus, vocab_w2id, top_words, save_path=model_path).toarray()
+                thetas_, betas, corpus, vocab_w2id, top_words, save_path=model_path).toarray()
 
         eval_docs = self._select_ids_nparts(mat, ntop)
-        eval_probs = [[thetas.T[k][doc_id] for doc_id in id_docs]
+        eval_probs = [[thetas_.T[k][doc_id] for doc_id in id_docs]
                       for k, id_docs in enumerate(eval_docs)]
-        assigned_to_k = self._get_assign_tpc(thetas)[eval_docs]
+        assigned_to_k = self._get_assign_tpc(thetas_)[eval_docs]
 
         return eval_docs, eval_probs, assigned_to_k
 

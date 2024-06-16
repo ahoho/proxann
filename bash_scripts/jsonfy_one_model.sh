@@ -33,5 +33,5 @@ python3 main.py jsonfy \
     --betas_path "data/models/mallet/beta.npy" \
     --vocab_path "data/models/mallet/vocab.json" \
     --corpus_path "data/train.metadata.jsonl" \
-    --method "thetas" \
+    --method "elbow" \
     --top_words 100

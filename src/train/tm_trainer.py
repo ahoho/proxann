@@ -862,6 +862,8 @@ class BERTopicTrainer(TMTrainer):
         betas = betas[:1] #drout outlier topic and keep (K-1, V) matrix
         self._logger.info(f"-- -- Betas shape: {betas.shape}")
         vocab = self._model.vectorizer_model.get_feature_names_out()
+        
+        import pdb; pdb.set_trace()
 
         keys = []
         for k, v in self._model.get_topics().items():

@@ -19,12 +19,20 @@ def train_tm(args):
     tm_trainer_main()
 
 def get_top_docs(args):
-    from src.top_docs_selection.doc_selector import main as doc_selector_main
+    from src.topics_docs_selection.doc_selector import main as doc_selector_main
 
     arguments = [f"--{key}={value}" for key, value in args.items() if key != 'func' and value is not True and value is not False]
     arguments += [f"--{key}" for key, value in args.items() if value is True]
     sys.argv = [sys.argv[0]] + arguments
     doc_selector_main()
+
+def get_topic_matches(args):
+    from src.topics_docs_selection.topic_selector import main as topic_selector_main
+
+    arguments = [f"--{key}={value}" for key, value in args.items() if key != 'func' and value is not True and value is not False]
+    arguments += [f"--{key}" for key, value in args.items() if value is True]
+    sys.argv = [sys.argv[0]] + arguments
+    topic_selector_main()
 
 def jsonfy(args):
     from src.jsonfy.topic_json_formatter import main as jsonfy_main
@@ -78,6 +86,14 @@ def main():
     parser_top_docs.add_argument('--trained_with_thetas_eval',action='store_true', help="Whether the model given by model_path was trained using this code")
     parser_top_docs.add_argument('--text_column', type=str, required=False, default="tokenized_text", help='Column of corpus_path that was used for training the model.')
     parser_top_docs.set_defaults(func=get_top_docs)
+    
+    ########################################################################
+    #                           TOPIC MATCHES                             #
+    ########################################################################
+    parser_topic_matches = subparsers.add_parser('get_topic_matches')
+    parser_topic_matches.add_argument("--betas_paths", help="Paths of the models'betas files", required=True)
+    parser_topic_matches.add_argument("--N", type=int, help="Number of matches (topics to evaluate)", default=2)
+    parser_topic_matches.set_defaults(func=get_topic_matches)
 
     ########################################################################
     #                               JSONFY                                 #

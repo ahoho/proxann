@@ -1,5 +1,9 @@
 # THETA-EVALUATION
 
+> **GET DATA FOR PILOT**
+>
+>
+
 ## Modules
 
 ### Embedder
@@ -51,6 +55,8 @@ Implements methods to select representative documents for each topic:
 - **sall**: Top docs are selected based on the largest Bhattacharya coefficient between their normalized BoW and the betas.
 - **spart**: Top docs are chosen by identifying those with the largest Bhattacharya coefficient between the BoW of the document, specific to the words generated for the topic, and the topic's betas.
 - **s3**: For each topic, top docs are chosen by keeping those with the largest sum of the weights that such a topic assigns to each word in the document.
+
+### TopicSelector
 
 ### TMTrainer
 

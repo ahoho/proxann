@@ -8,8 +8,10 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 from typing import List, Tuple, Dict, Optional
+from src.topics_docs_selection.topic_selector import TopicSelector
 from src.utils.utils import init_logger, keep_top_k_values
-
+from kneed import KneeLocator
+from scipy.ndimage import uniform_filter1d
 
 class DocSelector(object):
     """
@@ -35,6 +37,21 @@ class DocSelector(object):
         self._logger = logger if logger else init_logger(__name__, path_logs)
 
         return
+
+    def _get_assign_tpc(self, thetas):
+        """Get the topic assignment for each document based on the document-topic distributions as the most probable topic.
+
+        Parameters
+        ----------
+        thetas : np.ndarray
+            Document-topic distributions.
+
+        Returns
+        -------
+        np.ndarray
+            Topic assignments for each document.
+        """
+        return np.argmax(thetas, axis=1)
 
     def _get_words_assigned(
         self,
@@ -396,14 +413,16 @@ class DocSelector(object):
 
                 # Select one value from each bin
                 for i in range(len(bin_edges) - 1):
-                    bin_mask = (column_data >= bin_edges[i]) & (column_data < bin_edges[i + 1])
+                    bin_mask = (column_data >= bin_edges[i]) & (
+                        column_data < bin_edges[i + 1])
                     part_indices = np.where(bin_mask)[0]
                     if part_indices.size > 0:
                         selected_index = np.random.choice(part_indices)
                         this_col_ids.append(selected_index)
-                
+
                 # Sort such that probs are in descending order
-                this_col_ids = sorted(this_col_ids, key=lambda idx: column_data[idx], reverse=True)
+                this_col_ids = sorted(
+                    this_col_ids, key=lambda idx: column_data[idx], reverse=True)
 
             elif bucket_by == 'closest_value':
                 max_mat_k = column_data.max()
@@ -422,7 +441,7 @@ class DocSelector(object):
 
         return selected_ids
 
-    def get_top_docs(
+    def _get_mat_for_top(
         self,
         method: str,
         thetas: np.ndarray = None,
@@ -432,15 +451,13 @@ class DocSelector(object):
         vocab_w2id: dict = None,
         model_path: str = None,
         top_words: int = None,
-        thr: tuple = None,
-        ntop: int = 5) -> List[List[int]]:
+        thr: tuple = None
+    ) -> List[List[int]]:
         """
-        Get the top documents based on the specified method:
+        Calculate the matrix that is going to be used for selecing the top documents based on the specified method:
         For each topic, keep:
         * thetas: 
             the ntop-documents with the highest thetas (doc-topic distrib)
-        * thetas_sample: 
-            the ntop-documents are selected based on probabilistic sampling. The thetas matrix is normalized such that the columns sum to 1. For each topic, documents are sampled according to their probabilities in the normalized thetas matrix.
         * thetas_thr: 
             the ntop-documents are selected based on a threshold. The thetas matrix is filtered such that only values within the specified threshold range are kept.
         * sall: 
@@ -454,25 +471,34 @@ class DocSelector(object):
         ----------
         method : str
             Method to use for selecting top documents.
-        model_path : str
+        exemplar_docs : List[int]
+            List of IDs of the exemplar documents.
+        thetas : np.ndarray, optional
+            Topic proportions for documents.
+        bow : np.ndarray, optional
+            Bag-of-words representation of the corpus.
+        betas : np.ndarray, optional
+            Topic-word distributions.
+        corpus : List[List[str]], optional
+            The corpus as a list of lists of words.
+        vocab_w2id : dict, optional
+            Vocabulary word-to-id mapping.
+        model_path : str, optional
             Path to the model.
+        top_words : int, optional
+            Number of top words to consider.
+        thr : tuple, optional
+            Threshold values for filtering topics.
         ntop : int, default=5
             Number of top documents to select.
-        """
 
+        Returns
+        -------
+        np.ndarray:
+            The matrix to be used for selecting the top documents.
+        """
         if method == "thetas":
             mat = thetas.copy()
-        elif method == "thetas_sample":
-            mat = thetas.copy()
-            mat = mat / mat.sum(axis=0)
-            top_docs = []
-            for col in range(len(mat.T)):
-                top_docs_per_topic = []
-                for _ in range(ntop):
-                    sampled_idx = np.random.choice(len(mat), p=mat[:, col])
-                    top_docs_per_topic.append(sampled_idx)
-                top_docs.append(top_docs_per_topic)
-            return top_docs
         elif method == "thetas_thr":
             mat = thetas.copy()
             mask = (mat > thr[0]) & (mat < thr[1])
@@ -487,7 +513,132 @@ class DocSelector(object):
             mat = self._calculate_s3(
                 thetas, betas, corpus, vocab_w2id, top_words, save_path=model_path).toarray()
 
-        return self._get_most_representative_per_tpc(mat, ntop)
+        return mat
+
+    def get_top_docs(
+        self,
+        method: str,
+        thetas: np.ndarray = None,
+        bow: np.ndarray = None,
+        betas: np.ndarray = None,
+        corpus: List[List[str]] = None,
+        vocab_w2id: dict = None,
+        model_path: str = None,
+        top_words: int = None,
+        thr: tuple = None,
+        ntop: int = 5,
+        poly_degree=3,
+        smoothing_window=5
+    ) -> List[List[int]]:
+        """
+        Get the top documents based on the specified method.
+        For each topic, keep:
+        * thetas: 
+            the ntop-documents with the highest thetas (doc-topic distrib)
+        * thetas_sample: 
+            the ntop-documents are selected based on probabilistic sampling. The thetas matrix is normalized such that the columns sum to 1. For each topic, documents are sampled according to their probabilities in the normalized thetas matrix.
+        * thetas_thr: 
+            the ntop-documents are selected based on a threshold. The thetas matrix is filtered such that only values within the specified threshold range are kept.
+        * elbow:
+            The elbow point is calculated for each topic and ntop samples are selected based on the probabilities of the thetas matrix after filtering the values below the elbow point.
+        * sall: 
+            Top docs are selected based on the largest Bhattacharya    coefficient between  their normalized BoW and the betas.
+        * spart: 
+            Top docs are chosen by identifying those with the largest Bhattacharya coefficient between the BoW of the document, specific to the words generated for the topic, and the topic's betas.
+        * s3: 
+            For each topic, top docs are chosen by keeping those with the largest sum of the  eights that such a topic assigns to each word in the document.
+        
+        Parameters
+        ----------
+        method : str
+            Method to use for selecting top documents.
+        exemplar_docs : List[int]
+            List of IDs of the exemplar documents.
+        thetas : np.ndarray, optional
+            Topic proportions for documents.
+        bow : np.ndarray, optional
+            Bag-of-words representation of the corpus.
+        betas : np.ndarray, optional
+            Topic-word distributions.
+        corpus : List[List[str]], optional
+            The corpus as a list of lists of words.
+        vocab_w2id : dict, optional
+            Vocabulary word-to-id mapping.
+        model_path : str, optional
+            Path to the model.
+        top_words : int, optional
+            Number of top words to consider.
+        thr : tuple, optional
+            Threshold values for filtering topics.
+        ntop : int, default=5
+            Number of top documents to select.
+
+        Returns
+        -------
+        List[List[int]]:
+            A list of lists containing the indices of the ntop selected documents for each topic.
+        """
+
+        if method == "thetas_sample":
+            mat = thetas.copy()
+            mat = mat / mat.sum(axis=0)
+            top_docs = []
+            for col in range(len(mat.T)):
+                top_docs_per_topic = []
+                for _ in range(ntop):
+                    sampled_idx = np.random.choice(len(mat), p=mat[:, col])
+                    top_docs_per_topic.append(sampled_idx)
+                top_docs.append(top_docs_per_topic)
+            return top_docs
+        
+        elif method == "elbow":
+            mat = thetas.copy()
+            most_representative_per_tpc = []
+            for k in range(len(mat.T)):
+                allvalues = np.sort(mat[:, k].flatten())
+                step = int(np.round(len(allvalues) / 1000))
+                x_values = allvalues[::step]
+                y_values = (100 / len(allvalues)) * np.arange(0, len(allvalues))[::step]
+
+                # Apply smoothing
+                y_values_smooth = uniform_filter1d(y_values, size=smoothing_window)
+                                
+                # Using KneeLocator to find the elbow point
+                kneedle = KneeLocator(x_values, y_values_smooth, curve='convex', direction='increasing', interp_method='polynomial', polynomial_degree=poly_degree)
+                elbow = kneedle.elbow
+                
+                if elbow:
+                    # Filter document indices based on the elbow point (keeping values above the elbow)
+                    significant_idx = np.where(mat[:, k] >= elbow)[0]
+                    significant_values = mat[significant_idx, k]
+
+                    # Normalize the values to create a probability distribution
+                    probabilities = significant_values / np.sum(significant_values)
+
+                    # Sample indices based on the probability distribution
+                    if len(significant_idx) > 0:
+                        sampled_indices = np.random.choice(significant_idx, size=min(ntop, len(significant_idx)), p=probabilities, replace=False)
+                        most_representative_per_tpc.append(sampled_indices)
+                    else:
+                        self._logger.warning(f"-- -- No documents found above the elbow point for topic {k}. Using thetas...")
+                        sorted_docs_indices = np.argsort(mat.T[k])[::-1]
+                        top = sorted_docs_indices[:ntop].tolist()
+                        most_representative_per_tpc.append(top)
+                    
+                else:
+                    self._logger.warning(f"-- -- No elbow point found for topic {k}. Using thetas...")
+                    
+                    sorted_docs_indices = np.argsort(mat.T[k])[::-1]
+                    top = sorted_docs_indices[:ntop].tolist()
+                    most_representative_per_tpc.append(top)
+                    
+            return most_representative_per_tpc
+        
+        else:
+            mat = self._get_mat_for_top(
+                method, thetas, bow, betas, corpus, vocab_w2id, model_path, top_words, thr)
+
+            return self._get_most_representative_per_tpc(mat, ntop)
 
     def get_eval_docs(
         self,
@@ -536,26 +687,16 @@ class DocSelector(object):
         Tuple[List[List[int]], List[List[float]]]: 
             A tuple containing a list of lists of the IDs of the selected documents for each topic and their corresponding probabilities.
         """
-        
+
         # Modify thetas to remove the documents that have already been selected as exemplar docs
         thetas_ = thetas.copy()
         thetas_ = np.delete(thetas_, exemplar_docs, axis=0)
 
-        if method == "thetas" or method == "thetas_sample":
-            mat = thetas_
-        elif method == "thetas_thr":
-            mat = thetas_
-            mask = (mat > thr[0]) & (mat < thr[1])
-            mat = np.where(mask, mat, 0)
-        elif method == "sall":
-            mat = self._calculate_sall(
-                bow, betas, save_path=model_path).toarray()
-        elif method == "spart":
-            mat = self._calculate_spart(
-                bow, thetas_, betas, save_path=model_path).toarray()
-        elif method == "s3":
-            mat = self._calculate_s3(
-                thetas_, betas, corpus, vocab_w2id, top_words, save_path=model_path).toarray()
+        if method == "thetas_sample" or method == "elbow":
+            method = "thetas"
+
+        mat = self._get_mat_for_top(
+            method, thetas_, bow, betas, corpus, vocab_w2id, model_path, top_words, thr)
 
         eval_docs = self._select_ids_nparts(mat, ntop)
         eval_probs = [[thetas_.T[k][doc_id] for doc_id in id_docs]
@@ -564,8 +705,72 @@ class DocSelector(object):
 
         return eval_docs, eval_probs, assigned_to_k
 
-    def _get_assign_tpc(self, thetas):
-        return np.argmax(thetas, axis=1)
+    def get_doc_distractor(
+        self,
+        method: str,
+        thetas: np.ndarray = None,
+        bow: np.ndarray = None,
+        betas: np.ndarray = None,
+        corpus: List[List[str]] = None,
+        vocab_w2id: dict = None,
+        model_path: str = None,
+        top_words: int = None,
+        thr: tuple = None,
+        ntop: int = 5
+    ) -> List[List[int]]:
+        """
+        Get the top documents based on the specified method (see _get_mat_for_top for details).
+
+        Parameters
+        ----------
+        method : str
+            Method to use for selecting top documents.
+        exemplar_docs : List[int]
+            List of IDs of the exemplar documents.
+        thetas : np.ndarray, optional
+            Topic proportions for documents.
+        bow : np.ndarray, optional
+            Bag-of-words representation of the corpus.
+        betas : np.ndarray, optional
+            Topic-word distributions.
+        corpus : List[List[str]], optional
+            The corpus as a list of lists of words.
+        vocab_w2id : dict, optional
+            Vocabulary word-to-id mapping.
+        model_path : str, optional
+            Path to the model.
+        top_words : int, optional
+            Number of top words to consider.
+        thr : tuple, optional
+            Threshold values for filtering topics.
+        ntop : int, default=5
+            Number of top documents to select.
+
+        Returns
+        -------
+        List[int]:
+            A list of the indices of the selected documents, each one being the most representative 
+        """
+
+        #  Get the matrix to be used for selecting the top documents
+        if method == "thetas_sample" or method == "elbow":
+            method = "thetas"
+            
+        mat = self._get_mat_for_top(
+            method, thetas, bow, betas, corpus, vocab_w2id, model_path, top_words, thr)
+
+        topic_selector = TopicSelector()
+        disimilar_pairs = topic_selector.find_most_dissimilar_pairs(
+            betas, betas)
+        
+        # For each topic, select the a representative document of the most dissimilar topic
+        dis_docs = []
+        for topic in range(len(disimilar_pairs)):
+            dis_topic_distrb = disimilar_pairs[topic][1]
+            dis_doc = int(np.argmax(dis_topic_distrb))
+            dis_docs.append(dis_doc)
+
+        return dis_docs
 
 
 def main():

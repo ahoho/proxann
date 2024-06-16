@@ -360,11 +360,12 @@ class DocSelector(object):
             top_docs_per_topic.append(top)
         return top_docs_per_topic
 
+
     def _select_ids_nparts(
         self,
         mat: np.ndarray,
         n_parts: int = 5,
-        bucket_by: str = 'values'
+        bucket_by: str = 'closest_value'
     ) -> List[List[int]]:
         """
         Selects one random value from each of the n_parts segments of each column in the given matrix.
@@ -386,6 +387,10 @@ class DocSelector(object):
         """
         selected_ids = []
 
+        num_docs = mat.shape[0]
+        if num_docs < n_parts:
+            raise ValueError(f"Number of documents ({num_docs}) is less than the number of parts ({n_parts}).")
+
         for col in range(mat.shape[1]):
             column_data = mat[:, col]
             this_col_ids = []  # Initialize this_col_ids here
@@ -400,12 +405,23 @@ class DocSelector(object):
                 # Select one value from each part
                 for i in range(n_parts):
                     start_index = i * part_size
-                    end_index = (i + 1) * part_size if i < n_parts - \
-                        1 else len(sorted_data)
+                    end_index = (i + 1) * part_size if i < n_parts - 1 else len(sorted_data)
                     part_indices = sorted_indices[start_index:end_index]
                     if part_indices.size > 0:
                         selected_index = np.random.choice(part_indices)
                         this_col_ids.append(selected_index)
+                    else:
+                        self._logger.warning(f"-- -- Empty segment encountered in column {col}, part {i}")
+
+                # Fallback to ensure n_parts values
+                if len(this_col_ids) < n_parts:
+                    self._logger.warning(f"-- -- Not enough unique values to select {n_parts} parts for column {col}. Fallback to random selection.")
+                    remaining_indices = np.setdiff1d(sorted_indices, this_col_ids)
+                    np.random.shuffle(remaining_indices)
+                    for idx in remaining_indices:
+                        this_col_ids.append(idx)
+                        if len(this_col_ids) == n_parts:
+                            break
 
             elif bucket_by == 'values':
                 # Determine bin edges using histogram
@@ -413,30 +429,60 @@ class DocSelector(object):
 
                 # Select one value from each bin
                 for i in range(len(bin_edges) - 1):
-                    bin_mask = (column_data >= bin_edges[i]) & (
-                        column_data < bin_edges[i + 1])
+                    bin_mask = (column_data >= bin_edges[i]) & (column_data < bin_edges[i + 1])
                     part_indices = np.where(bin_mask)[0]
                     if part_indices.size > 0:
                         selected_index = np.random.choice(part_indices)
                         this_col_ids.append(selected_index)
+                    else:
+                        self._logger.warning(f"-- -- Warning: Empty bin encountered in column {col}, bin {i}")
 
-                # Sort such that probs are in descending order
-                this_col_ids = sorted(
-                    this_col_ids, key=lambda idx: column_data[idx], reverse=True)
+                # Fallback to non-empty bins if necessary
+                if len(this_col_ids) < n_parts:
+                    self._logger.warning(f"-- -- Not enough unique values to select {n_parts} parts for column {col}. Fallback to random selection.")
+                    remaining_indices = np.where(column_data < bin_edges[-1])[0]
+                    np.random.shuffle(remaining_indices)
+                    for idx in remaining_indices:
+                        if idx not in this_col_ids:
+                            this_col_ids.append(idx)
+                            if len(this_col_ids) == n_parts:
+                                break
 
             elif bucket_by == 'closest_value':
                 max_mat_k = column_data.max()
-                step = max_mat_k / n_parts
+                if max_mat_k == 0:
+                    step = 1e-10  # Avoid division by zero
+                else:
+                    step = max_mat_k / n_parts
+                    
+                try:
+                    for p in np.arange(max_mat_k, max_mat_k - step * n_parts, -step):
+                        idx = np.abs(column_data - p).argmin()
+                        this_col_ids.append(idx)
+                        column_data[idx] = 1e10  # Exclude from future selection
+                        if len(this_col_ids) == n_parts:
+                            break
+                except Exception as e:
+                    print(e)
+                    import pdb; pdb.set_trace()
 
-                for p in np.arange(max_mat_k, max_mat_k - step * n_parts, -step):
-                    idx = np.abs(column_data - p).argmin()
-                    this_col_ids.append(idx)
-                    column_data[idx] = 1e10  # Exclude from future selection
-                    if len(this_col_ids) == n_parts:
-                        break
+                # Fallback to ensure n_parts values
+                if len(this_col_ids) < n_parts:
+                    self._logger.warning(f"-- -- Not enough unique values to select {n_parts} parts for column {col}. Fallback to random selection.")
+                    remaining_indices = np.where(column_data < 1e10)[0]
+                    np.random.shuffle(remaining_indices)
+                    for idx in remaining_indices:
+                        if idx not in this_col_ids:
+                            this_col_ids.append(idx)
+                            if len(this_col_ids) == n_parts:
+                                break
             else:
-                raise ValueError(f"Invalid bucket_by value: {bucket_by}")
+                self._logger.error(f"Invalid bucket_by value: {bucket_by}")
+                return
 
+            # Sort such that probs are in descending order
+            this_col_ids = sorted(this_col_ids, key=lambda idx: column_data[idx], reverse=True)
+            
             selected_ids.append(this_col_ids)
 
         return selected_ids
@@ -701,7 +747,11 @@ class DocSelector(object):
         eval_docs = self._select_ids_nparts(mat, ntop)
         eval_probs = [[thetas_.T[k][doc_id] for doc_id in id_docs]
                       for k, id_docs in enumerate(eval_docs)]
-        assigned_to_k = self._get_assign_tpc(thetas_)[eval_docs]
+        
+        try:
+            assigned_to_k = self._get_assign_tpc(thetas_)[eval_docs]
+        except Exception as e:
+            import pdb; pdb.set_trace()
 
         return eval_docs, eval_probs, assigned_to_k
 

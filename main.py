@@ -67,6 +67,7 @@ def main():
     parser_tm_training.add_argument("--trainer_type", type=str, default="MalletLda", required=False)
     parser_tm_training.add_argument("--num_topics", type=int, default=50, required=False)
     parser_tm_training.add_argument("--text_col", type=str, default="tokenized_text", required=False)
+    parser_tm_training.add_argument("--vocab_path", help="Path to the vocabulary file", default="data/models/mallet/vocab.json")
     parser_tm_training.set_defaults(func=train_tm)
 
     ########################################################################

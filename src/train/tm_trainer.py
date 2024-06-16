@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import os
 import pathlib
@@ -6,7 +7,7 @@ import sys
 import shutil
 from subprocess import check_output
 import time
-from typing import List
+from typing import Dict, List
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -31,7 +32,7 @@ from sklearn.preprocessing import normalize
 from tqdm import tqdm
 from umap import UMAP
 
-from src.utils.utils import file_lines, get_embeddings_from_str, pickler, init_logger
+from src.utils.utils import file_lines, get_embeddings_from_str, load_vocab_from_txt, pickler, init_logger
 
 class TMTrainer(ABC):
     """
@@ -712,6 +713,7 @@ class BERTopicTrainer(TMTrainer):
         hdbscan_metric: str = 'euclidean',
         hdbscan_cluster_selection_method: str = 'eom',
         hbdsan_prediction_data: bool = True,
+        vocab_path: str = None,
         logger: logging.Logger = None,
         path_logs: pathlib.Path = pathlib.Path(__file__).parent.parent
     ):
@@ -770,8 +772,21 @@ class BERTopicTrainer(TMTrainer):
         self.hdbscan_metric = hdbscan_metric
         self.hdbscan_cluster_selection_method = hdbscan_cluster_selection_method
         self.hbdsan_prediction_data = hbdsan_prediction_data
+        if vocab_path:
+            # @ TODO
+            if vocab_path.endswith(".json"):
+                with open(vocab_path) as infile:
+                    vocab_w2id = json.load(infile)
 
-        word_min_len = 2
+            elif vocab_path.endswith()(".txt"):
+                vocab_w2id = load_vocab_from_txt(vocab_path)
+            
+            # Trasnform the ids to integers
+            vocab_w2id = {k: int(v) for k, v in vocab_w2id.items()}
+            
+            self.vocab_w2id = vocab_w2id
+
+        word_min_len = 0
         self.word_pattern = (
             f"(?<![a-zA-Z\u00C0-\u024F\d\-\_])"
             f"[a-zA-Z\u00C0-\u024F]"
@@ -824,12 +839,22 @@ class BERTopicTrainer(TMTrainer):
             prediction_data=self.hbdsan_prediction_data
         )
 
-        self._vectorizer_model = CountVectorizer(
-            token_pattern=self.word_pattern,
-            stop_words=self.stopwords,
-        )
+        if self.vocab_w2id:
+            
+            self._vectorizer_model = CountVectorizer(
+                vocabulary=self.vocab_w2id
+            )
+            self._logger.info(f"-- -- Using custom vocabulary for CountVectorizer")
+        else:
+            self._vectorizer_model = CountVectorizer(
+                token_pattern=self.word_pattern,
+                stop_words=self.stopwords,
+            )
+            self._logger.info(f"-- -- Using default vocabulary for CountVectorizer")
 
-        self._ctfidf_model = ClassTfidfTransformer(reduce_frequent_words=True)
+        if self.vocab_w2id:
+            bm25_weighting = True
+        self._ctfidf_model = ClassTfidfTransformer(reduce_frequent_words=True, bm25_weighting=bm25_weighting)
 
         self._representation_model = {
             "KeyBERT": KeyBERTInspired(),
@@ -841,6 +866,8 @@ class BERTopicTrainer(TMTrainer):
 
         self._model = BERTopic(
             language="english",
+            vectorizer_model=self._vectorizer_model,
+            ctfidf_model=self._ctfidf_model,
             top_n_words=self.topn,
             nr_topics=self.num_topics,
             embedding_model=self._embedding_model,
@@ -859,11 +886,11 @@ class BERTopicTrainer(TMTrainer):
         self._logger.info(f"-- -- Thetas shape: {thetas_approx.shape}")
 
         betas = self._model.c_tf_idf_.toarray()
-        betas = betas[:1] #drout outlier topic and keep (K-1, V) matrix
+        betas = betas[1:, :] #drout outlier topic and keep (K-1, V) matrix
         self._logger.info(f"-- -- Betas shape: {betas.shape}")
         vocab = self._model.vectorizer_model.get_feature_names_out()
         
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
 
         keys = []
         for k, v in self._model.get_topics().items():
@@ -938,6 +965,11 @@ def main():
         required=False
     )
     argparser.add_argument(
+        "--vocab_path",
+        help="Path to the vocabulary file",
+        default="data/models/mallet/vocab.json"
+    )
+    argparser.add_argument(
         "--trainer_type",
         help="Trainer to be used (MalletLda, TomotopyLda, or BERTopic)",
         type=str,
@@ -961,7 +993,10 @@ def main():
     
     args = argparser.parse_args()
     
-    
+    not_params = ["corpus_file", "trainer_type", "text_col"]
+    if args.trainer_type != "BERTopic":
+        not_params.append("vocab_path")
+        
     params = {k: v for k, v in vars(args).items()
               if v is not None and k not in ["corpus_file", "trainer_type", "text_col"]}
 

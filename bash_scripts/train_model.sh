@@ -29,7 +29,8 @@ python3 main.py train_tm \
     --model_path "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/models/trained/bertopic_wiki_50_ctm_emb_pre" \
     --trainer_type "BERTopic" \
     --num_topics 50 \
-    --text_col "tokenized_text"
+    --text_col "tokenized_text" \
+    --vocab_path "data/models/mallet/vocab.json"
 
 
 # Train Bertopic model (BERTopic default embeddings and preprocessed text)
@@ -55,4 +56,3 @@ python3 main.py train_tm \
     --trainer_type "BERTopic" \
     --num_topics 50 \
     --text_col "text"
-

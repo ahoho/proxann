@@ -11,6 +11,10 @@ from src.utils.utils import init_logger
 
 
 class TopicSelector(object):
+    """
+    Class to select topics from different topic models.
+    """
+
     def __init__(
         self,
         logger: Optional[logging.Logger] = None,
@@ -66,7 +70,7 @@ class TopicSelector(object):
     def _jensen_sim(self, mat1, mat2):
         """Computes inter-topic distance based on word distributions using Jensen Shannon distance.
         """
-        
+
         js_mat = np.zeros((mat1.shape[0], mat2.shape[0]))
         for k in range(mat1.shape[0]):
             for kk in range(mat2.shape[0]):
@@ -75,38 +79,32 @@ class TopicSelector(object):
         JSsim = 1 - js_mat
 
         return JSsim
-    
+
     def find_most_similar_pairs(self, mat1, mat2):
         """
         Finds the optimal pairings between topics using the Hungarian algorithm.
-        
+
         Parameters
         ----------
         JSsim : numpy.ndarray
             Matrix of Jensen-Shannon similarities between topics from two models.
-        
+
         Returns
         -------
         list of tuple
             List of tuples with the optimal pairings
         """
-        
-        # Compute Jensen-Shannon similarities between topics
+
         JSsim = self._jensen_sim(mat1, mat2)
-        
+
         # linear_sum_assignment finds the minimum cost, so we need to convert the similarity matrix to a cost matrix.
         cost_matrix = -JSsim
-
-        # Apply the Hungarian algorithm
         row_ind, col_ind = linear_sum_assignment(cost_matrix)
-        
-        # List of tuples with the optimal pairings and their similarities
-        results = [(i, j, JSsim[i, j]) for i, j in zip(row_ind, col_ind)]
 
-        # Sort the results based on similarity in descending order
+        results = [(i, j, JSsim[i, j]) for i, j in zip(row_ind, col_ind)]
         sorted_results = sorted(results, key=lambda x: x[2], reverse=True)
         pairings = [(i, j) for i, j, _ in sorted_results]
-        
+
         return pairings
 
     def find_most_dissimilar_pairs(self, mat1, mat2):
@@ -120,27 +118,22 @@ class TopicSelector(object):
             Matrix of topics from the first model.
         mat2 : numpy.ndarray
             Matrix of topics from the second model.
-        
+
         Returns
         -------
         list of tuple
             List of tuples with the most dissimilar pairs
         """
-        
-        # Compute Jensen-Shannon similarities between topics
-        JSsim = self._jensen_sim(mat1, mat2)
-        
-        # Convert similarity matrix to dissimilarity matrix
-        # Assuming similarity values are between 0 and 1, use (1 - similarity)
-        dissimilarity_matrix = 1 - JSsim
 
-        # Apply the Hungarian algorithm
+        JSsim = self._jensen_sim(mat1, mat2)
+
+        # Hungarian algorithm on dissimilarity matrix
+        dissimilarity_matrix = 1 - JSsim
         row_ind, col_ind = linear_sum_assignment(dissimilarity_matrix)
 
-        # Create a list of pairs
         pairs = list(zip(row_ind, col_ind))
         pairs = [(int(i), int(j)) for i, j in pairs]
-        
+
         return pairs
 
     def _get_models_combinations(self, models):
@@ -175,12 +168,17 @@ class TopicSelector(object):
         """
         Performs an iterative pairing process between the topics of multiple models.
 
-        Parameters:
-        models (list of numpy.ndarray): List of topic matrices for each model
-        N (int): Number of pairings to make
+        Parameters
+        ----------
+        models : list of numpy.ndarray
+            List with the betas matrices from different models.
+        N : int
+            Number of matches to find.
 
-        Returns:
-        list of list of tuples: List of topic pairings between the models
+        Returns
+        -------
+        list of list of tuple
+            List of lists with the N matches found. Each match is a list of tuples, where each tuple contains the model index and the topic index.
         """
 
         # Get topic pairs for each pair of models
@@ -188,58 +186,53 @@ class TopicSelector(object):
         combs = self._get_models_combinations(list(range(len(models))))
 
         for modelA, modelB in combs:
-            self._logger.info(f"Calculating pairing between {modelA} and {modelB}..")
+            self._logger.info(
+                f"Calculating pairing between {modelA} and {modelB}..")
             if (modelA, modelB) not in topic_pairs:
-                topic_pairs[(modelA, modelB)] = self.find_most_similar_pairs(models[modelA], models[modelB])
+                topic_pairs[(modelA, modelB)] = self.find_most_similar_pairs(
+                    models[modelA], models[modelB])
                 # Cache the inverted pairs for reverse lookups
-                topic_pairs[(modelB, modelA)] = [(pair[1], pair[0]) for pair in topic_pairs[(modelA, modelB)]]
+                topic_pairs[(modelB, modelA)] = [(pair[1], pair[0])
+                                                 for pair in topic_pairs[(modelA, modelB)]]
             else:
-                self._logger.info(f"Pairing between {modelA} and {modelB} already calculated.")
-        
+                self._logger.info(
+                    f"Pairing between {modelA} and {modelB} already calculated.")
+
         num_models = len(models)
         matches = []
 
         while len(matches) < N:
             this_model_matches = []
             for start_model in range(num_models):
-                next_model = (start_model + 1) % num_models
                 if len(matches) >= N:
                     break
 
-                # Get the first best pair for the current model
-                if not topic_pairs[(start_model, next_model)]:
-                    continue  # Skip if no pairs are left
+                this_model_matches = []
+                used_topics = set()
 
-                matchA, matchB = topic_pairs[(start_model, next_model)].pop(0)
-                this_model_matches.append((start_model, matchA))
-                this_model_matches.append((next_model, matchB))
-                last_match_topic = matchB
-                
-                # If there are more models to the right before coming back to the start model, we pair them      
-                next_next_model = (next_model + 1) % num_models          
-                while next_next_model != start_model:       
-                    
-                    if not topic_pairs[(next_model, next_next_model)]:
+                current_model = start_model
+                while len(this_model_matches) < num_models:
+                    next_model = (current_model + 1) % num_models
+
+                    if not topic_pairs[(current_model, next_model)]:
                         break  # Skip if no pairs are left
 
-                    match = next((pair for pair in topic_pairs[(next_model, next_next_model)] if pair[0] == last_match_topic), None)
-                    
+                    match = next((pair for pair in topic_pairs[(
+                        current_model, next_model)] if pair[0] not in used_topics), None)
+
                     if match:
-                        topic_pairs[(next_model, next_next_model)].remove(match)
-                        last_match_topic = match[1]
-                        this_model_matches.append((next_model, last_match_topic))
+                        topic_pairs[(current_model, next_model)].remove(match)
+                        this_model_matches.append((current_model, match[0]))
+                        used_topics.add(match[0])
+                        current_model = next_model
                     else:
                         break
-
-                    next_model = next_next_model
-                    next_next_model = (next_model + 1) % num_models
 
                 if len(this_model_matches) == num_models:
                     matches.append(this_model_matches)
                     break
 
         return matches
-
 
 
 def main():

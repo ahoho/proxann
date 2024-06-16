@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 import pandas as pd
 import numpy as np
-from typing import List, Union
+from typing import Dict, List, Union
 
 def unpickler(file: str) -> object:
     """Unpickle file
@@ -185,3 +185,25 @@ def keep_top_k_values(matrix: np.ndarray, top_k: int = 100) -> np.ndarray:
         row[~mask] = 0
         
     return modified_matrix
+
+
+def load_vocab_from_txt(vocab_file: str) -> Dict:
+    """
+    Load vocabulary from a text file.
+    
+    Parameters
+    ----------
+    vocab_file : str
+        Path to the vocabulary file.
+    
+    Returns
+    -------
+    dict
+        Dictionary mapping words to their indices.
+    """
+    vocab_w2id = {}
+    with (vocab_file).open('r', encoding='utf8') as fin:
+        for i, line in enumerate(fin):
+            wd = line.strip()
+            vocab_w2id[wd] = i
+    return vocab_w2id

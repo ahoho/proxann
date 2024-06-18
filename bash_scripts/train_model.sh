@@ -26,13 +26,14 @@ END_COMMENT
 # Train Bertopic model (CTM embeddings and preprocessed text)
 python3 main.py train_tm \
     --corpus_file "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/train.metadata.enriched.parquet" \
-    --model_path "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/models/trained/bertopic_wiki_50_ctm_emb_pre" \
+    --model_path "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/models/trained/bertopic_wiki_50_ctm_emb_pre2" \
     --trainer_type "BERTopic" \
     --num_topics 50 \
     --text_col "tokenized_text" \
     --vocab_path "data/models/mallet/vocab.json"
 
 
+: <<'END_COMMENT'
 # Train Bertopic model (BERTopic default embeddings and preprocessed text)
 python3 main.py train_tm \
     --corpus_file "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/train.metadata.enriched.parquet.all-MiniLM-L6-v2.parquet" \
@@ -56,3 +57,4 @@ python3 main.py train_tm \
     --trainer_type "BERTopic" \
     --num_topics 50 \
     --text_col "text"
+    END_COMMENT

@@ -820,11 +820,10 @@ class BERTopicTrainer(TMTrainer):
 
         if self.embeddings is not None:
             self._logger.info("-- -- Using pre-trained embeddings from the dataset...")
-            self._embedding_model = None
+            self._embedding_model = SentenceTransformer(self.sbert_model)
         else:
             self._logger.info(f"-- -- Creating SentenceTransformer model with {self.sbert_model}...")
             self._embedding_model = SentenceTransformer(self.sbert_model)
-
         self._umap_model = UMAP(
             n_components=self.umap_n_components,
             n_neighbors=self.umap_n_neighbors,
@@ -863,7 +862,7 @@ class BERTopicTrainer(TMTrainer):
                 top_n_words=15
             )
         }
-
+        
         self._model = BERTopic(
             language="english",
             vectorizer_model=self._vectorizer_model,
@@ -874,6 +873,7 @@ class BERTopicTrainer(TMTrainer):
             verbose=True
         )
         
+        
         self._logger.info(f"-- -- Training BERTopic model with {self.num_topics} topics... ")
 
         texts = [" ".join(doc) for doc in self.train_data]
@@ -882,7 +882,7 @@ class BERTopicTrainer(TMTrainer):
         else:
             _, probs = self._model.fit_transform(texts)
 
-        thetas_approx, _ = self._model.approximate_distribution(texts)
+        thetas_approx, _ = self._model.approximate_distribution(texts, use_embedding_model=True)
         self._logger.info(f"-- -- Thetas shape: {thetas_approx.shape}")
 
         betas = self._model.c_tf_idf_.toarray()

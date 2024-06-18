@@ -5,7 +5,6 @@ from typing import Optional
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from scipy.sparse.csgraph import maximum_bipartite_matching
 from scipy.spatial.distance import jensenshannon
 from src.utils.utils import init_logger
 

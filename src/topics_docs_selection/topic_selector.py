@@ -1,8 +1,8 @@
 import argparse
 import logging
 import pathlib
-from typing import Optional
-
+from typing import List, Optional, Union
+import gensim.downloader as api
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import jensenshannon
@@ -16,6 +16,7 @@ class TopicSelector(object):
 
     def __init__(
         self,
+        wmd_model: str = 'word2vec-google-news-300',
         logger: Optional[logging.Logger] = None,
         path_logs: pathlib.Path = pathlib.Path(
             __file__).parent.parent.parent / "data/logs"
@@ -31,6 +32,7 @@ class TopicSelector(object):
             Path for saving logs.
         """
         self._logger = logger if logger else init_logger(__name__, path_logs)
+        self._wmd_model = api.load(wmd_model)      
 
         return
 
@@ -78,6 +80,40 @@ class TopicSelector(object):
         JSsim = 1 - js_mat
 
         return JSsim
+    
+    def _get_wmd(
+        self,
+        from_: Union[str, List[str]],
+        to_: Union[str, List[str]],
+        n_words=10
+    ) -> float:
+        """
+        Calculate the Word Mover's Distance between two sentences.
+
+        Parameters
+        ----------
+        from_ : Union[str, List[str]]
+            The source sentence.
+        to_ : Union[str, List[str]]
+            The target sentence.
+        n_words : int
+            The number of words to consider in the sentences to calculate the WMD.
+        """
+        if isinstance(from_, str):
+            from_ = from_.split()
+
+        if isinstance(to_, str):
+            to_ = to_.split()
+
+        if n_words < len(from_):
+            from_ = from_[:n_words]
+        if n_words < len(to_):
+            to_ = to_[:n_words]
+
+        #self._logger.info(f"-- -- Calculating WMD from: {from_} to {to_}")
+
+        return self._wmd_model.wmdistance(from_, to_)
+    
 
     def find_most_similar_pairs(self, mat1, mat2):
         """
@@ -232,8 +268,53 @@ class TopicSelector(object):
                     break
 
         return matches
+    
+    def find_closest_by_wmd(self, models: list, keep_from_first: list = [0, 1, 2]) -> list:
+        """Find the closest topics between two models using Word Mover's Distance.
+        
+        Parameters
+        ----------
+        models : list
+            A list containing two sublists/arrays representing the models.
+        keep_from_first : list, optional
+            Indices of topics from the first model to keep, by default [0, 1, 2]
+        
+        Returns
+        -------
+        list
+            A list of tuples, each containing pairs of (model_index, topic_index) indicating the closest topics.
+        """
+        
+        if len(models) != 2:
+            raise ValueError("models must contain exactly two sublists/arrays.")
+        
+        num_topics_first_model = len(models[0])
+        num_topics_second_model = len(models[1])
+        
+        wmd_sims = np.zeros((num_topics_first_model, num_topics_second_model))
+        
+        for k_idx, k in enumerate(models[0]):
+            for k__idx, k_ in enumerate(models[1]):
+                wmd_sims[k_idx, k__idx] = self._get_wmd(k, k_)
+        
+        tuple_results = []
+        selected_k_indices = set()  # To keep track of selected indices from the second model
+        
+        for k in keep_from_first:
+            closest_k = None
+            closest_distance = float('inf')
+            for k__idx in range(num_topics_second_model):
+                if k__idx not in selected_k_indices and wmd_sims[k, k__idx] < closest_distance:
+                    closest_k = k__idx
+                    closest_distance = wmd_sims[k, k__idx]
+                    
+            if closest_k is not None:
+                selected_k_indices.add(closest_k)
+                tuple_results.append([(0, k), (1, closest_k)])
+        
+        return tuple_results
 
-
+                
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(

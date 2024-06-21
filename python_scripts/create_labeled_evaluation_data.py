@@ -58,7 +58,7 @@ if __name__ == "__main__":
             sims = cosine_similarity(embeds, central_emb[None, :]).squeeze()
             pseudo_theta[:, i] = sims
             # asserts that if we take the argmax for a document, it is the same as the group it belongs to
-            pseudo_theta[group_data.index] += 1.
+            pseudo_theta[group_data.index, i] += 1.
             
             # for building c-tf-idf
             group_docs.append(" ".join(group_data["tokenized_text"].tolist()))

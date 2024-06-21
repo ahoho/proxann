@@ -3,6 +3,7 @@ import sys
 sys.path.append("..")
 from pathlib import Path
 import argparse
+import json
 
 import pandas as pd
 import numpy as np
@@ -80,5 +81,6 @@ if __name__ == "__main__":
         group_output_dir.mkdir(parents=True, exist_ok=True)
         np.save(group_output_dir / "theta.npy", pseudo_theta)
         np.save(group_output_dir / "beta.npy", pseudo_beta)
-        
+        with open(group_output_dir / "vocab.json", "w") as outfile:
+            json.dump(cv.vocabulary_, outfile)
 # %%

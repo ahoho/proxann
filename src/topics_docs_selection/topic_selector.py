@@ -114,8 +114,37 @@ class TopicSelector(object):
 
         return self._wmd_model.wmdistance(from_, to_)
     
+    def _wmd_mat(self, models: list) -> np:
+        """Find the closest topics between two models using Word Mover's Distance.
+        
+        Parameters
+        ----------
+        models : list
+            A list containing two sublists/arrays representing the models.
+        keep_from_first : list, optional
+            Indices of topics from the first model to keep, by default [0, 1, 2]
+        
+        Returns
+        -------
+        np.ndarray
+            A matrix of Word Mover's Distance between topics from two models.
+        """
+        
+        if len(models) != 2:
+            raise ValueError("models must contain exactly two sublists/arrays.")
+        
+        num_topics_first_model = len(models[0])
+        num_topics_second_model = len(models[1])
+        
+        wmd_sims = np.zeros((num_topics_first_model, num_topics_second_model))
+        
+        for k_idx, k in enumerate(models[0]):
+            for k__idx, k_ in enumerate(models[1]):
+                wmd_sims[k_idx, k__idx] = self._get_wmd(k, k_)
+                
+        return wmd_sims
 
-    def find_most_similar_pairs(self, mat1, mat2):
+    def find_most_similar_pairs(self, mat1, mat2, metric='wmd'):
         """
         Finds the optimal pairings between topics using the Hungarian algorithm.
 
@@ -130,22 +159,30 @@ class TopicSelector(object):
             List of tuples with the optimal pairings
         """
 
-        JSsim = self._jensen_sim(mat1, mat2)
+        if metric == 'betas_sim':
+            mat_sim = self._jensen_sim(mat1, mat2)
+            cost_matrix = - mat_sim
+        elif metric == 'wmd':
+            mat_sim = self._wmd_mat([mat1, mat2])
+            cost_matrix = mat_sim
+        else:
+            self._logger.error("Invalid metric. Must be 'betas_sim' or 'wmd'.")            
 
-        # linear_sum_assignment finds the minimum cost, so we need to convert the similarity matrix to a cost matrix.
-        cost_matrix = -JSsim
+        # linear_sum_assignment finds the minimum cost
         row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
-        results = [(i, j, JSsim[i, j]) for i, j in zip(row_ind, col_ind)]
-        sorted_results = sorted(results, key=lambda x: x[2], reverse=True)
+        results = [(i, j, mat_sim[i, j]) for i, j in zip(row_ind, col_ind)]
+        
+        if metric == 'betas_sim':
+            sorted_results = sorted(results, key=lambda x: x[2], reverse=True)
+        elif metric == 'wmd':
+            sorted_results = sorted(results, key=lambda x: x[2], reverse=False)
         pairings = [(i, j) for i, j, _ in sorted_results]
-
         return pairings
 
     def find_most_dissimilar_pairs(self, mat1, mat2):
         """
-        Finds the most dissimilar pairs using the Hungarian algorithm.
-
+        Finds the most dissimilar pairs for each topic in the first model.
 
         Parameters
         ----------
@@ -161,15 +198,14 @@ class TopicSelector(object):
         """
 
         JSsim = self._jensen_sim(mat1, mat2)
-
-        # Hungarian algorithm on dissimilarity matrix
         dissimilarity_matrix = 1 - JSsim
-        row_ind, col_ind = linear_sum_assignment(dissimilarity_matrix)
 
-        pairs = list(zip(row_ind, col_ind))
-        pairs = [(int(i), int(j)) for i, j in pairs]
-
-        return pairs
+        dissimilar_pairs = []
+        for i, row in enumerate(dissimilarity_matrix):
+            most_dissimilar_index = np.argmax(row)
+            dissimilar_pairs.append((i, most_dissimilar_index))
+                    
+        return dissimilar_pairs
 
     def _get_models_combinations(self, models):
         """
@@ -199,7 +235,7 @@ class TopicSelector(object):
             combs.append((models[i], models[(i+1) % len(models)]))
         return combs
 
-    def iterative_matching(self, models, N):
+    def iterative_matching(self, models, N, metric='wmd'):
         """
         Performs an iterative pairing process between the topics of multiple models.
 
@@ -219,13 +255,12 @@ class TopicSelector(object):
         # Get topic pairs for each pair of models
         topic_pairs = {}
         combs = self._get_models_combinations(list(range(len(models))))
-
         for modelA, modelB in combs:
             self._logger.info(
                 f"Calculating pairing between {modelA} and {modelB}..")
             if (modelA, modelB) not in topic_pairs:
                 topic_pairs[(modelA, modelB)] = self.find_most_similar_pairs(
-                    models[modelA], models[modelB])
+                    models[modelA], models[modelB], metric)
                 # Cache the inverted pairs for reverse lookups
                 topic_pairs[(modelB, modelA)] = [(pair[1], pair[0])
                                                  for pair in topic_pairs[(modelA, modelB)]]

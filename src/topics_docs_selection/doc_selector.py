@@ -812,14 +812,14 @@ class DocSelector(object):
         topic_selector = TopicSelector()
         disimilar_pairs = topic_selector.find_most_dissimilar_pairs(
             betas, betas)
-        
+        disimilar_pairs = sorted(disimilar_pairs, key=lambda x: x[0])
         # For each topic, select the a representative document of the most dissimilar topic
         dis_docs = []
-        for topic in range(len(disimilar_pairs)):
-            dis_topic_distrb = disimilar_pairs[topic][1]
+        for topic_from, topic_to in disimilar_pairs:
+            dis_topic_distrb = mat[:, topic_to]
             dis_doc = int(np.argmax(dis_topic_distrb))
             dis_docs.append(dis_doc)
-
+        import pdb; pdb.set_trace()
         return dis_docs
 
 

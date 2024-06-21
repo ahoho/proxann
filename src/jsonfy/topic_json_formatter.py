@@ -13,6 +13,9 @@ from src.topics_docs_selection.doc_selector import DocSelector
 from src.utils.utils import init_logger
 
 
+DISTRACTOR_DOC = "There is nothing negative to say about these sponges. They are absorbent, made well, clean up well and so far no odors. I bought them to use on my new ceramic cook ware and they are GREAT! They do not scratch my cook ware, stove top or anything else. I'm not a fan of sponges, but I really like these. I have only used one so far and it is holding up nicely. I have been using it about 2-3 weeks. Normally, I'd have thrown it away by now, but, again, no odors and whatever I clean up comes right out of the sponge. I do use a liquid cleaner on these after use. I'd recommend these."
+
+
 class TopicJsonFormatter:
     """
     Generates JSON output for topic models, including:
@@ -46,6 +49,7 @@ class TopicJsonFormatter:
         df: pd.DataFrame,
         text_column: str,
         keys: List[str],
+        hard_distractor: bool = True,
         **kwargs
     ) -> dict:
         """
@@ -76,12 +80,17 @@ class TopicJsonFormatter:
         eval_docs = [[df[text_column].iloc[doc_id]
                       for doc_id in k] for k in eval_docs_ids]
         topic_ids = range(len(exemplar_docs_ids))
-        
-        distractor_ids = self._doc_selector.get_doc_distractor(**kwargs)
-        distractor_docs = [df[text_column].iloc[doc_id] for doc_id in distractor_ids]
-        
+
+        if hard_distractor:
+            distractor_docs = [
+                DISTRACTOR_DOC for _ in range(len(exemplar_docs_ids))]
+        else:
+            distractor_ids = self._doc_selector.get_doc_distractor(**kwargs)
+            distractor_docs = [df[text_column].iloc[doc_id]
+                               for doc_id in distractor_ids]
+
         json_out = self.jsonfy(topic_ids, exemplar_docs, keys,
-                               eval_docs_ids, eval_docs, eval_docs_probs, distractor_ids, distractor_docs, assigned_to_k)
+                               eval_docs_ids, eval_docs, eval_docs_probs, distractor_docs, assigned_to_k)
         return json_out
 
     def jsonfy(
@@ -92,9 +101,8 @@ class TopicJsonFormatter:
         eval_docs_ids: List[List[int]],
         eval_docs: List[List[str]],
         eval_docs_probs: List[List[float]],
-        distractor_docs_ids: List[List[int]],
         distractor_docs: List[List[str]],
-        assigned_to_k: List[List[bool]]
+        assigned_to_k: List[List[bool]],
     ) -> Dict[int, Dict[str, Any]]:
         """
         Convert model evaluation output to JSON format.
@@ -113,8 +121,6 @@ class TopicJsonFormatter:
             List of evaluation documents for each topic.
         eval_docs_probs : List[List[float]]
             List of probabilities for the evaluation documents.
-        distractor_docs_ids : List[List[int]]
-            List with the distractor document ID for each topic.
         distractor_docs : List[List[str]]
             List with the distractor document for each topic.
         assigned_to_k : List[List[bool]]
@@ -127,8 +133,8 @@ class TopicJsonFormatter:
         """
         dict_out = {}
 
-        for k, ed, tw, edids, evtext, edprobs, distid, disttext, edast in zip(
-            topic_ids, exemplar_docs, topic_words, eval_docs_ids, eval_docs, eval_docs_probs, distractor_docs_ids, distractor_docs, assigned_to_k
+        for k, ed, tw, edids, evtext, edprobs, disttext, edast in zip(
+            topic_ids, exemplar_docs, topic_words, eval_docs_ids, eval_docs, eval_docs_probs, distractor_docs, assigned_to_k
         ):
             edast_b = [item == k for item in edast]
 
@@ -141,12 +147,11 @@ class TopicJsonFormatter:
                 }
                 for edids_d, evtext_d, edprobs_d, edast_b_d in zip(edids, evtext, edprobs, edast_b)
             ]
-            
+
             distractor_doc = {
-                    "doc_id": int(distid),
-                    "text": disttext
-                }
-                
+                "text": disttext
+            }
+
             dict_out[int(k)] = {
                 "exemplar_docs": ed,
                 "topic_words": tw,
@@ -165,11 +170,11 @@ def main():
                 wd = line.strip()
                 vocab_w2id[wd] = i
         return vocab_w2id
-    
+
     def display_json_snippet(json_obj, num_items=5, snippet_length=100, level=0, indent="  "):
         """
         Displays a snippet from each element in a JSON object, handling nested JSON objects.
-        
+
         Parameters
         ----------
         json_obj: dict or list
@@ -184,14 +189,15 @@ def main():
             String used for indentation.
         """
         current_indent = indent * level
-        
+
         if isinstance(json_obj, dict):
             for i, (key, value) in enumerate(json_obj.items()):
                 if i >= num_items:
                     break
                 if isinstance(value, (dict, list)):
                     print(f"{current_indent}{key}:")
-                    display_json_snippet(value, num_items, snippet_length, level + 1, indent)
+                    display_json_snippet(
+                        value, num_items, snippet_length, level + 1, indent)
                 else:
                     value_snippet = str(value)[:snippet_length]
                     print(f"{current_indent}{key}: {value_snippet}")
@@ -201,11 +207,11 @@ def main():
                     break
                 if isinstance(item, (dict, list)):
                     print(f"{current_indent}Item {i + 1}:")
-                    display_json_snippet(item, num_items, snippet_length, level + 1, indent)
+                    display_json_snippet(
+                        item, num_items, snippet_length, level + 1, indent)
                 else:
                     item_snippet = str(item)[:snippet_length]
                     print(f"{current_indent}Item {i + 1}: {item_snippet}")
-
 
     def display_json_snippet(json_obj, num_items=5, snippet_length=100, level=0, indent="  "):
         """
@@ -337,7 +343,7 @@ def main():
     args = parser.parse_args()
 
     formatter = TopicJsonFormatter()
-    
+
     if args.trained_with_thetas_eval:
         model_path = pathlib.Path(args.model_path)
         try:

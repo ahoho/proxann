@@ -38,26 +38,82 @@ def main():
     # Topic selection          #
     ############################
     N = int(config['all']['n_matches'])
+    topic_selection_method = config['all']['topic_selection_method']
+    top_words_display = int(config['all']['top_words_display'])
 
-    betas_mats = []
-    for model in config.sections():
-        if model == 'all':  # Skip all section (configuration for all models)
-            continue
-        model_config = config[model]
-        # if trained with this repo code, we only need the model path
-        if model_config.getboolean('trained_with_thetas_eval'):
-            model_path = model_config['model_path']
-            betas_path = (pathlib.Path(model_path) / 'betas.npy').as_posix()
-        else:
-            betas_path = model_config['betas_path']
+    if topic_selection_method == 'betas_sim':
 
-        betas = np.load(betas_path)
-        if betas.shape[0] > betas.shape[1]:
-            betas = betas.T
-        betas_mats.append(betas)
+        betas_mats = []
+        for model in config.sections():
+            # Skip all section (configuration for all models)
+            if model == 'all':
+                continue
+            model_config = config[model]
+            # if trained with this repo code, we only need the model path
+            if model_config.getboolean('trained_with_thetas_eval'):
+                model_path = model_config['model_path']
+                betas_path = (pathlib.Path(model_path) /
+                              'betas.npy').as_posix()
+            else:
+                betas_path = model_config['betas_path']
+
+            betas = np.load(betas_path)
+            if betas.shape[0] > betas.shape[1]:
+                betas = betas.T
+            betas_mats.append(betas)
+        matrix_sim = betas_mats
+
+    elif topic_selection_method == 'wmd':
+        all_topic_keys = []
+        for model in config.sections():
+            # Skip all section (configuration for all models)
+            if model == 'all':
+                continue
+            model_config = config[model]
+            # if trained with this repo code, we only need the model path
+            if model_config.getboolean('trained_with_thetas_eval'):
+                # Load vocab dictionaries
+                vocab_w2id = {}
+                with (pathlib.Path(model_path)/'vocab.txt').open('r', encoding='utf8') as fin:
+                    for i, line in enumerate(fin):
+                        wd = line.strip()
+                        vocab_w2id[wd] = i
+                betas = np.load(pathlib.Path(model_path) / "betas.npy")
+            else:
+                vocab_path = model_config['vocab_path']
+                if vocab_path.endswith(".json"):
+                    with open(vocab_path) as infile:
+                        vocab_w2id = json.load(infile)
+
+                elif vocab_path.endswith()(".txt"):
+                    vocab_w2id = load_vocab_from_txt(args.vocab_path)
+                else:
+                    print(
+                        f"-- -- File does not have the required extension for loading the vocabulary. Exiting...")
+                    sys.exit()
+
+                betas_path = model_config['betas_path']
+                betas = np.load(betas_path)
+
+            #  Get keys
+            vocab_id2w = dict(zip(vocab_w2id.values(), vocab_w2id.keys()))
+            keys = [
+                [vocab_id2w[idx]
+                    for idx in row.argsort()[::-1][:top_words_display]]
+                for row in betas
+            ]
+            all_topic_keys.append(keys)
+
+        matrix_sim = all_topic_keys
+
+    else:
+        print(
+            f"Topic selection method {topic_selection_method} not recognized. Exiting...")
+        sys.exit()
 
     topic_selector = TopicSelector()
-    selected_topics = topic_selector.iterative_matching(betas_mats, N)
+    selected_topics = topic_selector.iterative_matching(
+        models=matrix_sim, N=N, metric=topic_selection_method)
 
     print(f"Selected topics: {selected_topics}")
 
@@ -65,7 +121,6 @@ def main():
     # JSON formatter           #
     ############################
     method = config['all']['method']
-    top_words_display = int(config['all']['top_words_display'])
     ntop = int(config['all']['ntop'])
     text_column = config['all']['text_column']
     text_column_disp = config['all']['text_column_disp']

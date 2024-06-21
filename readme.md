@@ -2,10 +2,7 @@
 
 ## Get Data for Pilot
 
-Configure the `config/config_pilot.conf` file and execute one of the following scripts:
-
-- `bash_scripts/jsonfy_pilot_wmd.sh` (to make alignment based on WMD, only works when given 2 models)
-- `bash_scripts/jsonfy_pilot.sh` (based on Jensen-Shannon and the Hungarian algorithm, works for N models)
+Configure the `config/config_pilot.conf` file and execute the script `bash_scripts/jsonfy_pilot.sh` (to make alignment based on WMD, only works when given 2 models).
 
 These scripts generate the following output, which is also saved at `data/json_out/config_pilot.json`:
 

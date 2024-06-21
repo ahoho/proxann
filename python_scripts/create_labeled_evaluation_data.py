@@ -80,7 +80,7 @@ if __name__ == "__main__":
         group_output_dir = (output_dir / f"{group_var}-{n_groups}")
         group_output_dir.mkdir(parents=True, exist_ok=True)
         np.save(group_output_dir / "theta.npy", pseudo_theta)
-        np.save(group_output_dir / "beta.npy", pseudo_beta)
+        np.save(group_output_dir / "beta.npy", pseudo_beta.A)
         with open(group_output_dir / "vocab.json", "w") as outfile:
             json.dump(cv.vocabulary_, outfile)
 # %%

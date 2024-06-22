@@ -245,7 +245,7 @@ def main():
         json.dump(combined_out, file, indent=4)
 
     # Return the JSON output
-    print(json.dumps(out, indent=2))
+    # print(json.dumps(out, indent=2))
 
 
 if __name__ == "__main__":

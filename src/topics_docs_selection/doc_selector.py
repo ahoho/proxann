@@ -386,8 +386,12 @@ class DocSelector(object):
             A list of lists containing the indices of the selected documents for each topic. Each inner list corresponds to a topic and contains one selected document from each of the n_parts segments.
         """
         selected_ids = []
+        mat = mat.copy()
 
         num_docs = mat.shape[0]
+        if np.any(mat > 1):
+            self._logger.info("Subtracting thetas > 1 (should only happen for the labeled docs)")
+            mat[mat > 1] -=1
         if num_docs < n_parts:
             raise ValueError(f"Number of documents ({num_docs}) is less than the number of parts ({n_parts}).")
 
@@ -396,6 +400,7 @@ class DocSelector(object):
             this_col_ids = []  # Initialize this_col_ids here
 
             if bucket_by == 'rank':
+                raise NotImplementedError("Need to account for the exemplar docs assigned -1 before this is called")
                 # Sort in descending order keeping original indices
                 sorted_indices = np.argsort(-column_data)
                 sorted_data = column_data[sorted_indices]
@@ -424,6 +429,7 @@ class DocSelector(object):
                             break
 
             elif bucket_by == 'values':
+                raise NotImplementedError("Need to account for the exemplar docs assigned -1 before this is called")
                 # Determine bin edges using histogram
                 bin_edges = np.histogram_bin_edges(column_data, bins=n_parts)
 
@@ -454,7 +460,7 @@ class DocSelector(object):
                     step = 1e-10  # Avoid division by zero
                 else:
                     step = max_mat_k / n_parts
-                    
+                
                 try:
                     for p in np.arange(max_mat_k, max_mat_k - step * n_parts, -step):
                         idx = np.abs(column_data - p).argmin()
@@ -463,13 +469,13 @@ class DocSelector(object):
                         if len(this_col_ids) == n_parts:
                             break
                 except Exception as e:
-                    print(e)
-                    import pdb; pdb.set_trace()
+                    self._logger.error(f"Error occurred when bucketing by closest value: {e}")
+                    return
 
                 # Fallback to ensure n_parts values
                 if len(this_col_ids) < n_parts:
                     self._logger.warning(f"-- -- Not enough unique values to select {n_parts} parts for column {col}. Fallback to random selection.")
-                    remaining_indices = np.where(column_data < 1e10)[0]
+                    remaining_indices = np.where(0 <= column_data < 1e10)[0]
                     np.random.shuffle(remaining_indices)
                     for idx in remaining_indices:
                         if idx not in this_col_ids:
@@ -736,7 +742,7 @@ class DocSelector(object):
 
         # Modify thetas to remove the documents that have already been selected as exemplar docs
         thetas_ = thetas.copy()
-        thetas_ = np.delete(thetas_, exemplar_docs, axis=0)
+        thetas_[exemplar_docs] = -1
 
         if method == "thetas_sample" or method == "elbow":
             method = "thetas"

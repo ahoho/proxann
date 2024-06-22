@@ -1,6 +1,7 @@
 import argparse
 import logging
 import pathlib
+from itertools import product
 from typing import List, Optional, Union
 import gensim.downloader as api
 import numpy as np
@@ -251,57 +252,37 @@ class TopicSelector(object):
         list of list of tuple
             List of lists with the N matches found. Each match is a list of tuples, where each tuple contains the model index and the topic index.
         """
+        dists = {}
+        for modelA, modelB in product(range(len(models)), range(len(models))):
+            dists[(modelA, modelB)] = self._wmd_mat([models[modelA], models[modelB]])
 
-        # Get topic pairs for each pair of models
-        topic_pairs = {}
-        combs = self._get_models_combinations(list(range(len(models))))
-        for modelA, modelB in combs:
-            self._logger.info(
-                f"Calculating pairing between {modelA} and {modelB}..")
-            if (modelA, modelB) not in topic_pairs:
-                topic_pairs[(modelA, modelB)] = self.find_most_similar_pairs(
-                    models[modelA], models[modelB], metric)
-                # Cache the inverted pairs for reverse lookups
-                topic_pairs[(modelB, modelA)] = [(pair[1], pair[0])
-                                                 for pair in topic_pairs[(modelA, modelB)]]
-            else:
-                self._logger.info(
-                    f"Pairing between {modelA} and {modelB} already calculated.")
-
-        num_models = len(models)
         matches = []
-
+        assert(all(N <= len(m) for m in models))
         while len(matches) < N:
-            this_model_matches = []
-            for start_model in range(num_models):
-                if len(matches) >= N:
-                    break
-
-                this_model_matches = []
-                used_topics = set()
-
-                current_model = start_model
-                while len(this_model_matches) < num_models:
-                    next_model = (current_model + 1) % num_models
-
-                    if not topic_pairs[(current_model, next_model)]:
-                        break  # Skip if no pairs are left
-
-                    match = next((pair for pair in topic_pairs[(
-                        current_model, next_model)] if pair[0] not in used_topics), None)
-
-                    if match:
-                        topic_pairs[(current_model, next_model)].remove(match)
-                        this_model_matches.append((current_model, match[0]))
-                        used_topics.add(match[0])
-                        current_model = next_model
-                    else:
-                        break
-
-                if len(this_model_matches) == num_models:
-                    matches.append(this_model_matches)
-                    break
-
+            for seed_model in range(len(models)):
+                # Calculate the mean distance to all other models
+                min_dists, min_dists_indices = [], []
+                for other_model in range(len(models)):
+                    if seed_model == other_model:
+                        min_dists_indices.append((seed_model, None))
+                        continue
+                    distsAB = dists[(seed_model, other_model)]
+                    # Get the minimum distance for each topic in the seed model to the other model
+                    min_dists.append(distsAB.min(1))
+                    min_dists_indices.append((other_model, distsAB.argmin(1)))
+                mean_min_dists = np.mean(min_dists, axis=0)
+                seed_model_topic = np.argmin(mean_min_dists)
+                seed_model_matches = [
+                    (model_idx, indices[seed_model_topic]) if model_idx != seed_model else (model_idx, seed_model_topic)
+                    for model_idx, indices in min_dists_indices
+                ]
+                matches.append(seed_model_matches)
+                # Remove the matched topics from the distance matrix
+                for modelA, modelA_topic in seed_model_matches:
+                    for modelB in range(len(models)):
+                        if modelA != modelB:
+                            dists[(modelA, modelB)][modelA_topic, :] = np.inf
+                            dists[(modelB, modelA)][:, modelA_topic] = np.inf
         return matches
     
     def find_closest_by_wmd(self, models: list, keep_from_first: list = [0, 1, 2]) -> list:

@@ -26,7 +26,7 @@ END_COMMENT
 # Train Bertopic model (CTM embeddings and preprocessed text)
 python3 main.py train_tm \
     --corpus_file "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/train.metadata.enriched.parquet" \
-    --model_path "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/models/trained/bertopic_wiki_50_ctm_emb_pre2" \
+    --model_path "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/models/trained/bertopic_wiki_50_ctm_emb_pre_umap_cuml" \
     --trainer_type "BERTopic" \
     --num_topics 50 \
     --text_col "tokenized_text" \

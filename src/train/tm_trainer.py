@@ -7,7 +7,7 @@ import sys
 import shutil
 from subprocess import check_output
 import time
-from typing import Dict, List
+from typing import List
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -30,7 +30,8 @@ from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.preprocessing import normalize
 from tqdm import tqdm
-from umap import UMAP
+#from umap import UMAP
+from cuml.manifold import UMAP
 
 from src.utils.utils import file_lines, get_embeddings_from_str, load_vocab_from_txt, pickler, init_logger
 
@@ -64,10 +65,8 @@ class TMTrainer(ABC):
             Path for saving logs.
         """
         
-        # Initialize logger
         self._logger = logger if logger else init_logger(__name__, path_logs)
 
-        # Create folder for saving model
         self.model_path = pathlib.Path(model_path)
         if self.model_path.exists():
             self._logger.info(
@@ -80,7 +79,6 @@ class TMTrainer(ABC):
 
         self.model_path.mkdir(exist_ok=True)
         
-        # Other attributes
         self.num_topics = num_topics
         self.topn = topn
 
@@ -203,7 +201,8 @@ class TMTrainer(ABC):
         self,
         path_to_data: str,
         get_embeddings: bool = False,
-        text_data: str = "tokenized_text"
+        text_data: str = "tokenized_text",
+        raw_text_data: str = "text"
     ) -> None:
         """
         Load the training data.
@@ -239,10 +238,12 @@ class TMTrainer(ABC):
 
         if get_embeddings:
             if "embeddings" not in df.columns:
-                self._logger.info(f"-- -- Embeddings required but not present in data. Exiting...")
-                return
+                self._logger.warning(f"-- -- Embeddings required but not present in data. They will be calculated from the training data...")
+                self.embeddings = None
+                self.raw_text = [doc.split() for doc in df[raw_text_data]]
             else:
                 self.embeddings = get_embeddings_from_str(df, self._logger)
+                self.raw_text = None
                 self._logger.info(f"-- -- Loaded embeddings from the DataFrame")
         else:
             self.embeddings = None
@@ -580,7 +581,6 @@ class TomotopyLdaModel(TMTrainer):
 
         super().__init__(num_topics, topn, model_path, logger, path_logs)
 
-        # Initialize specific parameters for Tomotopy LDA
         self.num_iters = num_iters
 
     def train(self, path_to_data: str, text_col: str = "tokenized_text") -> float:
@@ -714,6 +714,9 @@ class BERTopicTrainer(TMTrainer):
         hdbscan_cluster_selection_method: str = 'eom',
         hbdsan_prediction_data: bool = True,
         vocab_path: str = None,
+        language: str = "english",
+        repr_model_diversity: float = 0.3,
+        repr_model_topnwords: int = 15,
         logger: logging.Logger = None,
         path_logs: pathlib.Path = pathlib.Path(__file__).parent.parent
     ):
@@ -772,19 +775,26 @@ class BERTopicTrainer(TMTrainer):
         self.hdbscan_metric = hdbscan_metric
         self.hdbscan_cluster_selection_method = hdbscan_cluster_selection_method
         self.hbdsan_prediction_data = hbdsan_prediction_data
+        
         if vocab_path:
-            # @ TODO
             if vocab_path.endswith(".json"):
                 with open(vocab_path) as infile:
                     vocab_w2id = json.load(infile)
 
             elif vocab_path.endswith()(".txt"):
                 vocab_w2id = load_vocab_from_txt(vocab_path)
+                
+            else:
+                raise NotImplementedError("Need to account for other forms of loading the vocabulary.")
             
             # Trasnform the ids to integers
             vocab_w2id = {k: int(v) for k, v in vocab_w2id.items()}
             
             self.vocab_w2id = vocab_w2id
+            
+        self.language = language
+        self.repr_model_diversity = repr_model_diversity
+        self.repr_model_topnwords = repr_model_topnwords
 
         word_min_len = 0
         self.word_pattern = (
@@ -794,6 +804,7 @@ class BERTopicTrainer(TMTrainer):
             f"(?<![\-\_\·\.'])[a-zA-Z\u00C0-\u024F\d]?"
             f"(?![a-zA-Z\u00C0-\u024F\d])"
         )
+        
 
     def train(self, path_to_data: str, text_col: str = "tokenized_text") -> float:
         """
@@ -820,10 +831,10 @@ class BERTopicTrainer(TMTrainer):
 
         if self.embeddings is not None:
             self._logger.info("-- -- Using pre-trained embeddings from the dataset...")
-            self._embedding_model = SentenceTransformer(self.sbert_model)
         else:
             self._logger.info(f"-- -- Creating SentenceTransformer model with {self.sbert_model}...")
-            self._embedding_model = SentenceTransformer(self.sbert_model)
+        self._embedding_model = SentenceTransformer(self.sbert_model)
+        
         self._umap_model = UMAP(
             n_components=self.umap_n_components,
             n_neighbors=self.umap_n_neighbors,
@@ -858,13 +869,14 @@ class BERTopicTrainer(TMTrainer):
         self._representation_model = {
             "KeyBERT": KeyBERTInspired(),
             "MMR": MaximalMarginalRelevance(
-                diversity=0.3,
-                top_n_words=15
+                diversity=self.repr_model_diversity,
+                top_n_words=self.repr_model_topnwords
             )
         }
         
         self._model = BERTopic(
-            language="english",
+            language=self.language,
+            umap_model=self._umap_model,
             vectorizer_model=self._vectorizer_model,
             ctfidf_model=self._ctfidf_model,
             top_n_words=self.topn,
@@ -873,13 +885,16 @@ class BERTopicTrainer(TMTrainer):
             verbose=True
         )
         
-        
         self._logger.info(f"-- -- Training BERTopic model with {self.num_topics} topics... ")
 
-        texts = [" ".join(doc) for doc in self.train_data]
+        
         if self.embeddings is not None:
+            self._logger.info(f"-- -- Using tokenized data and precalculated embeddings to train the model.")
+            texts = [" ".join(doc) for doc in self.train_data]
             _, probs = self._model.fit_transform(texts, self.embeddings)
         else:
+            self._logger.info(f"-- -- Using raw data to calculate embeddings and train the model")
+            texts = [" ".join(doc) for doc in self.raw_text]
             _, probs = self._model.fit_transform(texts)
 
         thetas_approx, _ = self._model.approximate_distribution(texts, use_embedding_model=True)
@@ -890,8 +905,6 @@ class BERTopicTrainer(TMTrainer):
         self._logger.info(f"-- -- Betas shape: {betas.shape}")
         vocab = self._model.vectorizer_model.get_feature_names_out()
         
-        #import pdb; pdb.set_trace()
-
         keys = []
         for k, v in self._model.get_topics().items():
             keys.append([el[0] for el in v])
@@ -930,7 +943,6 @@ class BERTopicTrainer(TMTrainer):
 def main():
     
     def create_model(model_name, **kwargs):
-        # Map model names to corresponding classes
         trainer_mapping = {
             'MalletLda': MalletLDATrainer,
             'TomotopyLda': TomotopyLdaModel,
@@ -939,12 +951,8 @@ def main():
 
         # Retrieve the class based on the model name
         trainer_class = trainer_mapping.get(model_name)
-
-        # Check if the model name is valid
         if trainer_class is None:
             raise ValueError(f"Invalid trainer name: {model_name}")
-
-        # Create an instance of the trainer class
         trainer_instance = trainer_class(**kwargs)
 
         return trainer_instance
@@ -1000,14 +1008,8 @@ def main():
     params = {k: v for k, v in vars(args).items()
               if v is not None and k not in ["corpus_file", "trainer_type", "text_col"]}
 
-    # Create a trainer instance of type args.trainer_type
     trainer = create_model(args.trainer_type, **params)
-    
-    # Fit the model
-    training_time = trainer.train(args.corpus_file, args.text_col)
-  
-    
-    # Print the training time
+    training_time = trainer.train(args.corpus_file, args.text_col)    
     print(f"Training time: {training_time} seconds")
 
 

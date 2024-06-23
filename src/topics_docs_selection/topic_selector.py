@@ -115,7 +115,7 @@ class TopicSelector(object):
 
         return self._wmd_model.wmdistance(from_, to_)
     
-    def _wmd_mat(self, models: list) -> np:
+    def _get_wmd_mat(self, models: list) -> np:
         """Find the closest topics between two models using Word Mover's Distance.
         
         Parameters
@@ -164,7 +164,7 @@ class TopicSelector(object):
             mat_sim = self._jensen_sim(mat1, mat2)
             cost_matrix = - mat_sim
         elif metric == 'wmd':
-            mat_sim = self._wmd_mat([mat1, mat2])
+            mat_sim = self._get_wmd_mat([mat1, mat2])
             cost_matrix = mat_sim
         else:
             self._logger.error("Invalid metric. Must be 'betas_sim' or 'wmd'.")            
@@ -254,7 +254,7 @@ class TopicSelector(object):
         """
         dists = {}
         for modelA, modelB in product(range(len(models)), range(len(models))):
-            dists[(modelA, modelB)] = self._wmd_mat([models[modelA], models[modelB]])
+            dists[(modelA, modelB)] = self._get_wmd_mat([models[modelA], models[modelB]])
 
         matches = []
         assert(all(N <= len(m) for m in models))
@@ -345,17 +345,6 @@ def main():
         if betas.shape[0] > betas.shape[1]:
             betas = betas.T
         betas_mats.append(betas)
-
-    # get K for each model
-    """
-    Ks = [betas.shape[0] for betas in betas_mats]
-    # Find if there is a model with a different K, and if so, get that model index
-    diff_K = [K for K in Ks if K != Ks[0]]
-    for idx_diff in diff_K:
-        print(f"Modelo {idx_diff} tiene un K diferente")
-        # Compensate the K difference with zero rows
-        betas_mats[idx_diff] = np.vstack((betas_mats[idx_diff], np.zeros((Ks[0] - Ks[idx_diff], betas_mats[idx_diff].shape[1]))))
-    """
 
     selector = TopicSelector()
     matches = selector.iterative_matching(betas_mats, args.N)

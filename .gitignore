@@ -164,5 +164,6 @@ cython_debug/
 src/train/Mallet-202108
 data/models
 data/logs
+data/json_out
 *parquet
 *jsonl

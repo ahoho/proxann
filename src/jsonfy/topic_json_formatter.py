@@ -71,7 +71,7 @@ class TopicJsonFormatter:
         dict
             JSON formatted dictionary of the model evaluation output.
         """
-        exemplar_docs_ids = self._doc_selector.get_top_docs(**kwargs)
+        exemplar_docs_ids, exemplar_docs_probs = self._doc_selector.get_top_docs(**kwargs)
         exemplar_docs = [[df[text_column].iloc[doc_id]
                           for doc_id in k] for k in exemplar_docs_ids]
         eval_docs_ids, eval_docs_probs, assigned_to_k = self._doc_selector.get_eval_docs(
@@ -89,14 +89,21 @@ class TopicJsonFormatter:
             distractor_docs = [df[text_column].iloc[doc_id]
                                for doc_id in distractor_ids]
 
-        json_out = self.jsonfy(topic_ids, exemplar_docs, keys,
-                               eval_docs_ids, eval_docs, eval_docs_probs, distractor_docs, assigned_to_k)
+        json_out = self.jsonfy(
+            topic_ids,
+            exemplar_docs_ids, exemplar_docs, exemplar_docs_probs,
+            keys,
+            eval_docs_ids, eval_docs, eval_docs_probs,
+            distractor_docs, assigned_to_k
+        )
         return json_out
 
     def jsonfy(
         self,
         topic_ids: List[int],
+        exemplar_docs_ids: List[List[int]],
         exemplar_docs: List[List[str]],
+        exemplar_docs_probs: List[List[float]],
         topic_words: List[str],
         eval_docs_ids: List[List[int]],
         eval_docs: List[List[str]],
@@ -111,8 +118,12 @@ class TopicJsonFormatter:
         ----------
         topic_ids : List[int]
             List of topic IDs.
+        exemplar_docs_ids : List[List[int]]
+            List of exemplar document IDs for each topic.
         exemplar_docs : List[List[str]]
-            List of exemplar documents for each topic.
+            List of evalexemplaruation documents for each topic.
+        exemplar_docs_probs : List[List[float]]
+            List of probabilities for the exemplar documents.
         topic_words : List[str]
             List of topic words.
         eval_docs_ids : List[List[int]]
@@ -133,19 +144,28 @@ class TopicJsonFormatter:
         """
         dict_out = {}
 
-        for k, ed, tw, edids, evtext, edprobs, disttext, edast in zip(
-            topic_ids, exemplar_docs, topic_words, eval_docs_ids, eval_docs, eval_docs_probs, distractor_docs, assigned_to_k
+        for k, exdids, exdtext, exdprobs, tw, evids, evtext, evprobs, disttext, edast in zip(
+            topic_ids, exemplar_docs_ids, exemplar_docs, exemplar_docs_probs, topic_words, eval_docs_ids, eval_docs, eval_docs_probs, distractor_docs, assigned_to_k
         ):
             edast_b = [item == k for item in edast]
+            
+            exemplar_docs_list = [
+                {
+                    "doc_id": int(exids_d),
+                    "text": extext_d,
+                    "prob": float(exprobs_d),
+                }
+                for exids_d, extext_d, exprobs_d in zip(exdids, exdtext, exdprobs)
+            ]
 
             eval_docs_list = [
                 {
-                    "doc_id": int(edids_d),
+                    "doc_id": int(evids_d),
                     "text": evtext_d,
-                    "prob": float(edprobs_d),
+                    "prob": float(evprobs_d),
                     "assigned_to_k": bool(edast_b_d)
                 }
-                for edids_d, evtext_d, edprobs_d, edast_b_d in zip(edids, evtext, edprobs, edast_b)
+                for evids_d, evtext_d, evprobs_d, edast_b_d in zip(evids, evtext, evprobs, edast_b)
             ]
 
             distractor_doc = {
@@ -153,7 +173,7 @@ class TopicJsonFormatter:
             }
 
             dict_out[int(k)] = {
-                "exemplar_docs": ed,
+                "exemplar_docs": exemplar_docs_list,
                 "topic_words": tw,
                 "eval_docs": eval_docs_list,
                 "distractor_doc": distractor_doc

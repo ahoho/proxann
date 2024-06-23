@@ -4,14 +4,17 @@ import logging
 import pathlib
 import sys
 import time
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
+from kneed import KneeLocator
 from scipy import sparse
-from typing import List, Tuple, Dict, Optional
+from scipy.ndimage import uniform_filter1d
+
 from src.topics_docs_selection.topic_selector import TopicSelector
 from src.utils.utils import init_logger, keep_top_k_values
-from kneed import KneeLocator
-from scipy.ndimage import uniform_filter1d
+
 
 class DocSelector(object):
     """
@@ -337,12 +340,12 @@ class DocSelector(object):
         topn: int = 10
     ) -> List[List[int]]:
         """
-        Finds the most representative documents for each topic based on a given matrix.
+        Finds the most representative documents for each topic based on a given matrix (e.g., thetas, s3, etc.)
 
         Parameters
         ----------
         mat: numpy.ndarray
-            The input matrix of shape (D, K) where D is the number of documents and K is the number of topics. Each element represents the distribution of a document over a topic.
+            The input matrix of shape (D, K) where D is the number of documents and K is the number of topics. 
         topn: int, optional
             The number of top documents to select for each topic. Defaults to 10.
 
@@ -351,7 +354,6 @@ class DocSelector(object):
         List[List[int]]: 
             A list of lists containing the indices of the most representative documents for each topic.
         """
-        # Find the most representative document for each topic based on a matrix mat
         top_docs_per_topic = []
 
         for doc_distr in mat.T:
@@ -639,8 +641,10 @@ class DocSelector(object):
                 top_docs_per_topic = []
                 for _ in range(ntop):
                     sampled_idx = np.random.choice(len(mat), p=mat[:, col])
-                    top_docs_per_topic.append(sampled_idx)
-                top_docs.append(top_docs_per_topic)
+                    top_docs_per_topic.append((sampled_idx, mat[sampled_idx, col]))
+                # Sort by the probs in descending order and append just idxs
+                top_docs_per_topic.sort(key=lambda x: x[1], reverse=True)
+                top_docs.append([doc[0] for doc in top_docs_per_topic])
             return top_docs
         
         elif method == "elbow":
@@ -660,16 +664,19 @@ class DocSelector(object):
                 elbow = kneedle.elbow
                 
                 if elbow:
-                    # Filter document indices based on the elbow point (keeping values above the elbow)
+                    # Filter document indices based on the elbow (keeping values above the elbow)
                     significant_idx = np.where(mat[:, k] >= elbow)[0]
                     significant_values = mat[significant_idx, k]
 
-                    # Normalize the values to create a probability distribution
+                    # Normalize to get probability distribution
                     probabilities = significant_values / np.sum(significant_values)
 
                     # Sample indices based on the probability distribution
                     if len(significant_idx) > 0:
                         sampled_indices = np.random.choice(significant_idx, size=min(ntop, len(significant_idx)), p=probabilities, replace=False)
+                        
+                        # Sort by the probs in descending order and append just idxs
+                        sampled_indices = sorted(sampled_indices, key=lambda idx: mat[idx, k], reverse=True)
                         most_representative_per_tpc.append(sampled_indices)
                     else:
                         self._logger.warning(f"-- -- No documents found above the elbow point for topic {k}. Using thetas...")
@@ -684,14 +691,16 @@ class DocSelector(object):
                     top = sorted_docs_indices[:ntop].tolist()
                     most_representative_per_tpc.append(top)
                     
-            return most_representative_per_tpc
-        
         else:
             mat = self._get_mat_for_top(
                 method, thetas, bow, betas, corpus, vocab_w2id, model_path, top_words, thr)
-
-            return self._get_most_representative_per_tpc(mat, ntop)
-
+            
+            most_representative_per_tpc = self._get_most_representative_per_tpc(mat, ntop)
+        exemplar_docs_probs = [[thetas.T[k][doc_id] for doc_id in id_docs]
+            for k, id_docs in enumerate(most_representative_per_tpc)]
+            
+        return most_representative_per_tpc, exemplar_docs_probs
+        
     def get_eval_docs(
         self,
         method: str,
@@ -975,7 +984,7 @@ def main():
 
     for method in methods:
         print(f"Getting with {method}")
-        top_docs = doc_selector.get_top_docs(
+        top_docs, _ = doc_selector.get_top_docs(
             method=method,
             thetas=thetas,
             bow=bow,

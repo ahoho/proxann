@@ -2,40 +2,7 @@
 
 ## Get Data for Pilot
 
-Configure the `config/config_pilot.conf` file and execute the script `bash_scripts/jsonfy_pilot.sh` (to make alignment based on WMD, only works when given 2 models).
-
-These scripts generate the following output, which is also saved at `data/json_out/config_pilot.json`:
-
-```json
- {  
-    "<model_path>": {
-        "<topic_id>": {
-            "topic_words": ["word1", "word2", "word3", ...], 
-            "exemplar_docs": ["doc1", "doc2", "doc3", ...], 
-            "eval_docs": [
-                {
-                    "doc_id": 1, 
-                    "text": "Document text goes here.", 
-                    "prob": 0.9, 
-                    "assigned_to_k": 1
-                },
-                {
-                    "doc_id": 2, 
-                    "text": "Document text goes here.", 
-                    "prob": 0.8, 
-                    "assigned_to_k": 1
-                },
-                ...
-            ],
-            "distractor_doc": {
-                "doc_id": 100,
-                "text": "Document text goes here"
-            }
-        },
-        ...
-    }
-}
-```
+Configure the `config/config_pilot.conf` file and execute the script `bash_scripts/jsonfy_pilot.sh`. The script dumps a JSON, which is also saved at `data/json_out/config_pilot.json`.
 
 ## Modules
 
@@ -57,7 +24,19 @@ Example structure:
 {
     "<topic_id>": {
         "topic_words": ["word1", "word2", "word3", ...], 
-        "exemplar_docs": ["doc1", "doc2", "doc3", ...], 
+        "exemplar_docs": [
+            {
+                "doc_id": 1, 
+                "text": "Document text goes here.", 
+                "prob": 0.9, 
+            },
+            {
+                "doc_id": 2, 
+                "text": "Document text goes here.", 
+                "prob": 0.8, 
+            },
+            ...
+        ],
         "eval_docs": [
             {
                 "doc_id": 1, 

@@ -461,10 +461,10 @@ class DocSelector(object):
                 if max_mat_k == 0:
                     step = 1e-10  # Avoid division by zero
                 else:
-                    step = max_mat_k / n_parts
+                    step = max_mat_k / (n_parts - 1)
                 
                 try:
-                    for p in np.arange(max_mat_k, max_mat_k - step * n_parts, -step):
+                    for p in np.arange(max_mat_k, -step, -step):
                         idx = np.abs(column_data - p).argmin()
                         this_col_ids.append(idx)
                         column_data[idx] = 1e10  # Exclude from future selection

@@ -1,4 +1,5 @@
 import argparse
+import random
 import logging
 import pathlib
 from itertools import product
@@ -236,7 +237,7 @@ class TopicSelector(object):
             combs.append((models[i], models[(i+1) % len(models)]))
         return combs
 
-    def iterative_matching(self, models, N, metric='wmd'):
+    def iterative_matching(self, models, N, metric='wmd', seed=2357_11):
         """
         Performs an iterative pairing process between the topics of multiple models.
 
@@ -252,13 +253,14 @@ class TopicSelector(object):
         list of list of tuple
             List of lists with the N matches found. Each match is a list of tuples, where each tuple contains the model index and the topic index.
         """
+        random.seed(seed)
         dists = {}
         for modelA, modelB in product(range(len(models)), range(len(models))):
             dists[(modelA, modelB)] = self._get_wmd_mat([models[modelA], models[modelB]])
 
         matches = []
         assert(all(N <= len(m) for m in models))
-        while len(matches) < N:
+        while len(matches) < min(len(m) for m in models):
             for seed_model in range(len(models)):
                 # Calculate the mean distance to all other models
                 min_dists, min_dists_indices = [], []
@@ -283,7 +285,7 @@ class TopicSelector(object):
                         if modelA != modelB:
                             dists[(modelA, modelB)][modelA_topic, :] = np.inf
                             dists[(modelB, modelA)][:, modelA_topic] = np.inf
-        return matches
+        return random.sample(matches, N)
     
     def find_closest_by_wmd(self, models: list, keep_from_first: list = [0, 1, 2]) -> list:
         """Find the closest topics between two models using Word Mover's Distance.

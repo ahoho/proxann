@@ -11,12 +11,12 @@ from scipy.stats import pearsonr, spearmanr, kendalltau
 from sklearn.metrics import ndcg_score
 
 
-RESPONSE_CSV = "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_June+27%2C+2024_09.47.csv"
-DATA_JSON = "../data/json_out/config_pilot.json"
+RESPONSE_CSV = "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_June+28%2C+2024_16.51.csv"
+DATA_JSON = "../data/json_out/config_first_round.json"
 
 raw_responses = pd.read_csv(RESPONSE_CSV)
 MIN_MINUTES = 5
-START_DATE = "2024-06-28 00:00:00"
+START_DATE = "2024-06-28 12:00:00"
 n_eval_docs = 7
 
 # %% load data
@@ -27,6 +27,8 @@ raw_responses = raw_responses.iloc[2:]
 raw_responses = raw_responses.loc[raw_responses["Status"] == "IP Address"]
 # only after recent change
 raw_responses = raw_responses.loc[raw_responses["StartDate"] >= START_DATE]
+
+print(f"Total responses: {len(raw_responses)}")
 
 # %% get the data
 with open(DATA_JSON) as infile:
@@ -53,25 +55,40 @@ assert "prolific ID" in column_names["Q22"]
 # %% parse
 responses = []
 total_time = []
-failed_fit_att_check, failed_rank_att_check, failed_practice_rank, too_quick = 0, 0, 0, 0
 
 time_cutoff = min(np.quantile(raw_responses["Duration (in seconds)"][2:].astype(float), 0.05), 60 * MIN_MINUTES) # 4 minutes
 
 for _, row in raw_responses.iterrows():
     r = {}
-    if float(row["Duration (in seconds)"]) < time_cutoff:
-        too_quick += 1
-        continue
-
-    if row["11_loop_fit_a"] != "Not sure":
-        failed_fit_att_check += 1
-        continue
-
-    if row[f"rank_99"] not in ["8"]: # change to 7, 8?
-        failed_rank_att_check += 1
-        continue
-
     r["annotator_id"] = row["Q22"]
+
+    # check if completion time was too fast
+    r["too_quick"] = float(row["Duration (in seconds)"]) < time_cutoff
+
+    # check basic comprehension
+    r["failed_purpose"] = "single category" not in row["practice_purpose"]
+
+    # check attention checks
+    r["failed_fit_check"] = not row["11_loop_fit_a"].startswith("2")
+    r["failed_fam_check"] = not str(row["11_loop_familiarity"]).startswith("I am not familiar")
+
+    r["failed_rank_check"] = row[f"rank_99"] != "8"
+
+    # did they do the practice ranking correctly? (allowable)
+    practice_ranks = [int(row[f"practice_rank_{i}"]) for i in range(4)]
+    r["incorrect_practice_rank"] = practice_ranks != [1, 2, 3, 4]
+    # extremely obvious
+    r["failed_practice_rank"] = practice_ranks[0] != 1 or practice_ranks[3] != 4
+
+    r["any_failure"] = (
+        r["failed_purpose"]
+        or r["too_quick"]
+        or r["failed_fit_check"]
+        or r["failed_fam_check"]
+        or r["failed_rank_check"]
+        or r["failed_practice_rank"]
+    )
+
     r["time"] = float(row["Duration (in seconds)"])
 
     # retrieve the data for the cluster/topic that was used to generate the questions for this respondent
@@ -82,13 +99,6 @@ for _, row in raw_responses.iterrows():
     assert len(r["eval_docs"]) == n_eval_docs
     r["exemplar_docs"] = cluster_data["exemplar_docs"]
     r["topic_words"] = cluster_data["topic_words"]
-
-    # did they do the practice ranking correctly?
-    practice_ranks = [int(row[f"practice_rank_{i}"]) for i in range(4)]
-    r["is_practice_rank_correct"] = practice_ranks == [1, 2, 3, 4]
-    if not r["is_practice_rank_correct"]:
-        failed_practice_rank += 1
-        continue
     
     # get their assigned label and clarity score
     label = row["cluster_label"]
@@ -96,25 +106,33 @@ for _, row in raw_responses.iterrows():
 
     # now get their responses for each document
     for i in range(n_eval_docs):
-        fit_answer = row[f"{i+1}_loop_fit_a"]
-        if fit_answer == "No, it doesn't fit":
-            fit_answer = 0
-        elif fit_answer == "Not sure":
-            fit_answer = 1
-        elif fit_answer == "Yes, it fits":
-            fit_answer = 2
+        fit_answer = int(row[f"{i+1}_loop_fit_a"].split("-")[0].strip())
         
         r["eval_docs"][i]["fit"] = fit_answer
         r["eval_docs"][i]["rank"] = int(row[f"rank_{i}"])
 
     responses.append(r)
 
-print(f"Total responses: {len(responses)}")
-print(f"Failed fit attention check: {failed_fit_att_check}")
-print(f"Failed rank attention check: {failed_rank_att_check}")
-print(f"Too quick: {too_quick}")
-print(f"Failed practice ranking: {failed_practice_rank}")
+#%% Collect the attention check failures
+failed_purpose = np.array([r["failed_purpose"] for r in responses])
+failed_practice_rank = np.array([r["failed_practice_rank"] for r in responses])
+failed_fit_check = np.array([r["failed_fit_check"] for r in responses])
+failed_fam_check = np.array([r["failed_fam_check"] for r in responses])
+failed_rank_check = np.array([r["failed_rank_check"] for r in responses])
+too_quick = np.array([r["too_quick"] for r in responses])
+incorrect_practice_rank = np.array([r["incorrect_practice_rank"] for r in responses])
 
+print(f"Total responses: {len(responses)}")
+print(f"Any failure: {sum(r['any_failure'] for r in responses)}")
+print(f"Too quick: {too_quick.sum()}")
+print(f"Failed purpose: {failed_purpose.sum()}")
+print(f"Failed practice ranking: {failed_practice_rank.sum()}")
+print(f"Failed fit attention check: {failed_fit_check.sum()}")
+print(f"Failed familiarity attention check: {failed_fam_check.sum()}")
+print(f"Failed rank attention check: {failed_rank_check.sum()}")
+print(f"Incorrect practice ranking: {incorrect_practice_rank.sum()}")
+
+responses = [r for r in responses if not r["any_failure"]]
 responses = sorted(responses, key=lambda r: r["cluster_id"])
 
 # %% Save the id counts
@@ -123,8 +141,9 @@ with open("../data/human_annotations/_cluster_rank_counts.json", "w") as outfile
     json.dump(counts, outfile, indent=2)
 
 # %% Bonus calculation: if correlation between any two people is over threshold,
-# both get a bonus
+# both get a bonus. Never award bonus if they failed any attention check.
 min_corr_agree = 0.5
+payout=1.0
 bonus_receivers = set()
 for id, group in groupby(responses, key=lambda r: r["cluster_id"]):
     group = list(group)
@@ -139,7 +158,7 @@ for id, group in groupby(responses, key=lambda r: r["cluster_id"]):
             bonus_receivers.add(r2["annotator_id"])
 
 print(f"# Bonus receivers: {len(bonus_receivers)}")
-print("\n".join(sorted(bonus_receivers)))
+print("\n".join([f"{id},{payout}" for id in sorted(bonus_receivers)]))
 
 # %% A summary of the responses
 for i, r in enumerate(responses):

@@ -659,7 +659,7 @@ class DocSelector(object):
                 # Apply smoothing
                 y_values_smooth = uniform_filter1d(y_values, size=smoothing_window)
                                 
-                # Using KneeLocator to find the elbow point
+                # Find the elbow point
                 kneedle = KneeLocator(x_values, y_values_smooth, curve='convex', direction='increasing', interp_method='polynomial', polynomial_degree=poly_degree)
                 elbow = kneedle.elbow
                 
@@ -668,14 +668,13 @@ class DocSelector(object):
                     significant_idx = np.where(mat[:, k] >= elbow)[0]
                     significant_values = mat[significant_idx, k]
 
-                    # Normalize to get probability distribution
+                    # Normalize to get probability distribution and sample
                     probabilities = significant_values / np.sum(significant_values)
 
-                    # Sample indices based on the probability distribution
                     if len(significant_idx) > 0:
                         sampled_indices = np.random.choice(significant_idx, size=min(ntop, len(significant_idx)), p=probabilities, replace=False)
                         
-                        # Sort by the probs in descending order and append just idxs
+                        # Sort by the probs in descending order and append idxs
                         sampled_indices = sorted(sampled_indices, key=lambda idx: mat[idx, k], reverse=True)
                         most_representative_per_tpc.append(sampled_indices)
                     else:

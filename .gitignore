@@ -167,3 +167,5 @@ data/logs
 data/json_out
 *parquet
 *jsonl
+data/results
+*.DS_Store

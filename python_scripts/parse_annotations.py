@@ -2,17 +2,18 @@
 import json
 from copy import deepcopy
 from collections import Counter
-from itertools import groupby
+from itertools import combinations
 
 import pandas as pd
 import numpy as np
 
-from scipy.stats import pearsonr, spearmanr, kendalltau
+from scipy.stats import pearsonr, spearmanr, kendalltau, ttest_ind
 from sklearn.metrics import ndcg_score
 
+from irrCAC.raw import CAC
 
-RESPONSE_CSV = "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_June+29%2C+2024_15.48.csv"
-DATA_JSON = "../data/json_out/config_first_round.json"
+RESPONSE_CSV = "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_July+14%2C+2024_15.13.csv"
+DATA_JSONS = ["../data/json_out/config_first_round.json", "../data/json_out/config_second_round.json"]
 
 raw_responses = pd.read_csv(RESPONSE_CSV)
 MIN_MINUTES = 5
@@ -31,13 +32,19 @@ raw_responses = raw_responses.loc[raw_responses["StartDate"] >= START_DATE]
 print(f"Total responses: {len(raw_responses)}")
 
 # %% get the data
-with open(DATA_JSON) as infile:
-    eval_data = json.load(infile)
-eval_data = {
-    f"{model_id}/{cluster_id}": cluster_data
-    for model_id, model_data in eval_data.items()
-    for cluster_id, cluster_data in model_data.items()
-}
+eval_data = {}
+topics_per_model = Counter()
+for json_fpath in DATA_JSONS:
+    with open(json_fpath) as infile:
+        raw_eval_data = json.load(infile)
+    
+    for model_id, model_data in raw_eval_data.items():
+        for cluster_id, cluster_data in model_data.items():
+            # the match id should align the topics across models
+            cluster_data["topic_match_id"] = topics_per_model[model_id]
+            eval_data[f"{model_id}/{cluster_id}"] = cluster_data
+            topics_per_model[model_id] += 1
+
 
 # %% check that the columns are correct
 # first for the loop-and-merge fit questions
@@ -60,10 +67,23 @@ time_cutoff = min(np.quantile(raw_responses["Duration (in seconds)"][2:].astype(
 
 for _, row in raw_responses.iterrows():
     r = {}
-    r["annotator_id"] = row["Q22"]
 
+    # don't include people who didn't complete
+    if str(row["rank_99"]) == "nan":
+        continue
+
+    # retrieve the data for the cluster/topic that was used to generate the questions for this respondent
+    r["cluster_id"] = row["id"]
+    r["annotator_id"] = row["Q22"]
+    cluster_data = eval_data[r["cluster_id"]]
     # check if completion time was too fast
     r["too_quick"] = float(row["Duration (in seconds)"]) < time_cutoff
+
+    # store their label for the topic
+    r["category"] = row["cluster_label"]
+
+    # make sure they didn't just copy the topic
+    r["failed_category"] = r["category"] in " ".join(cluster_data["topic_words"])
 
     # check basic comprehension
     r["failed_purpose"] = "single category" not in row["practice_purpose"]
@@ -84,6 +104,7 @@ for _, row in raw_responses.iterrows():
     # determine when to throw people away
     r["remove"] = (
         r["failed_purpose"] # if they got this wrong they almost certainly didn't understand the task
+        or r["failed_category"] # if they just copied the topic, they are lazy
         or r["too_quick"] # much too quick and they probably didn't read the questions
         or r["failed_fit_check"] # this attention check is very clear
         or r["failed_sponge_check_weak"] # if you didn't put it anywhere close to last, you didn't follow
@@ -96,10 +117,6 @@ for _, row in raw_responses.iterrows():
 
     r["StartDate"] = row["StartDate"]
     r["time"] = float(row["Duration (in seconds)"])
-
-    # retrieve the data for the cluster/topic that was used to generate the questions for this respondent
-    r["cluster_id"] = row["id"]
-    cluster_data = eval_data[r["cluster_id"]]
 
     r["eval_docs"] = deepcopy(cluster_data["eval_docs"])
     assert len(r["eval_docs"]) == n_eval_docs
@@ -124,6 +141,7 @@ for _, row in raw_responses.iterrows():
 print(f"Total responses: {len(responses)}")
 print(f"Removed: {sum(r['remove'] for r in responses)}")
 print(f"Too quick: {sum(r['too_quick'] for r in responses)}")
+print(f"Failed category: {sum(r['failed_category'] for r in responses)}")
 print(f"Failed purpose: {sum(r['failed_purpose'] for r in responses)}")
 print(f"Failed fit check: {sum(r['failed_fit_check'] for r in responses)}")
 print(f"Failed fam check: {sum(r['failed_fam_check'] for r in responses)}")
@@ -133,12 +151,15 @@ print(f"Failed practice rank weak: {sum(r['failed_practice_rank_weak'] for r in 
 print(f"Failed practice rank strict: {sum(r['failed_practice_rank_strict'] for r in responses)}")
 
 responses = [r for r in responses if not r["remove"]]
-responses = sorted(responses, key=lambda r: r["cluster_id"])
+responses_by_id = {cluster_id: [] for cluster_id in eval_data.keys()}
+for r in responses:
+    responses_by_id[r["cluster_id"]].append(r)
 
 # %% Save the id counts
 counts = Counter([r["cluster_id"] for r in responses])
 with open("../data/human_annotations/_cluster_rank_counts.json", "w") as outfile:
     json.dump(counts, outfile, indent=2)
+print(json.dumps(counts, indent=1))
 
 # %% Save the responses
 # get date from the last response
@@ -157,8 +178,8 @@ with open("../data/human_annotations/paid_bonuses.txt") as infile:
 min_corr_agree = 0.75
 payout=1.5
 bonus_receivers = set()
-for id, group in groupby(responses, key=lambda r: r["cluster_id"]):
-    group = list(group)
+for id, group in responses_by_id.items():
+    
     if len(group) < 3:
         continue
     ranks = np.array([
@@ -182,122 +203,70 @@ for r in responses:
 print(f"# Bonus receivers: {len(bonus_receivers)}")
 print("\n".join([f"{id},{payout}" for id in sorted(bonus_receivers) if id not in paid_bonuses]))
 
-# %% A summary of the responses
-for i, r in enumerate(responses):
-    fits = np.array([doc["fit"] for doc in r["eval_docs"]])
-    ranks = np.array([doc["rank"] for doc in r["eval_docs"]])
-    probs = np.array([doc["prob"] for doc in r["eval_docs"]])
-    assigns = np.array([doc["assigned_to_k"] for doc in r["eval_docs"]])
+#%% 
+# collect the categories per topic -- this is just for a latex table, so doesn't need to be complete
+category_data = []
 
-    # fit-to-rank correlation
-    fit_to_rank_corr, fit_to_rank_pval = spearmanr(fits, ranks)
-
-    # fit to prob correlation
-    fit_to_prob_corr, fit_to_prob_pval = spearmanr(fits, probs)
-
-    # rank to prob correlation
-    rank_to_prob_corr, rank_to_prob_pval = spearmanr(ranks, probs)
-
-    print(f"\n ==== Cluster {r['cluster_id']}, annotator {i}, time {r['time']/60:0.1f} ====")
-    print(
-        f"Fit to rank corr: {fit_to_rank_corr:.2f} (p={fit_to_rank_pval:.3f}) | "
-        f"Fit to prob corr: {fit_to_prob_corr:.2f} (p={fit_to_prob_pval:.3f}) | "
-        f"Rank to prob corr: {rank_to_prob_corr:.2f} (p={rank_to_prob_pval:.3f}) | "
-    )
-# %%
-from itertools import groupby
-
-for id, group in groupby(responses, key=lambda r: r["cluster_id"]):
-    group = list(group)
+for i, (id, group) in enumerate(responses_by_id.items()):
+    if i % 3 != 0: # ensures matches
+        continue
     if len(group) < 2:
         continue
-    fit_data = np.array([
-        [doc["fit"] for doc in r["eval_docs"]]
-        for r in group
-    ])
-    rank_data = np.array([
-        [doc["rank"] for doc in r["eval_docs"]]
-        for r in group
-    ])
-    prob_data = np.array(
-        [doc["prob"] for doc in group[0]["eval_docs"]]
+    
+    split_id = id.split("/")
+    model_name = split_id[-2]
+    topic = split_id[-1]
+
+    category_data.append({
+        "id": id,
+        "model": model_name,
+        "topic": topic,
+        "topic_idx": i // 9,
+        "annotator_id": None,
+        "annotator_idx": -1,
+        "category": r"\emph{" + " ".join(group[0]["topic_words"][:5]) + "}",
+    })
+    for j in range(4):
+        try:
+            category = group[j]["category"]
+            annotator_id = group[j]["annotator_id"]
+        except IndexError:
+            category = ""
+            annotator_id = None
+        category_data.append({
+            "id": id,
+            "model": model_name,
+            "topic": topic,
+            "topic_idx": i // 9,
+            "annotator_id": annotator_id,
+            "annotator_idx": j,
+            "category": category.replace("&", r"\&"),
+        })
+
+# create a simple dataframe for latex
+category_data = (
+    pd.DataFrame(category_data)
+      .pivot_table(columns="model", index=["topic_idx", "annotator_idx"], values="category", aggfunc="first")
+      #.droplevel(1, 0)
+      [["mallet", "ctm", "category-45"]] # sort columns
+      .rename(columns={"mallet": "Mallet", "ctm": "CTM", "category-45": "Labeled"})
+)
+
+# print the latex
+# 
+print(
+    category_data.style.hide().to_latex(
+        hrules=True
     )
-    print("")
-    top_words = " ".join(group[0]["topic_words"][:10])
-    avg_familiar = np.mean([doc["is_familiar"] for r in group for doc in r["eval_docs"]])
-    print(f"=== {id} | annotators: {len(group)} | {top_words} | {avg_familiar:.2f} fam ===")
-    # average inter-annotator correlations
-    ia_fit_corrs = np.zeros((len(group), 2))
-    ia_rank_corrs = np.zeros((len(group), 2))
-    for i in range(len(group)):
-        fit_i = fit_data[i]
-        rank_i = rank_data[i]
-        # is this leave-one-out averaging the right choice? should we sum instead?
-        mean_fit = np.mean(np.delete(fit_data, i, axis=0), axis=0)
-        mean_rank = np.mean(np.delete(rank_data, i, axis=0), axis=0)
-
-        ia_fit_corrs[i] = spearmanr(fit_i, mean_fit)
-        ia_rank_corrs[i] = spearmanr(rank_i, mean_rank)
-    mean_ia_fit_corr = np.mean(ia_fit_corrs, axis=0)
-    mean_ia_rank_corr = np.mean(ia_rank_corrs, axis=0)
-    #print(f"mean IA fit correlation: {mean_ia_fit_corr[0]:0.3f} (p={mean_ia_fit_corr[1]:0.3f})")
-    #print(f"mean IA rank correlation: {mean_ia_rank_corr[0]:0.3f} (p={mean_ia_rank_corr[1]:0.3f})")
-
-    # average model-annotator correlations
-    # TODO: definitely want to double check this--concatenate instead??
-    prob_fit_corrs = np.zeros((len(group), 2))
-    prob_rank_corrs = np.zeros((len(group), 2))
-    for i in range(len(group)):
-        fit_i = fit_data[i]
-        rank_i = rank_data[i]
-        prob_fit_corrs[i] = spearmanr(fit_i, prob_data)
-        prob_rank_corrs[i] = spearmanr(rank_i, prob_data)
-    mean_prob_fit_corr = np.mean(prob_fit_corrs, axis=0)
-    mean_prob_rank_corr = np.mean(prob_rank_corrs, axis=0)
-
-    # TODO: bootstrap (with leave-one-out or something)
-
-    print(f"mean fit-prob correlation: {mean_prob_fit_corr[0]:0.3f} (p={mean_prob_fit_corr[1]:0.3f})")
-    print(f"mean rank-prob correlation: {mean_prob_rank_corr[0]:0.3f} (p={mean_prob_rank_corr[1]:0.3f})")
-
-    # Borda count
-    rank_sums = (8 - rank_data).sum(0)
-    rank_sum_corr, rank_sum_pval = spearmanr(rank_sums, prob_data)
-    print(f"rank sum-prob correlation: {rank_sum_corr:0.3f} (p={rank_sum_pval:0.3f})")
-
-    # agreements
-    alpha_score = alpha(fit_data, value_domain=[1, 2, 3, 4, 5], level_of_measurement="ordinal")
-    #print (f"fit agreement ({len(group)}): {alpha_score:0.3f}")
-
-    alpha_score = alpha(rank_data, value_domain=range(1, n_eval_docs+2), level_of_measurement="ordinal")
-    #print (f"rank agreement ({len(group)}): {alpha_score:0.3f}")
-    
-    # # get the fits
-    # fit_task = AnnotationTask(data=[
-    #     (r["annotator_id"], i, r["eval_docs"][i]["fit"])
-    #     for r in group
-    #     for i in range(n_eval_docs)
-    # ])
-    # print(f"fit agreement ({len(group)}): {fit_task.alpha():0.3f}")
-    
-    # # get the ranks
-    # rank_task = AnnotationTask(data=[
-    #     (r["annotator_id"], i, r["eval_docs"][i]["rank"])
-    #     for r in group
-    #     for i in range(n_eval_docs)
-    # ])
-    # print(f"rank agreement ({len(group)}): {rank_task.alpha():0.3f}")
-
+)
 
 # %% agreement per topic
-from irrCAC.raw import CAC
-
-fits_threshold = 4
+fit_threshold = 4
 agreement_data = []
 bin_fit_data_by_model = {"mallet": [], "ctm": [], "category-45": []}
 j = 0
-for id, group in groupby(responses, key=lambda r: r["cluster_id"]):
-    group = list(group)
+for id, group in responses_by_id.items():
+    
     if len(group) < 2:
         continue
 
@@ -312,7 +281,7 @@ for id, group in groupby(responses, key=lambda r: r["cluster_id"]):
         columns=doc_idxs,
     ).T
     # binarize the fits
-    bin_fit_data = id + "_" + (fit_data >= fits_threshold).astype(str)
+    bin_fit_data = id + "_" + (fit_data >= fit_threshold).astype(str)
 
     # get rank data
     rank_data = pd.DataFrame(
@@ -329,11 +298,11 @@ for id, group in groupby(responses, key=lambda r: r["cluster_id"]):
     fit_alpha = fit_cac.krippendorff()["est"]
     fit_ac2 = fit_cac.gwet()["est"]
 
-    bin_fit_alpha = bin_fit_cac.krippendorff()["est"]
-    bin_fit_ac2 =  bin_fit_cac.gwet()["est"]
+    # bin_fit_alpha = bin_fit_cac.krippendorff()["est"]
+    # bin_fit_ac2 =  bin_fit_cac.gwet()["est"]
 
-    rank_alpha = fit_cac.krippendorff()["est"]
-    rank_ac2 = fit_cac.gwet()["est"]
+    rank_alpha = rank_cac.krippendorff()["est"]
+    rank_ac2 = rank_cac.gwet()["est"]
 
     # get data from the id
     split_id = id.split("/")
@@ -351,11 +320,11 @@ for id, group in groupby(responses, key=lambda r: r["cluster_id"]):
         "fit_ac2": fit_ac2["coefficient_value"],
         "fit_ac2_p": fit_ac2["p_value"],
 
-        "bin_fit_alpha": bin_fit_alpha["coefficient_value"],
-        "bin_fit_alpha_p": bin_fit_alpha["p_value"],
+        # "bin_fit_alpha": bin_fit_alpha["coefficient_value"],
+        # "bin_fit_alpha_p": bin_fit_alpha["p_value"],
 
-        "bin_fit_ac2": bin_fit_ac2["coefficient_value"],
-        "bin_fit_ac2_p": bin_fit_ac2["p_value"],
+        # "bin_fit_ac2": bin_fit_ac2["coefficient_value"],
+        # "bin_fit_ac2_p": bin_fit_ac2["p_value"],
 
         "rank_alpha": rank_alpha["coefficient_value"],
         "rank_alpha_p": rank_alpha["p_value"],
@@ -367,23 +336,281 @@ for id, group in groupby(responses, key=lambda r: r["cluster_id"]):
 
 agreement_data_by_topic = pd.DataFrame(agreement_data)
 
-bin_agreement_data_by_model = []
-for model, model_bin_fit_data in bin_fit_data_by_model.items():
-    model_bin_fit_data = pd.concat(model_bin_fit_data)
-    model_bin_fit_cac = CAC(model_bin_fit_data, weights="identity")
+# bin_agreement_data_by_model = []
+# for model, model_bin_fit_data in bin_fit_data_by_model.items():
+#     model_bin_fit_data = pd.concat(model_bin_fit_data)
+#     model_bin_fit_cac = CAC(model_bin_fit_data, weights="identity")
 
-    model_bin_fit_alpha = model_bin_fit_cac.krippendorff()["est"]
-    model_bin_fit_ac2 = model_bin_fit_cac.gwet()["est"]
+#     model_bin_fit_alpha = model_bin_fit_cac.krippendorff()["est"]
+#     model_bin_fit_ac2 = model_bin_fit_cac.gwet()["est"]
 
-    bin_agreement_data_by_model.append({
-        "model": model,
-        "bin_fit_alpha": model_bin_fit_alpha["coefficient_value"],
-        "bin_fit_alpha_p": model_bin_fit_alpha["p_value"],
+#     bin_agreement_data_by_model.append({
+#         "model": model,
+#         "bin_fit_alpha": model_bin_fit_alpha["coefficient_value"],
+#         "bin_fit_alpha_p": model_bin_fit_alpha["p_value"],
 
-        "bin_fit_ac2": model_bin_fit_ac2["coefficient_value"],
-        "bin_fit_ac2_p": model_bin_fit_ac2["p_value"],
-    })
+#         "bin_fit_ac2": model_bin_fit_ac2["coefficient_value"],
+#         "bin_fit_ac2_p": model_bin_fit_ac2["p_value"],
+#     })
 
-bin_agreement_data_by_model = pd.DataFrame(bin_agreement_data_by_model)
+# bin_agreement_data_by_model = pd.DataFrame(bin_agreement_data_by_model)
+#%%
+print(
+    agreement_data_by_topic
+        .replace({"mallet": "Mallet", "ctm": "CTM", "category-45": "Labeled"})
+        .groupby("model")[["fit_alpha", "rank_alpha"]]
+        .agg(lambda x: f"{x.mean():0.2f} ({x.std():0.2f})")
+        .rename(columns={"fit_alpha": r"$\alpha$ Fit", "rank_alpha": r"$\alpha$ Rank"})
+        .style
+        .to_latex(hrules=True)
+        .replace("model", "")
+)
 
 # %%
+aggregation_method = "mean"
+corr_data = []
+model_fit_data = {"mallet": [], "ctm": [], "category-45": []}
+model_rank_data = {"mallet": [], "ctm": [], "category-45": []}
+model_prob_data = {"mallet": [], "ctm": [], "category-45": []}
+
+# first collect the responses and compute the correlation data
+for id, group in responses_by_id.items():
+    
+    # get data from the id
+    split_id = id.split("/")
+    model_name = split_id[-2]
+    topic = split_id[-1]
+
+    if len(group) < 2:
+        continue
+
+    # compile the fit and rank data
+    fit_data = np.array([
+        [doc["fit"] for doc in r["eval_docs"]]
+        for r in group
+    ])
+    rank_data = np.array([
+        [doc["rank"] for doc in r["eval_docs"]]
+        for r in group
+    ])
+    rank_data = 8 - rank_data # reverse so that higher is better
+    prob_data = np.array(
+        [doc["prob"] for doc in group[0]["eval_docs"]]
+    )
+    assign_data = np.array(
+        [doc["assigned_to_k"] for doc in group[0]["eval_docs"]]
+    )
+    top_words = " ".join(group[0]["topic_words"][:10])
+    avg_familiar = np.mean([doc["is_familiar"] for r in group for doc in r["eval_docs"]])
+    #print(f"=== {id} | annotators: {len(group)} | {top_words} | {avg_familiar:.2f} fam ===")
+
+    model_fit_data[model_name].append(fit_data)
+    model_rank_data[model_name].append(rank_data)
+    model_prob_data[model_name].append(np.repeat([prob_data], len(group), axis=0))
+    
+    # compute the correlations
+    bin_fit_data = (fit_data >= fit_threshold).astype(int)
+    # could flatten and compute over all rather than take mean
+    if aggregation_method == "mean":
+        mean_rank_data = rank_data.mean(0)
+        mean_fit_data = fit_data.mean(0)
+    elif aggregation_method == "concatenate":
+        mean_fit_data = fit_data.flatten()
+        mean_rank_data = rank_data.flatten()
+        prob_data = np.tile(prob_data, len(group))
+    else:
+        raise ValueError(f"Unknown aggregation method: {aggregation_method}")
+
+    fit_rho, _ = spearmanr(mean_fit_data, prob_data)
+    rank_rho, _ = spearmanr(mean_rank_data, prob_data)
+
+    fit_tau, _ = kendalltau(mean_fit_data, prob_data)
+    rank_tau, _ = kendalltau(mean_rank_data, prob_data)
+
+    fit_ndcg = ndcg_score(fit_data, prob_data.tile((len(group), 1)))
+    rank_ndcg = ndcg_score(rank_data, prob_data.tile((len(group), 1)))
+
+    fit_agree = np.mean(bin_fit_data == assign_data)
+
+    corr_data.append({
+        "id": id,
+        "model": model_name,
+        "n_annotators": len(group),
+        "topic": topic,
+        "topic_match_id": eval_data[id]["topic_match_id"],
+        "fit_rho": fit_rho,
+        "fit_tau": fit_tau,
+        "rank_rho": rank_rho,
+        "rank_tau": rank_tau,
+        "fit_ndcg": fit_ndcg,
+        "rank_ndcg": rank_ndcg,
+        "fit_agree": fit_agree,
+    })
+corr_data = pd.DataFrame(corr_data)
+
+#%% t-tests
+corr_data = corr_data.sort_values(["model", "topic_match_id"])
+for model_a, model_b in combinations(["mallet", "ctm", "category-45"], 2):
+    for metric in ["fit_rho", "rank_rho", "fit_tau", "rank_tau", "fit_agree"]:
+        stat, pval = ttest_ind(corr_data[corr_data["model"] == model_a][metric].values, corr_data[corr_data["model"] == model_b][metric].values)
+        alpha = 0.05 / 5 # Bonferroni correction for number of metrics
+        sig = "*" if pval < alpha else ""
+        print(f"{model_a} vs {model_b} | {metric} | {stat:.3f} | {pval:.3f}{sig}")
+
+
+#%% then compute ndcg
+ndcg_data = []
+for model_name in model_fit_data.keys():
+    fit_data = np.concatenate(model_fit_data[model_name], axis=0)
+    rank_data = np.concatenate(model_rank_data[model_name], axis=0)
+    prob_data = np.concatenate(model_prob_data[model_name], axis=0)
+    
+    fit_ndcg = ndcg_score(fit_data, prob_data)
+    rank_ndcg = ndcg_score(rank_data, prob_data)
+
+    print(f"{model_name} | Fit NDCG: {fit_ndcg:.5f} | Rank NDCG: {rank_ndcg:.5f}")
+    ndcg_data.append({
+        "model": model_name,
+        "fit_ndcg": fit_ndcg,
+        "rank_ndcg": rank_ndcg,
+    })
+
+ndcg_data = pd.DataFrame(ndcg_data)
+
+# %% correlation plots
+from plotnine import (
+    ggplot,
+    aes,
+    geom_point,
+    geom_bar,
+    facet_wrap,
+    facet_grid,
+    theme_classic,
+    coord_cartesian,
+    scale_fill_brewer,
+    scale_color_brewer,
+    theme,
+    element_text,
+    element_blank,
+)
+
+#%%
+corr_data["model"] = corr_data["model"].replace({"mallet": "Mallet", "ctm": "CTM", "category-45": "Labeled"})
+# change data from wide to long, where each row is (model, fit/rank, rho/tau, value)
+corr_plot_data = pd.melt(
+    corr_data,
+    id_vars=["model", "id", "topic_match_id"],
+    value_vars=["fit_rho", "rank_rho", "fit_tau", "rank_tau", "fit_agree"],
+    var_name="metric",
+    value_name="Value",
+)
+corr_plot_data["score_type"] = corr_plot_data["metric"].str.split("_").str[0].str.capitalize()
+corr_plot_data["coefficient"] = corr_plot_data["metric"].str.split("_").str[1].str.capitalize()
+corr_plot_data["coefficient"] = corr_plot_data["coefficient"].astype("category").cat.reorder_categories(["Rho", "Tau", "Agree"])
+corr_plot_data["model"] = corr_plot_data["model"].astype("category").cat.reorder_categories(["Mallet", "CTM", "Labeled"])
+corr_plot_data["topic_match_id"] = corr_plot_data["topic_match_id"].astype("category") # can plot as color, but no real relationship model-to-model
+corr_plot = (
+    ggplot(corr_plot_data, aes(x="model", y="Value", color="model"))
+    + geom_point()
+    + scale_color_brewer(type="qual", palette=2)
+    # score type on rows of facet, coefficient on columns
+    + facet_grid("score_type ~ coefficient")
+    + theme_classic()
+    + theme(
+        # remove x axis title
+        axis_title_x=element_blank(),
+        # remove y axis title
+        axis_title_y=element_blank(),
+        # remove legend
+        legend_position="none",
+        # make font a bit smaller
+        text=element_text(size=7),
+    )
+)
+corr_plot
+# remove margins
+corr_plot.save("../figures/correlation_plot.pdf", dpi=300, width=4.65, height=3.5, bbox_inches='tight')
+
+# %% NDCG plots
+ndcg_data["model"] = ndcg_data["model"].replace({"mallet": "Mallet", "ctm": "CTM", "category-45": "Labeled"})
+ndcg_plot_data = pd.melt(ndcg_data, id_vars=["model"], value_vars=["fit_ndcg", "rank_ndcg"], var_name="metric", value_name="value")
+ndcg_plot_data["score_type"] = ndcg_plot_data["metric"].str.split("_").str[0].str.capitalize()
+ndcg_plot_data["coefficient"] = "NDGC"
+ndcg_plot_data["model"] = ndcg_plot_data["model"].astype("category").cat.reorder_categories(["Mallet", "CTM", "Labeled"])
+
+# bar plot
+ndcg_plot = (
+    ggplot(ndcg_plot_data, aes(x="model", y="value", fill="model"))
+    + geom_bar(stat="identity", position="dodge")
+    + facet_grid("score_type ~ coefficient")
+    + coord_cartesian(ylim=(0.89, 1))
+    + scale_fill_brewer(type="qual", palette=2)
+    + theme_classic()
+    + theme(
+        # remove x axis title
+        axis_title_x=element_blank(),
+        # remove y axis title
+        axis_title_y=element_blank(),
+        # remove legend
+        legend_position="none",
+        # make font a bit smaller
+        text=element_text(size=7),
+    )
+)
+ndcg_plot.save("../figures/ndcg_plot.pdf", dpi=300, width=1.55, height=3.5, bbox_inches='tight')
+ndcg_plot
+
+#%% get coherence 
+from gensim.models import CoherenceModel
+from gensim.corpora import Dictionary
+
+with open("../data/document-data/wikitext/processed/labeled/vocab_15k/train.metadata.jsonl") as infile:
+    docs = [json.loads(line)["tokenized_text"].split() for line in infile]
+with open("../data/document-data/wikitext/processed/labeled/vocab_15k/test.metadata.jsonl") as infile:
+    docs.extend([json.loads(line)["tokenized_text"].split() for line in infile])
+
+vocab = sorted(set([word for doc in docs for word in doc]))
+data_dict = Dictionary([vocab])
+
+#%%
+from tqdm import tqdm
+for cluster_id, cluster_data in tqdm(eval_data.items()):
+    topics = [cluster_data["topic_words"][:15]] # number shown to annotators
+    cm = CoherenceModel(
+        topics=topics,
+        texts=docs,
+        dictionary=data_dict,
+        coherence="c_npmi",
+        window_size=None,
+        processes=1,
+    )
+
+    confirmed_measures = cm.get_coherence_per_topic()
+    mean = cm.aggregate_measures(confirmed_measures)
+    eval_data[cluster_id]["npmi"] = mean
+npmi_data = pd.DataFrame({'id': id, 'NPMI': data['npmi']} for id, data in eval_data.items())
+corr_plot_data = corr_plot_data.merge(npmi_data, on="id")
+
+#%% plot NPMI vs. correlation
+corr_plot_data["color"] = "a"
+npmi_corr_plot = (
+    ggplot(corr_plot_data, aes(x="Value", y="NPMI", color="color"))
+    + geom_point()
+    + scale_color_brewer(type="qual", palette="Set1")
+    + facet_grid("score_type ~ coefficient", scales="free")
+    + theme_classic()
+    + theme(
+        # remove x axis title
+        axis_title_x=element_blank(),
+        # remove legend
+        legend_position="none",
+        # make font a bit smaller
+        text=element_text(size=7),
+    )
+)
+npmi_corr_plot.save("../figures/npmi_corr_plot.pdf", dpi=300, width=4.65, height=3.5, bbox_inches='tight')
+npmi_corr_plot
+# %%
+corr_data = corr_data.merge(npmi_data, on="id")
+pearsonr(corr_data.npmi, corr_data.rank_rho)
+pearsonr(corr_data.npmi, corr_data.rank_rtau)

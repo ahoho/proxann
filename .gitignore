@@ -171,3 +171,4 @@ data/results
 *.DS_Store
 src/analysis/topic-model-data
 data/human_annotations
+data/document-data

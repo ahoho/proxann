@@ -7,11 +7,32 @@ from itertools import combinations
 import pandas as pd
 import numpy as np
 
-from scipy.stats import pearsonr, spearmanr, kendalltau, ttest_ind
+from scipy.stats import pearsonr, spearmanr, kendalltau, ttest_ind, sem, mannwhitneyu
 from sklearn.metrics import ndcg_score
 
 from irrCAC.raw import CAC
 
+from plotnine import (
+    ggplot,
+    aes,
+    geom_point,
+    geom_bar,
+    geom_boxplot,
+    geom_errorbar,
+    facet_wrap,
+    facet_grid,
+    position_dodge,
+    theme_classic,
+    coord_cartesian,
+    scale_fill_brewer,
+    scale_fill_manual,
+    scale_color_brewer,
+    theme,
+    element_text,
+    element_blank,
+)
+
+#%%
 RESPONSE_CSV = "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_July+14%2C+2024_15.13.csv"
 DATA_JSONS = ["../data/json_out/config_first_round.json", "../data/json_out/config_second_round.json"]
 
@@ -427,9 +448,6 @@ for id, group in responses_by_id.items():
     fit_tau, _ = kendalltau(mean_fit_data, prob_data)
     rank_tau, _ = kendalltau(mean_rank_data, prob_data)
 
-    fit_ndcg = ndcg_score(fit_data, prob_data.tile((len(group), 1)))
-    rank_ndcg = ndcg_score(rank_data, prob_data.tile((len(group), 1)))
-
     fit_agree = np.mean(bin_fit_data == assign_data)
 
     corr_data.append({
@@ -442,17 +460,15 @@ for id, group in responses_by_id.items():
         "fit_tau": fit_tau,
         "rank_rho": rank_rho,
         "rank_tau": rank_tau,
-        "fit_ndcg": fit_ndcg,
-        "rank_ndcg": rank_ndcg,
         "fit_agree": fit_agree,
     })
 corr_data = pd.DataFrame(corr_data)
 
-#%% t-tests
+#%% mann-whitney U tests
 corr_data = corr_data.sort_values(["model", "topic_match_id"])
 for model_a, model_b in combinations(["mallet", "ctm", "category-45"], 2):
     for metric in ["fit_rho", "rank_rho", "fit_tau", "rank_tau", "fit_agree"]:
-        stat, pval = ttest_ind(corr_data[corr_data["model"] == model_a][metric].values, corr_data[corr_data["model"] == model_b][metric].values)
+        stat, pval = mannwhitneyu(corr_data[corr_data["model"] == model_a][metric].values, corr_data[corr_data["model"] == model_b][metric].values)
         alpha = 0.05 / 5 # Bonferroni correction for number of metrics
         sig = "*" if pval < alpha else ""
         print(f"{model_a} vs {model_b} | {metric} | {stat:.3f} | {pval:.3f}{sig}")
@@ -476,23 +492,6 @@ for model_name in model_fit_data.keys():
     })
 
 ndcg_data = pd.DataFrame(ndcg_data)
-
-# %% correlation plots
-from plotnine import (
-    ggplot,
-    aes,
-    geom_point,
-    geom_bar,
-    facet_wrap,
-    facet_grid,
-    theme_classic,
-    coord_cartesian,
-    scale_fill_brewer,
-    scale_color_brewer,
-    theme,
-    element_text,
-    element_blank,
-)
 
 #%%
 corr_data["model"] = corr_data["model"].replace({"mallet": "Mallet", "ctm": "CTM", "category-45": "Labeled"})
@@ -529,7 +528,7 @@ corr_plot = (
 )
 corr_plot
 # remove margins
-corr_plot.save("../figures/correlation_plot.pdf", dpi=300, width=4.65, height=3.5, bbox_inches='tight')
+#corr_plot.save("../figures/correlation_plot.pdf", dpi=300, width=4.65, height=3.5, bbox_inches='tight')
 
 # %% NDCG plots
 ndcg_data["model"] = ndcg_data["model"].replace({"mallet": "Mallet", "ctm": "CTM", "category-45": "Labeled"})
@@ -614,3 +613,235 @@ npmi_corr_plot
 corr_data = corr_data.merge(npmi_data, on="id")
 pearsonr(corr_data.npmi, corr_data.rank_rho)
 pearsonr(corr_data.npmi, corr_data.rank_rtau)
+
+#%% ################
+# REVISIONS
+##################
+
+corr_data = []
+model_fit_data = {"mallet": [], "ctm": [], "category-45": []}
+model_rank_data = {"mallet": [], "ctm": [], "category-45": []}
+model_prob_data = {"mallet": [], "ctm": [], "category-45": []}
+
+# first collect the responses and compute the correlation data
+for id, group in responses_by_id.items():
+
+    # get data from the id
+    split_id = id.split("/")
+    model_name = split_id[-2]
+    topic = split_id[-1]
+
+    if len(group) < 2:
+        continue
+
+    # compile the fit and rank data
+    fit_data = np.array([
+        [doc["fit"] for doc in r["eval_docs"]]
+        for r in group
+    ])
+    rank_data = np.array([
+        [doc["rank"] for doc in r["eval_docs"]]
+        for r in group
+    ])
+    rank_data = 8 - rank_data # reverse so that higher is better
+    prob_data = np.array(
+        [doc["prob"] for doc in group[0]["eval_docs"]]
+    )
+    assign_data = np.array(
+        [doc["assigned_to_k"] for doc in group[0]["eval_docs"]]
+    )
+    top_words = " ".join(group[0]["topic_words"][:10])
+    avg_familiar = np.mean([doc["is_familiar"] for r in group for doc in r["eval_docs"]])
+
+    model_fit_data[model_name].append(fit_data)
+    model_rank_data[model_name].append(rank_data)
+    model_prob_data[model_name].append(np.repeat([prob_data], len(group), axis=0))
+
+    bin_fit_data = (fit_data >= fit_threshold).astype(int)
+
+    for i in range(len(group)):
+        # compute the correlations
+        fit_rho, _ = spearmanr(fit_data[i], prob_data)
+        rank_rho, _ = spearmanr(rank_data[i], prob_data)
+
+        fit_tau, _ = kendalltau(fit_data[i], prob_data)
+        rank_tau, _ = kendalltau(rank_data[i], prob_data)
+
+        fit_ndcg = ndcg_score([fit_data[i]], [prob_data])
+        rank_ndcg = ndcg_score([rank_data[i]], [prob_data])
+
+        fit_agree = np.mean(bin_fit_data[i] == assign_data)
+        #rank_agree = np.mean(assign_data[rank_data[i].argsort()[::-1][:assign_data.sum()]]) # how many of the top k are in the assigned k
+
+        # to mean of other annotators
+        other_mean_fit_data = np.mean(np.delete(fit_data, i, axis=0), axis=0)
+        other_mean_rank_data = np.mean(np.delete(rank_data, i, axis=0), axis=0)
+
+        fit_ia_rho, _ = spearmanr(fit_data[i], other_mean_fit_data)
+        rank_ia_rho, _ = spearmanr(rank_data[i], other_mean_rank_data)
+
+        fit_ia_tau, _ = kendalltau(fit_data[i], other_mean_fit_data)
+        rank_ia_tau, _ = kendalltau(rank_data[i], other_mean_rank_data)
+
+        corr_data.append({
+            "id": id,
+            "model": model_name,
+            "n_annotators": len(group),
+            "topic": topic,
+            "topic_match_id": eval_data[id]["topic_match_id"],
+            "annotator": i,
+            "fit_rho": fit_rho,
+            "fit_tau": fit_tau,
+            "rank_rho": rank_rho,
+            "rank_tau": rank_tau,
+            "fit_NDCG": fit_ndcg,
+            "rank_NDCG": rank_ndcg,
+            "fit_agree": fit_agree,
+            #"rank_agree": rank_agree,
+            "fit_ia-rho": fit_ia_rho,
+            "fit_ia-tau": fit_ia_tau,
+            "rank_ia-rho": rank_ia_rho,
+            "rank_ia-tau": rank_ia_tau
+        })
+    
+corr_data = pd.DataFrame(corr_data)
+
+#%% mann-whitney U tests
+corr_data = corr_data.sort_values(["model", "topic_match_id"])
+for model_a, model_b in combinations(["mallet", "ctm", "category-45"], 2):
+    for metric in ["fit_tau", "rank_tau", "fit_NDCG", "rank_NDCG", "fit_agree", "fit_ia-tau", "rank_ia-tau"]:
+        stat, pval = mannwhitneyu(corr_data[corr_data["model"] == model_a][metric].values, corr_data[corr_data["model"] == model_b][metric].values)
+        alpha = 0.05 / 7 # Bonferroni correction for number of metrics
+        sig = "*" if pval < alpha else ""
+        print(f"{model_a} vs {model_b} | {metric} | {stat:.3f} | {pval:.3f}{sig}")
+
+#%%
+corr_data["model"] = corr_data["model"].replace({"mallet": "Mallet", "ctm": "CTM", "category-45": "Labeled"})
+# change data from wide to long, where each row is (model, fit/rank, rho/tau, value)
+corr_plot_data = pd.melt(
+    corr_data.drop(columns=["topic", "n_annotators", "annotator"]),
+    id_vars=["model", "id", "topic_match_id"],
+    var_name="metric",
+    value_name="Value",
+)
+
+corr_plot_data["coefficient"] = corr_plot_data["metric"].str.split("_").str[-1]
+corr_plot_data["score_type"] = corr_plot_data["metric"].str.split("_").str[0].str.capitalize()
+corr_plot_data["model"] = corr_plot_data["model"].astype("category").cat.reorder_categories(["Mallet", "CTM", "Labeled"])
+corr_plot_data["topic_match_id"] = corr_plot_data["topic_match_id"].astype("category") # can plot as color, but no real relationship model-to-model
+corr_plot_data = corr_plot_data.loc[~corr_plot_data["coefficient"].str.contains("rho", case=False)]
+corr_plot_data["coefficient"] = corr_plot_data["coefficient"].replace({"ia-tau": "Inter-Annotator Tau", "tau": "Model-Annotator Tau", "ndcg": "NDCG", "agree": "Binary Agreement"})
+corr_plot_data["coefficient"] = corr_plot_data["coefficient"].astype("category").cat.reorder_categories(["Inter-Annotator Tau", "Model-Annotator Tau", "NDCG", "Binary Agreement"])
+
+#corr_plot_data = corr_plot_data.loc[corr_plot_data.coefficient.str.contains("Tau")]
+corr_plot = (
+    ggplot(corr_plot_data, aes(x="model", y="Value", fill="model"))
+    + geom_boxplot()
+    + scale_fill_manual(values=["#66c2a5", "#fc8d62", "#b3b3b3"])
+    # score type on rows of facet, coefficient on columns
+    + facet_grid("score_type ~ coefficient")
+    + theme_classic()
+    + theme(
+        # remove x axis title
+        axis_title_x=element_blank(),
+        # remove y axis title
+        axis_title_y=element_blank(),
+        # remove legend
+        legend_position="none",
+        # make font a bit smaller
+        text=element_text(size=7),
+    )
+)
+corr_plot
+# remove margins
+corr_plot.save("../figures/correlation_boxplot.pdf", dpi=300, width=6.2, height=3.5, bbox_inches='tight')
+
+
+#%%
+
+from plotnine import geom_smooth, scale_color_manual
+
+corr_plot_data = corr_plot_data.merge(npmi_data, on="id")
+corr_plot_data["color"] = "b"
+corr_plot_data["coefficient"] = corr_plot_data["coefficient"].astype("category").cat.reorder_categories(["Inter-Annotator Tau", "Model-Annotator Tau", "NDCG", "Binary Agreement"])
+
+npmi_corr_plot = (
+    ggplot(corr_plot_data, aes(x="NPMI", y="Value", color="color"))
+    + geom_point()
+    #+ stat_summary(fun.data= mean_cl_normal) 
+    + geom_smooth(method='lm')
+    + scale_color_manual("#7570b3")
+    + facet_grid("score_type ~ coefficient", scales="free")
+    + theme_classic()
+    + theme(
+        # remove x axis title
+        axis_title_y=element_blank(),
+        # remove legend
+        legend_position="none",
+        # make font a bit smaller
+        text=element_text(size=7),
+    )
+)
+npmi_corr_plot
+npmi_corr_plot.save("../figures/npmi_correlation_with_line.pdf", dpi=300, width=6.2, height=3.5, bbox_inches='tight')
+npmi_corr_plot
+
+for metric, df in corr_plot_data.groupby("metric"):
+    rho, pval = pearsonr(df.Value, df.NPMI)
+    print(f"{metric:11} {rho:0.3f} {pval:0.3f}")
+
+
+
+#%%
+### This is for error bars:
+mean_corr_data = (
+    corr_data.groupby(["id", "model", "topic", "topic_match_id", "n_annotators"])
+             .agg(["mean", sem])
+             .drop(columns=["annotator"])
+)
+mean_corr_data.columns = ["|".join(col) for col in mean_corr_data.columns.values]
+mean_corr_data = mean_corr_data.reset_index()
+
+mean_corr_data["model"] = mean_corr_data["model"].replace({"mallet": "Mallet", "ctm": "CTM", "category-45": "Labeled"})
+# change data from wide to long, where each row is (model, fit/rank, rho/tau, value)
+corr_plot_data = pd.melt(
+    mean_corr_data.drop(columns=["topic", "n_annotators"]),
+    id_vars=["model", "id", "topic_match_id"],
+    var_name="metric",
+    value_name="Value",
+)
+
+corr_plot_data["stat"] = corr_plot_data["metric"].str.split("|").str[1]
+corr_plot_data["metric"] = corr_plot_data["metric"].str.split("|").str[0]
+corr_plot_data = corr_plot_data.pivot(index=["model", "id", "topic_match_id", "metric"], columns="stat", values="Value")
+corr_plot_data = corr_plot_data.reset_index()
+
+corr_plot_data["score_type"] = corr_plot_data["metric"].str.split("_").str[0].str.capitalize()
+corr_plot_data["coefficient"] = corr_plot_data["metric"].str.split("_").str[-1]
+corr_plot_data["model"] = corr_plot_data["model"].astype("category").cat.reorder_categories(["Mallet", "CTM", "Labeled"])
+corr_plot_data["topic_match_id"] = corr_plot_data["topic_match_id"].astype("category") # can plot as color, but no real relationship model-to-model
+
+corr_plot_data = corr_plot_data.loc[~corr_plot_data["coefficient"].str.contains("rho", case=False)]
+corr_plot_data["coefficient"] = corr_plot_data["coefficient"].replace({"ia-tau": "Inter-Annotator Tau", "tau": "Model-Annotator Tau", "ndcg": "NDCG", "agree": "Binary Agreement"})
+corr_plot_data["coefficient"] = corr_plot_data["coefficient"].astype("category").cat.reorder_categories(["Inter-Annotator Tau", "Model-Annotator Tau", "NDCG", "Binary Agreement"])
+
+corr_plot = (
+    ggplot(corr_plot_data, aes(x="model", y="mean", color="model"))
+    + geom_point(position=position_dodge2(width=0.5))
+    + geom_errorbar(aes(ymin="mean-sem", ymax="mean+sem"), position=position_dodge2(width=0.5))
+    + scale_color_brewer(type="qual", palette=2)
+    # score type on rows of facet, coefficient on columns
+    + facet_grid("score_type ~ coefficient")
+    + theme_classic()
+    + theme(
+        # remove x axis title
+        axis_title_x=element_blank(),
+        # remove y axis title
+        axis_title_y=element_blank(),
+        # remove legend
+        legend_position="none",
+        # make font a bit smaller
+        text=element_text(size=7),
+    )
+)
+corr_plot

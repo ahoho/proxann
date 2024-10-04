@@ -1,0 +1,5 @@
+{
+    "BUCKET_NAME": "elasticbeanstalk-us-east-1-218873361869",
+    "COUNTS_FILE": "_cluster_rank_counts.json",
+    "DATA_FILE": "_cluster_rank_data.json"
+}

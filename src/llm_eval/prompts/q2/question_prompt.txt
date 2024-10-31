@@ -1,0 +1,5 @@
+Keywords: {}
+Document: {}
+Based on the keywords and document content, on a scale of 1 to 5, how clearly do the documents and keywords fit the category you came up with?
+Follow this format to answer:
+Score: SCORE - Rationale: RATIONALE

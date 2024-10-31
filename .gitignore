@@ -172,3 +172,4 @@ data/results
 src/analysis/topic-model-data
 data/human_annotations
 data/document-data
+src/llm_eval/.venv

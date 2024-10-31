@@ -1,0 +1,7 @@
+Category: {}
+Documents: {}
+
+Decide which document is more closely related to the given category.
+Follow this format to answer:
+Order: Document that is more closely related to the category (A or B)
+Comparison: Which document is more related to the category and why?

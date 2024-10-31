@@ -1,0 +1,20 @@
+You will be provided with a set of keywords and a document. Both are centered around a common category. Your job is to evaluate how well the document aligns with the keywords and the given category, assigning a score from 1 to 5 based on the level of fit.
+
+Task Breakdown:
+1. Examine the Keywords: Use the keywords to identify key themes or subject areas related to the category.
+2. Review the Document: Skim through the document or summary to grasp its main idea and subject matter.
+3. Assign a Score: Using both the keywords and the content of the document, provide a score from 1 to 5, with 5 being a perfect fit and 1 being no connection at all.
+
+Scoring Guide:
+5: Very clear fit. The document matches almost all of the keywords and fits well within the category.
+4: Clear fit. Most of the keywords and the document content align with the category.
+3: Mixed fit. Some of the keywords match, but there is partial misalignment between the document and the category.
+2: Low clarity. Only a few of the keywords match the document, and the overall connection is weak.
+1: No fit. The document and keywords don’t relate to the category at all.
+
+Example:
+Keywords: television episode sitcom starring action drama ​​​​​aired
+Document: The Gettysburg Address is a speech that U.S. President Abraham Lincoln delivered during the American Civil War at the dedication of the Soldiers' National Cemetery, now known as Gettysburg National Cemetery, in Gettysburg, Pennsylvania on the afternoon of November 19, 1863, four and a half months after the Union armies defeated Confederate forces in the Battle of Gettysburg, the Civil War's deadliest battle. The speech is widely considered one of the most notable and famous delivered in American history.
+
+Your response:
+Score: 1 - Rationale: The document has no connection to television or related keywords, as it is about a historical speech and event.

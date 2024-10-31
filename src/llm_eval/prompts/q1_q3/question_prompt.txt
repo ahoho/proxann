@@ -1,0 +1,8 @@
+Keywords: {}
+Documents: {}
+Pairs: {}
+Based on the keywords and document content, come up with a single label that best describes the topic connecting all the documents. Then, decide which document from PAIRS is more closely related to the label you came up with.
+Follow this format to answer:
+Label: Label that best describes the topic connecting all the documents
+Order: Document that is more closely related to the category (A or B)
+Comparison: Which document is more related to the category and why?

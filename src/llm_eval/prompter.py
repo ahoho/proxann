@@ -39,7 +39,8 @@ class Prompter:
         ]
         
         self.OLLAMA_MODELS = [
-            'llama3.2'
+            'llama3.2',
+            'llama3.1:8b-instruct-q8_0'
         ]
         
         self.params = {
@@ -164,8 +165,7 @@ class Prompter:
 
         def handle_q2(text: dict, topk: int = 10) -> List[str]:
             keys = " ".join(text["topic_words"][:topk])
-            template = self._load_template("src/llm_eval/prompts/q2/question_prompt.txt")
-            return [template.format(keys, doc["text"]) for doc in text["eval_docs"]]
+            return [self._load_template("src/llm_eval/prompts/q2/question_prompt.txt").format(keys, doc["text"]) for doc in text["eval_docs"]]
 
         def handle_q3(text: dict, cat: str, num_words: int = 100) -> List[str]:
             template = self._load_template("src/llm_eval/prompts/q3/question_prompt.txt")
@@ -187,6 +187,11 @@ class Prompter:
                 doc_pairs.append(f"\n{doc_a}\n{doc_b}")
 
             return [template.format(cat, pair) for pair in doc_pairs], pair_ids
+        
+        def handle_q1_q2(text: dict, topk: int = 10, num_words: int = 100):
+            docs = "\n".join(f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
+            keys = " ".join(text["topic_words"][:topk])
+            return [self._load_template("src/llm_eval/prompts/q1_q2/question_prompt.txt").format(keys, docs, doc["text"]) for doc in text["eval_docs"]]
         
         def handle_q1_q3(text: dict, topk: int = 10, num_words: int = 100):
             docs = "\n".join(f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
@@ -216,6 +221,7 @@ class Prompter:
             "q1": handle_q1,
             "q2": handle_q2,
             "q3": lambda text: handle_q3(text, category),
+            "q1_q2": handle_q1_q2,
             "q1_q3": handle_q1_q3
         }
 

@@ -2,16 +2,17 @@ import json
 import re
 from collections import Counter
 from copy import deepcopy
-from itertools import combinations
-from typing import List, Optional
-
+from typing import List
+import choix
+from gensim.models import CoherenceModel
+from gensim.corpora import Dictionary
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
-from scipy.stats import kendalltau, mannwhitneyu, spearmanr
+from scipy.stats import kendalltau, spearmanr, pearsonr
 from sklearn.metrics import ndcg_score
 
 from irrCAC.raw import CAC
-
 
 def extend_to_full_sentence(
     text: str,
@@ -38,71 +39,103 @@ def extend_to_full_sentence(
     return extended_text
 
 def bradley_terry_model(
-    pair_ids: List[dict[str, str]],
-    orders: List[str],
-    logprobs: Optional[List[float]] = None,
+    pair_ids: list[dict[str, str]],
+    orders: list[str],
+    logprobs: list[float] = None,
     num_iters: int = 1000,
-    lr: float = 0.01
+    lr: float = 0.01,
+    use_choix: bool = True
 ) -> pd.DataFrame:
     """
-    Perform Bradley-Terry model for pairwise rank comparisons. If logprobs are provided, the learning rate is adjusted based on the logprobs.
+    Perform Bradley-Terry model for pairwise rank comparisons. If use_choix is True,
+    the choix library is used to compute the rankings without considering logprobs.
     
     Parameters:
     ----------
-    pair_ids: List[dict[str, str]]
+    pair_ids: list[dict[str, str]]
         List of dictionaries containing the document IDs for each pair.
-    orders: List[str]
-        List of orders for each pair (A or B).
-    logprobs: Optional[List[float]]
+    orders: list[str]
+        List of orders for each pair ('A' or 'B').
+    logprobs: list[float], optional
         List of log probabilities for each pair.
-    num_iters: int
+    num_iters: int, optional
         Number of iterations for the model.
-    lr: float
+    lr: float, optional
         Learning rate for the model.
+    use_choix: bool, optional
+        Flag to determine whether to use the choix library for ranking.
     
     Returns:
     -------
     pd.DataFrame
         DataFrame with the ranked document IDs and scores, sorted by score in descending order.
     """
-    # Extract document IDs and initialize their scores
-    doc_ids = {doc_id for pair in pair_ids for doc_id in pair.values()}
-    scores = {doc_id: 0.0 for doc_id in doc_ids} 
-
-    pairwises = []
-    for i, order in enumerate(orders):
-        pair = pair_ids[i]
-        if order == 'A':
-            pairwises.append((pair["A"], pair["B"]))  # A wins over B
-        elif order == 'B':
-            pairwises.append((pair["B"], pair["A"]))  # B wins over A
-
-    # Likelihood maximization
-    for _ in range(num_iters):
-        score_updates = {doc_id: 0.0 for doc_id in doc_ids}
-        
-        for i, (winner, loser) in enumerate(pairwises):
-            # Calculate probabilities based on current scores
-            score_diff = scores[winner] - scores[loser]
-            probability_win = 1 / (1 + np.exp(-score_diff))  
-            
-            # Adjust lr if logprobs are provided (higher logprob means higher certainty)
-            adjustment_factor = np.exp(logprobs[i]) if logprobs and i < len(logprobs) else 1.0
-            adjusted_lr = lr * adjustment_factor
-            
-            # Winner gets stronger, loser gets weaker
-            score_updates[winner] += adjusted_lr * (1 - probability_win)
-            score_updates[loser] -= adjusted_lr * (1 - probability_win)
-        
-        for doc_id in doc_ids:
-            scores[doc_id] += score_updates[doc_id]
     
-    ranked_docs = sorted(scores.items(), key=lambda item: item[1], reverse=True)
-    ranked_df = pd.DataFrame(ranked_docs, columns=["doc_id", "score"])
+    # Extract unique document IDs
+    doc_ids = {doc_id for pair in pair_ids for doc_id in pair.values()}
+    doc_id_to_index = {doc_id: idx for idx, doc_id in enumerate(doc_ids)}
+    index_to_doc_id = {idx: doc_id for doc_id, idx in doc_id_to_index.items()}
+    n_items = len(doc_ids)
+    
+    if use_choix:
+        # Prepare data for choix
+        data = []
+        for i, order in enumerate(orders):
+            pair = pair_ids[i]
+            if order == 'A':
+                data.append((doc_id_to_index[pair["A"]], doc_id_to_index[pair["B"]]))  # A wins over B
+            elif order == 'B':
+                data.append((doc_id_to_index[pair["B"]], doc_id_to_index[pair["A"]]))  # B wins over A
+        
+        # Compute parameters using choix's MM algorithm
+        params = choix.mm_pairwise(n_items, data)
+        
+        # Convert parameters to a DataFrame
+        ranked_docs = sorted(
+            ((index_to_doc_id[idx], score) for idx, score in enumerate(params)),
+            key=lambda item: item[1],
+            reverse=True
+        )
+        ranked_df = pd.DataFrame(ranked_docs, columns=["doc_id", "score"])
+        
+    else:
+        # Initialize scores
+        scores = {doc_id: 0.0 for doc_id in doc_ids}
+        
+        pairwises = []
+        for i, order in enumerate(orders):
+            pair = pair_ids[i]
+            if order == 'A':
+                pairwises.append((pair["A"], pair["B"]))  # A wins over B
+            elif order == 'B':
+                pairwises.append((pair["B"], pair["A"]))  # B wins over A
+        
+        # Likelihood maximization
+        for _ in range(num_iters):
+            score_updates = {doc_id: 0.0 for doc_id in doc_ids}
+            
+            for i, (winner, loser) in enumerate(pairwises):
+                # Calculate probabilities based on current scores
+                score_diff = scores[winner] - scores[loser]
+                probability_win = 1 / (1 + np.exp(-score_diff))
+                
+                # Adjust learning rate if logprobs are provided
+                adjustment_factor = np.exp(logprobs[i]) if logprobs and i < len(logprobs) else 1.0
+                adjusted_lr = lr * adjustment_factor
+                
+                # Update scores
+                score_updates[winner] += adjusted_lr * (1 - probability_win)
+                score_updates[loser] -= adjusted_lr * (1 - probability_win)
+            
+            for doc_id in doc_ids:
+                scores[doc_id] += score_updates[doc_id]
+        
+        ranked_docs = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+        ranked_df = pd.DataFrame(ranked_docs, columns=["doc_id", "score"])
     
     return ranked_df
 
-def extract_info(text, get_label):
+def extract_info_q1_q3(text, get_label):
     """
     Extracts the label, order, and rationale from the prompt text based on the 'get_label' parameter. If 'get_label' is set to True, the method extracts from the 'q1_q3' prompt; otherwise, it extracts from 'q3'.
     """    
@@ -123,7 +156,32 @@ def extract_info(text, get_label):
     rationale = rationale_match[0].strip() if rationale_match else ""
 
     return label, order, rationale
+    
+def extract_info_q1_q2(text, get_label):
+    """
+    Extracts the label, score, and rationale from the prompt text based on the 'get_label' parameter. 
+    If 'get_label' is set to True, the method extracts from the 'q1_q2' prompt; otherwise, it extracts from 'q2'.
+    """
+    label_pattern = r'Label:\s*(.*?)\s*(?=Score:)'
+    score_pattern = r'Score:\s*(\d+)'
+    rationale_pattern = r'Rationale:\s*(.*)'
 
+    if get_label: 
+        label_match = re.findall(label_pattern, text, re.DOTALL)
+        label = label_match[0].strip() if label_match else ""
+    else:
+        label = ""
+    
+    score_match = re.findall(score_pattern, text)
+    score = score_match[0].strip() if score_match else ""
+    score = int(score) if score else 0
+    
+    rationale_match = re.findall(rationale_pattern, text, re.DOTALL)
+    rationale = rationale_match[0].strip() if rationale_match else ""
+    
+    return label, score, rationale
+
+    return label, score, rationale
 def extract_logprobs(pairwise_logprobs, backend, logging):
     """Extracts log probabilities associated with the pairwise rankings (i.e., whether the more related document is A or B) from LLM responses, handling different backends (i.e., LLM types)."""
     
@@ -406,22 +464,35 @@ def collect_fit_rank_data(
     
     return model_fit_data, model_rank_data, model_prob_data, corr_data
 
-def compute_correlations(corr_data, corr_llm_data=None, aggregation_method="mean", fit_threshold=4):
-    """Compute correlation coefficients for fit and rank data."""
+def compute_correlations_one(
+    corr_data,
+    rank_llm_data=None,
+    fit_llm_data=None,
+    aggregation_method="mean",
+    fit_threshold=4
+    ):
+    """Compute correlation coefficients for fit and rank data: average rank per question/document over annotators, then correlate those with the topic model probabilities (thetas).
+    """
     
-    if corr_llm_data is None:
-        corr_llm_data = [None] * len(corr_data)
+    if rank_llm_data is None:
+        rank_llm_data = [None] * len(corr_data)
+    
+    if fit_llm_data is None:
+        fit_llm_data = [None] * len(corr_data)
         
     corr_results = []
-    for data, llm_data in zip(corr_data, corr_llm_data):
+    for d_us, d_r_llm, d_f_llm in zip(corr_data, rank_llm_data, fit_llm_data): 
+        fit_data, rank_data, prob_data = d_us["fit_data"], d_us["rank_data"], d_us["prob_data"]
         
-        fit_data, rank_data, prob_data = data["fit_data"], data["rank_data"], data["prob_data"]
+        annotator_results = {} # to store llm-correlations
         
-        annotator_results = {} 
-        if llm_data is not None:
-            rank_llm_data = llm_data["rank_data"]
-            annotators = llm_data["annotators"]
+        if d_r_llm is not None:
+            r_llm = d_r_llm["rank_data"]
+            r_annotators = d_r_llm["annotators"]
         
+        if d_f_llm is not None:
+            f_llm = d_f_llm["fit_data"]
+            f_annotators = d_f_llm["annotators"] # f_annotators should be the same as r_annotators unless only one out of rank_llm_data and fit_llm_data is provided
         if aggregation_method == "mean":
             mean_fit_data, mean_rank_data = fit_data.mean(0), rank_data.mean(0)
         elif aggregation_method == "concatenate":
@@ -437,27 +508,41 @@ def compute_correlations(corr_data, corr_llm_data=None, aggregation_method="mean
         rank_tau, _ = kendalltau(mean_rank_data, prob_data)
         
         # Calculate fit agreement
-        fit_agree = np.mean((fit_data >= fit_threshold).astype(int) == data["assign_data"])
+        fit_agree = np.mean((fit_data >= fit_threshold).astype(int) == d_us["assign_data"])
         
-        # LLM correlations if llm_data
-        if llm_data is not None:
-            for annotator, rank_llm in zip(annotators, rank_llm_data):
-                rank_rho_users, _ = spearmanr(mean_rank_data, rank_llm)
-                rank_rho_gt, _ = spearmanr(prob_data, rank_llm)
-                rank_tau_users, _ = kendalltau(mean_rank_data, rank_llm)
-                rank_tau_gt, _ = kendalltau(prob_data, rank_llm)
+        # LLM correlations if r_llm
+        if r_llm is not None:
+            for a, r_llm_a in zip(r_annotators, r_llm):
+                rank_rho_users, _ = spearmanr(mean_rank_data, r_llm_a)
+                rank_rho_gt, _ = spearmanr(prob_data, r_llm_a)
+                rank_tau_users, _ = kendalltau(mean_rank_data, r_llm_a)
+                rank_tau_gt, _ = kendalltau(prob_data, r_llm_a)
                 
                 # Add annotator-specific results to the dictionary
-                annotator_results[f"rank_rho_users_{annotator}"] = rank_rho_users
-                annotator_results[f"rank_rho_gt_{annotator}"] = rank_rho_gt
-                annotator_results[f"rank_tau_users_{annotator}"] = rank_tau_users
-                annotator_results[f"rank_tau_gt_{annotator}"] = rank_tau_gt
-
+                annotator_results[f"rank_rho_users_{a}"] = rank_rho_users
+                annotator_results[f"rank_rho_tm_{a}"] = rank_rho_gt
+                annotator_results[f"rank_tau_users_{a}"] = rank_tau_users
+                annotator_results[f"rank_tau_tm_{a}"] = rank_tau_gt
+        
+        # LLM correlations if f_llm
+        if f_llm is not None:
+            for a, f_llm_a in zip(f_annotators, f_llm):
+                fit_rho_users, _ = spearmanr(mean_fit_data, f_llm_a)
+                fit_rho_gt, _ = spearmanr(prob_data, f_llm_a)
+                fit_tau_users, _ = kendalltau(mean_fit_data, f_llm_a)
+                fit_tau_gt, _ = kendalltau(prob_data, f_llm_a)
+                
+                # Add annotator-specific results to the dictionary
+                annotator_results[f"fit_rho_users_{a}"] = fit_rho_users
+                annotator_results[f"fit_rho_tm_{a}"] = fit_rho_gt
+                annotator_results[f"fit_tau_users_{a}"] = fit_tau_users
+                annotator_results[f"fit_tau_tm_{a}"] = fit_tau_gt
+        
         corr_results.append({
-            "id": data["id"],
-            "model": data["model"],
-            "topic": data["topic"],
-            "n_annotators": data["n_annotators"],
+            "id": d_us["id"],
+            "model": d_us["model"],
+            "topic": d_us["topic"],
+            "n_annotators": d_us["n_annotators"],
             "fit_rho": fit_rho,
             "fit_tau": fit_tau,
             "rank_rho": rank_rho,
@@ -468,39 +553,174 @@ def compute_correlations(corr_data, corr_llm_data=None, aggregation_method="mean
     
     return pd.DataFrame(corr_results)
 
-def perform_mann_whitney_tests(corr_data):
-    """Perform Mann-Whitney U tests between models for each metric."""
-    #metrics = ["fit_rho", "rank_rho", "fit_tau", "rank_tau", "fit_agree"]
-    no_include = ["id", "model", "topic", "n_annotators"]
-    metrics = [col for col in corr_data.columns if col not in no_include]
-    alpha = 0.05 / len(metrics)  # Bonferroni correction
+def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=None, fit_threshold = 4):
+    
+    corr_data = []
+    model_fit_data = {"mallet": [], "ctm": [], "category-45": []}
+    model_rank_data = {"mallet": [], "ctm": [], "category-45": []}
+    model_prob_data = {"mallet": [], "ctm": [], "category-45": []}
 
-    for model_a, model_b in combinations(corr_data["model"].unique(), 2):
-        for metric in metrics:
-            stat, pval = mannwhitneyu(
-                corr_data[corr_data["model"] == model_a][metric].values,
-                corr_data[corr_data["model"] == model_b][metric].values
-            )
-            sig = "*" if pval < alpha else ""
-            print(f"{model_a} vs {model_b} | {metric} | {stat:.3f} | {pval:.3f}{sig}")
+    # first collect the responses and compute the correlation data
+    for id, group in responses_by_id.items():
+        # get data from the id
+        split_id = id.split("/")
+        model_name = split_id[-2]
+        topic = split_id[-1]
 
-def compute_ndcg_scores(model_fit_data, model_rank_data, model_prob_data):
-    """Compute NDCG scores for each model's fit and rank data."""
-    ndcg_results = []
+        if len(group) < 2:
+            continue
 
-    for model_name in model_fit_data.keys():
-        fit_data = np.concatenate(model_fit_data[model_name], axis=0)
-        rank_data = np.concatenate(model_rank_data[model_name], axis=0)
-        prob_data = np.concatenate(model_prob_data[model_name], axis=0)
+        # compile the fit and rank data
+        fit_data = np.array([
+            [doc["fit"] for doc in r["eval_docs"]]
+            for r in group
+        ])
+        rank_data = np.array([
+            [doc["rank"] for doc in r["eval_docs"]]
+            for r in group
+        ])
+        rank_data = 8 - rank_data # reverse so that higher is better
+        prob_data = np.array(
+            [doc["prob"] for doc in group[0]["eval_docs"]]
+        )
+        assign_data = np.array(
+            [doc["assigned_to_k"] for doc in group[0]["eval_docs"]]
+        )
+        top_words = " ".join(group[0]["topic_words"][:10])
+        avg_familiar = np.mean([doc["is_familiar"] for r in group for doc in r["eval_docs"]])
 
-        fit_ndcg = ndcg_score(fit_data, prob_data)
-        rank_ndcg = ndcg_score(rank_data, prob_data)
+        model_fit_data[model_name].append(fit_data)
+        model_rank_data[model_name].append(rank_data)
+        model_prob_data[model_name].append(np.repeat([prob_data], len(group), axis=0))
+        
+        bin_fit_data = (fit_data >= fit_threshold).astype(int)
+        
+        for i in range(len(group)): # for each of the human annotators
+            
+            # compute the correlations
+            fit_rho, _ = spearmanr(fit_data[i], prob_data)
+            rank_rho, _ = spearmanr(rank_data[i], prob_data)
 
-        print(f"{model_name} | Fit NDCG: {fit_ndcg:.5f} | Rank NDCG: {rank_ndcg:.5f}")
-        ndcg_results.append({
-            "model": model_name,
-            "fit_ndcg": fit_ndcg,
-            "rank_ndcg": rank_ndcg,
-        })
+            fit_tau, _ = kendalltau(fit_data[i], prob_data)
+            rank_tau, _ = kendalltau(rank_data[i], prob_data)
 
-    return pd.DataFrame(ndcg_results)
+            fit_ndcg = ndcg_score([fit_data[i]], [prob_data])
+            rank_ndcg = ndcg_score([rank_data[i]], [prob_data])
+
+            fit_agree = np.mean(bin_fit_data[i] == assign_data)
+
+            # to mean of other annotators
+            other_mean_fit_data = np.mean(np.delete(fit_data, i, axis=0), axis=0)
+            other_mean_rank_data = np.mean(np.delete(rank_data, i, axis=0), axis=0)
+
+            fit_ia_rho, _ = spearmanr(fit_data[i], other_mean_fit_data)
+            rank_ia_rho, _ = spearmanr(rank_data[i], other_mean_rank_data)
+
+            fit_ia_tau, _ = kendalltau(fit_data[i], other_mean_fit_data)
+            rank_ia_tau, _ = kendalltau(rank_data[i], other_mean_rank_data)            
+            
+            # if there is LLM data, compute the correlations
+            annotator_results = {} 
+            if rank_llm_data is not None:
+                # keep element of the list rank_llm_data whose "id" == id
+                rank_llm_group = list(filter(lambda d: d["id"] == id, rank_llm_data))[0]
+                
+                for llm_annotator, rank_llm in zip(rank_llm_group["annotators"], rank_llm_group["rank_data"]):
+                    
+                    # compute the correlations
+                    rank_rho_user_llm, _ = spearmanr(rank_data[i], rank_llm)
+                    rank_rho_llm_tm, _ = spearmanr(rank_llm, prob_data)
+                    
+                    rank_tau_user_llm, _ = kendalltau(rank_data[i], rank_llm)
+                    rank_tau_llm_tm, _ = kendalltau(rank_llm, prob_data)
+
+                    rank_ndcg_user_llm = ndcg_score([rank_data[i]], [rank_llm])
+                    rank_ndcg_llm_tm = ndcg_score([rank_llm], [prob_data])
+                    
+                    # add to the dictionary
+                    annotator_results[f"rank_rho_user_{llm_annotator}"] = rank_rho_user_llm
+                    annotator_results[f"rank_rho_tm_{llm_annotator}"] = rank_rho_llm_tm
+                    annotator_results[f"rank_tau_user_{llm_annotator}"] = rank_tau_user_llm
+                    annotator_results[f"rank_tau_tm_{llm_annotator}"] = rank_tau_llm_tm
+                    annotator_results[f"rank_ndcg_user_{llm_annotator}"] = rank_ndcg_user_llm
+                    annotator_results[f"rank_ndcg_tm_{llm_annotator}"] = rank_ndcg_llm_tm
+                
+            if fit_llm_data is not None:
+                fit_llm_group = list(filter(lambda d: d["id"] == id, fit_llm_data))[0]
+                
+                for llm_annotator, fit_llm in zip(fit_llm_group["annotators"], fit_llm_group["fit_data"]):
+                    fit_rho_user_llm, _ = spearmanr(fit_data[i], fit_llm)
+                    fit_rho_llm_tm, _ = spearmanr(fit_llm, prob_data)
+                    
+                    fit_tau_user_llm, _ = kendalltau(fit_data[i], fit_llm)
+                    fit_tau_llm_tm, _ = kendalltau(fit_llm, prob_data)
+                    
+                    fit_ndcg_user_llm = ndcg_score([fit_data[i]], [fit_llm])
+                    fit_ndcg_llm_tm = ndcg_score([fit_llm], [prob_data])
+                    
+                    # add to the dictionary
+                    annotator_results[f"fit_rho_user_{llm_annotator}"] = fit_rho_user_llm
+                    annotator_results[f"fit_rho_tm_{llm_annotator}"] = fit_rho_llm_tm
+                    annotator_results[f"fit_tau_user_{llm_annotator}"] = fit_tau_user_llm
+                    annotator_results[f"fit_tau_tm_{llm_annotator}"] = fit_tau_llm_tm
+                    annotator_results[f"fit_ndcg_user_{llm_annotator}"] = fit_ndcg_user_llm
+                    annotator_results[f"fit_ndcg_tm_{llm_annotator}"] = fit_ndcg_llm_tm
+            
+            corr_data.append({
+                "id": id,
+                "model": model_name,
+                "n_annotators": len(group),
+                "topic": topic,
+                "topic_match_id": group[0]["topic_match_id"],
+                "annotator": i,
+                "fit_rho": fit_rho,
+                "fit_tau": fit_tau,
+                "rank_rho": rank_rho,
+                "rank_tau": rank_tau,
+                "fit_NDCG": fit_ndcg,
+                "rank_NDCG": rank_ndcg,
+                "fit_agree": fit_agree,
+                #"rank_agree": rank_agree,
+                "fit_ia-rho": fit_ia_rho,
+                "fit_ia-tau": fit_ia_tau,
+                "rank_ia-rho": rank_ia_rho,
+                "rank_ia-tau": rank_ia_tau,
+                **annotator_results
+            })
+            
+    corr_data = pd.DataFrame(corr_data)
+    return corr_data
+
+def calculate_coherence(eval_data, data_docs):
+    """Calculate NPMI coherence for each topic in eval_data."""
+    docs = []
+    for data_doc in data_docs:
+        with open(data_doc) as infile:
+            docs.extend([json.loads(line)["tokenized_text"].split() for line in infile])
+    
+    vocab = sorted(set([word for doc in docs for word in doc]))
+    data_dict = Dictionary([vocab])
+    
+    for cluster_id, cluster_data in tqdm(eval_data.items()):
+        topics = [cluster_data["topic_words"][:15]] # number shown to annotators
+        cm = CoherenceModel(
+            topics=topics,
+            texts=docs,
+            dictionary=data_dict,
+            coherence="c_npmi",
+            window_size=None,
+            processes=1,
+        )
+
+        confirmed_measures = cm.get_coherence_per_topic()
+        mean = cm.aggregate_measures(confirmed_measures)
+        eval_data[cluster_id]["npmi"] = mean
+    npmi_data = pd.DataFrame({'id': id, 'NPMI': data['npmi']} for id, data in eval_data.items())
+    
+    return npmi_data
+
+def calculate_corr_npmi(corr_data, npmi_data):
+    # calculate spearman correlation
+    corr_data = corr_data.merge(npmi_data, on="id")
+    pearsonr(corr_data.npmi, corr_data.rank_rho)
+    pearsonr(corr_data.npmi, corr_data.rank_rtau)

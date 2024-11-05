@@ -9,7 +9,7 @@ Examples:
 --------
 {}
 
-Keywords: {}
-Documents: {}
-Based on the keywords and document content, come up with a single label that best describes the topic connecting all the documents. Return just the label.
-Your response:
+KEYWORDS: {}
+DOCUMENTS: {}
+Based on the keywords and document content, come up with a single category that best describes the topic connecting all the documents. Return just the category.
+CATEGORY:

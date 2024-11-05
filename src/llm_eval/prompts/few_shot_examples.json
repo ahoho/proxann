@@ -16,7 +16,19 @@
             }
         }
     ],
-    "q2": [],
+    "q2": [
+        {
+            "example_id": "q2_0",
+            "example": {
+                "category": "American television shows",
+                "document": "The Gettysburg Address is a speech that U.S. President Abraham Lincoln delivered during the American Civil War at the dedication of the Soldiers' National Cemetery, now known as Gettysburg National Cemetery, in Gettysburg, Pennsylvania on the afternoon of November 19, 1863, four and a half months after the Union armies defeated Confederate forces in the Battle of Gettysburg, the Civil War's deadliest battle. The speech is widely considered one of the most notable and famous delivered in American history.",
+                "response": {
+                    "score": 1,
+                    "rationale": "The document has no connection to television or related keywords, as it is about a historical speech and event."
+                }
+            }
+        }
+    ],
     "q3": [
         {
             "example_id": "q3_0",

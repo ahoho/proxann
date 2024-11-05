@@ -23,8 +23,8 @@ def main():
     llm_results_q3, llm_results_q2 = [], []
     topics_per_model = Counter()
     
-      
     # keep dictionary with only first key (for debugging)
+
     """
     inside_dict = {
         '32':  config_pilot['data/models/mallet']['32']
@@ -69,6 +69,7 @@ def main():
 
                             try:
                                 label, order, rationale = extract_info_q1_q3(pairwise, get_label=get_label)
+                                print(f"\033[92mOrder: {order}\033[0m")
                                 labels.append(label)
                                 orders.append(order)
                                 rationales.append(rationale)
@@ -88,7 +89,7 @@ def main():
                             logging.warning(f"-- -- No logprobs found for model {model_id} and cluster {cluster_id}")
 
                         # Obtain full rank (Bradley-Terry model)
-                        ranked_documents = bradley_terry_model(pair_ids, orders, logprobs) #, use_choix=False
+                        ranked_documents = bradley_terry_model(pair_ids, orders, logprobs)
                         true_order = [el["doc_id"] for el in cluster_data["eval_docs"]]
                         rank = [true_order.index(doc_id) + 1 for doc_id in ranked_documents['doc_id']]
                         rank = [len(rank) - r + 1 for r in rank] # Invert rank
@@ -105,19 +106,8 @@ def main():
                         })
                         
                     elif prompt_mode == "q1_then_q2" or prompt_mode == "q1_and_q2":
-                        if prompt_mode == "q1_and_q2":
-                            
-                            questions = prompter.get_prompt(cluster_data, "q1_q2")
-                            
-                            labels, scores, rationales = [], [], []
-                            for question in questions:
-                                response_q2, _ = prompter.prompt("src/llm_eval/prompts/q1_q2/simplified_system_prompt.txt", question, use_context=False)
-                                label, score, rationale = extract_info_q1_q2(response_q2, get_label=True)
-                                labels.append(label)
-                                scores.append(score)
-                                rationales.append(rationale)
-                                
-                        else: #q1_then_q2
+                        
+                        if prompt_mode == "q1_then_q2":
                             logging.info("-- Executing Q1...")
                             question = prompter.get_prompt(cluster_data, "q1")
                             category, _ = prompter.prompt("src/llm_eval/prompts/q1/simplified_system_prompt.txt", question, use_context=False)
@@ -130,6 +120,17 @@ def main():
                             for question in questions:
                                 response_q2, _ = prompter.prompt("src/llm_eval/prompts/q2/simplified_system_prompt.txt", question, use_context=False)
                                 label, score, rationale = extract_info_q1_q2(response_q2, get_label=False)
+                                scores.append(score)
+                                rationales.append(rationale)
+                                                        
+                        else: # prompt_mode == "q1_and_q2"
+                            questions = prompter.get_prompt(cluster_data, "q1_q2")
+                            
+                            labels, scores, rationales = [], [], []
+                            for question in questions:
+                                response_q2, _ = prompter.prompt("src/llm_eval/prompts/q1_q2/simplified_system_prompt.txt", question, use_context=False)
+                                label, score, rationale = extract_info_q1_q2(response_q2, get_label=True)
+                                labels.append(label)
                                 scores.append(score)
                                 rationales.append(rationale)
                         

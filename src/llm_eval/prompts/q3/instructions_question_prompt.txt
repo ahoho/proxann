@@ -6,17 +6,16 @@ Task Breakdown:
 3. Justify Your Choice: Explain why you think one document is more closely related than the other.
 
 Response Format:
-Order: Document that is more closely related to the category (A or B)
-Comparison: Which document is more related to the category and why?
+CLOSEST: Document that is more closely related to the category (A or B)
+RATIONALE: Which document is more related to the category and why?
 
 Examples
 ---------
 {}
 
-Category: {}
-Documents: {}
+CATEGORY: {}
+DOCUMENTS: {}
 Decide which document is more closely related to the given category.
 Follow this format to answer:
-Order: Document that is more closely related to the category (A or B)
-Comparison: Which document is more related to the category and why?
-Your response:
+CLOSEST:
+RATIONALE:

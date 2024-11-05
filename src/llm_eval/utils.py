@@ -148,9 +148,9 @@ def extract_info_q1_q3(text, get_label):
     """
     Extracts the label, order, and rationale from the prompt text based on the 'get_label' parameter. If 'get_label' is set to True, the method extracts from the 'q1_q3' prompt; otherwise, it extracts from 'q3'.
     """    
-    label_pattern = r'Label:\s*(.*?)\s*(?=Order:|Comparison:)'
-    order_pattern = r'Order:\s*(?:DOCUMENT\s*)?([AB])' 
-    rationale_pattern = r'Comparison:\s*(.*)'
+    label_pattern = r'LABEL:\s*(.*?)\s*(?=CLOSEST:|RATIONALE:)'
+    order_pattern = r'CLOSEST:\s*(?:DOCUMENT\s*)?([AB])' 
+    rationale_pattern = r'RATIONALE:\s*(.*)'
 
     if get_label: 
         label_match = re.findall(label_pattern, text, re.DOTALL)
@@ -171,9 +171,9 @@ def extract_info_q1_q2(text, get_label):
     Extracts the label, score, and rationale from the prompt text based on the 'get_label' parameter. 
     If 'get_label' is set to True, the method extracts from the 'q1_q2' prompt; otherwise, it extracts from 'q2'.
     """
-    label_pattern = r'Label:\s*(.*?)\s*(?=Score:)'
-    score_pattern = r'Score:\s*(\d+)'
-    rationale_pattern = r'Rationale:\s*(.*)'
+    label_pattern = r'LABEL:\s*(.*?)\s*(?=SCORE:)'
+    score_pattern = r'SCORE:\s*(\d+)'
+    rationale_pattern = r'RATIONALE:\s*(.*)'
 
     if get_label: 
         label_match = re.findall(label_pattern, text, re.DOTALL)

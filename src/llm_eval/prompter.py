@@ -157,7 +157,8 @@ class Prompter:
         text_for_prompt: dict,
         question_type: str,
         category: str = None,
-        nr_few_shot: int = 3,
+        nr_few_shot: int = 1,
+        doing_both_ways: bool = True,
         path_examples: str = "src/llm_eval/prompts/few_shot_examples.json",
         base_prompt_path: str = "src/llm_eval/prompts/"
     ) -> Union[str, List[str]]:
@@ -175,7 +176,7 @@ class Prompter:
             # Few-shot examples
             examples_q1 = few_shot["q1"][:nr_few_shot]
             examples = [
-                "KEYWORDS: {}\nDOCUMENTS: {}\nYOUR RESPONSE: {}".format(
+                "KEYWORDS: {}\nDOCUMENTS: {}\nCATEGORY: {}".format(
                     ex['example']['keywords'],
                     ''.join(f"- {doc}\n" for doc in ex['example']['documents']),
                     ex['example']['response']['label']
@@ -189,18 +190,33 @@ class Prompter:
             template_path = load_template_path("q1")
             return self._load_template(template_path).format("\n".join(examples), keys, docs)
 
-        def handle_q2(text: dict, few_shot: dict, topk: int = 10, nr_few_shot=1) -> List[str]:
+        def handle_q2(text: dict, few_shot: dict, cat: str, topk: int = 10, nr_few_shot=1) -> List[str]:
+            
+            # Few shot examples
+            examples_q2 = few_shot["q2"][:nr_few_shot]
+            examples = "\n".join([
+                #"CATEGORY: {}\nDOCUMENT: {}\nRESPONSE:\nSCORE: {}\n RATIONALE: {}".format(
+                "CATEGORY: {}\nDOCUMENT: {}\nSCORE: {}\n RATIONALE: {}".format(
+                    cat,
+                    ex['example']['document'],
+                    ex['example']['response']['score'],
+                    ex['example']['response']['rationale']
+                )
+                for ex in examples_q2
+            ])
+            
+            # Actual question to the LLM (category from Q1 and doc)
             keys = " ".join(text["topic_words"][:topk])
             template_path = load_template_path("q2")
-            return [self._load_template(template_path).format(keys, doc["text"]) for doc in text["eval_docs"]]
+            return [self._load_template(template_path).format(examples, keys, doc["text"]) for doc in text["eval_docs"]]
 
-        def handle_q3(text: dict, few_shot: dict, cat: str, num_words: int = 100, nr_few_shot=1) -> List[str]:
+        def handle_q3(text: dict, few_shot: dict, cat: str, num_words: int = 100, nr_few_shot=1, doing_both_ways=True) -> List[str]:
             
             # Few-shot examples
             examples_q3 = few_shot["q3"][:nr_few_shot]
             
             examples = "\n".join([
-                "CATEGORY: {}\nDOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{}\nYOUR RESPONSE: \nCLOSEST: {} \nRATIONALE: {}".format(
+                "CATEGORY: {}\nDOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{}\nCLOSEST: {} \nRATIONALE: {}".format(
                     ex['example']['category'],
                     ex['example']['documents']["A"],
                     ex['example']['documents']["B"],
@@ -213,14 +229,17 @@ class Prompter:
             # Actual question to the LLM (category and pair of docs) 
             doc_pairs = []
             pair_ids = []
+
             for d1, d2 in itertools.combinations(text["eval_docs"], 2):
-                docs = [d1, d2]
-                random.shuffle(docs)
-                pair_ids.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
-                doc_a = re.sub(r'^ID\d+\.', 'DOCUMENT A.', f"ID{docs[0]['doc_id']}. {extend_to_full_sentence(docs[0]['text'], num_words)}")
-                doc_b = re.sub(r'^ID\d+\.', 'DOCUMENT B.', f"ID{docs[1]['doc_id']}. {extend_to_full_sentence(docs[1]['text'], num_words)}")
-                doc_pairs.append(f"\n{doc_a}\n{doc_b}")
-                
+                docs_list = [[d1, d2], [d2, d1]] if doing_both_ways else [random.sample([d1, d2], 2)] # if doing_both_ways, we have n×(n−1) pairs, n = len(text["eval_docs"]). Otherwise, we have n×(n−1)/2 pairs, but we suffle the order of the docs in the pair so the first doc is not always the same.
+                for docs in docs_list:
+                    pair_ids.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+                    
+                    doc_a = re.sub(r'^ID\d+\.', 'DOCUMENT A.', f"ID{docs[0]['doc_id']}. {extend_to_full_sentence(docs[0]['text'], num_words)}")
+                    doc_b = re.sub(r'^ID\d+\.', 'DOCUMENT B.', f"ID{docs[1]['doc_id']}. {extend_to_full_sentence(docs[1]['text'], num_words)}")
+                    
+                    doc_pairs.append(f"\n{doc_a}\n{doc_b}")
+
             # Load template
             template_path = load_template_path("q3")
             template = self._load_template(template_path)
@@ -249,8 +268,8 @@ class Prompter:
 
         question_handlers = {
             "q1": lambda text: handle_q1(text, few_shot_examples, nr_few_shot=nr_few_shot),
-            "q2": lambda text: handle_q2(text, few_shot_examples, nr_few_shot=nr_few_shot),
-            "q3": lambda text: handle_q3(text, few_shot_examples, category, nr_few_shot=nr_few_shot),
+            "q2": lambda text: handle_q2(text, few_shot_examples, category,nr_few_shot=nr_few_shot),
+            "q3": lambda text: handle_q3(text, few_shot_examples, category, nr_few_shot=nr_few_shot, doing_both_ways=doing_both_ways),
             "q1_q2": lambda text: handle_q1_q2(text, few_shot_examples, nr_few_shot=nr_few_shot),
             "q1_q3": lambda text: handle_q1_q3(text, few_shot_examples, nr_few_shot=nr_few_shot)
         }

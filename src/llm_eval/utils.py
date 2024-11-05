@@ -9,9 +9,9 @@ from gensim.corpora import Dictionary
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
+import networkx as nx
 from scipy.stats import kendalltau, spearmanr, pearsonr
 from sklearn.metrics import ndcg_score
-
 from irrCAC.raw import CAC
 
 def extend_to_full_sentence(
@@ -47,8 +47,7 @@ def bradley_terry_model(
     use_choix: bool = True
 ) -> pd.DataFrame:
     """
-    Perform Bradley-Terry model for pairwise rank comparisons. If use_choix is True,
-    the choix library is used to compute the rankings without considering logprobs.
+    Perform Bradley-Terry model for pairwise rank comparisons. If use_choix is True, the choix library is used to compute the rankings **without considering logprobs**.
     
     Parameters:
     ----------
@@ -88,7 +87,17 @@ def bradley_terry_model(
                 data.append((doc_id_to_index[pair["B"]], doc_id_to_index[pair["A"]]))  # B wins over A
         
         # Compute parameters using choix's MM algorithm
-        params = choix.mm_pairwise(n_items, data)
+        try:
+            params = choix.ilsr_pairwise(n_items, data)
+        except Exception as e:
+            print(e)
+            print("-- -- Graph is not connected. Printing adjacency matrix:")
+            graph = nx.DiGraph(data=data)
+            graph.add_edges_from(data)
+            adjacency_matrix = nx.to_numpy_array(graph, dtype=int)
+            print(adjacency_matrix)
+            print("-- -- Using a small regularization factor to solve the issue.--")
+            params = choix.ilsr_pairwise(n_items, data, alpha=0.01) # adding a little bit of regularization when the comparison graph is not connected,
         
         # Convert parameters to a DataFrame
         ranked_docs = sorted(
@@ -181,7 +190,6 @@ def extract_info_q1_q2(text, get_label):
     
     return label, score, rationale
 
-    return label, score, rationale
 def extract_logprobs(pairwise_logprobs, backend, logging):
     """Extracts log probabilities associated with the pairwise rankings (i.e., whether the more related document is A or B) from LLM responses, handling different backends (i.e., LLM types)."""
     
@@ -485,6 +493,7 @@ def compute_correlations_one(
         fit_data, rank_data, prob_data = d_us["fit_data"], d_us["rank_data"], d_us["prob_data"]
         
         annotator_results = {} # to store llm-correlations
+        f_llm, r_llm = None, None
         
         if d_r_llm is not None:
             r_llm = d_r_llm["rank_data"]

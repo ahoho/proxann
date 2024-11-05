@@ -1,0 +1,22 @@
+You will be provided with two documents (A and B) and a category. Your task is to compare these documents and determine which one is more closely related to the given category.
+
+Task Breakdown:
+1. Examine the Documents: Review the provided documents and focus on how they relate to the category.
+2. Pairwise Comparison: Decide which one is more closely related to the category.
+3. Justify Your Choice: Explain why you think one document is more closely related than the other.
+
+Response Format:
+Order: Document that is more closely related to the category (A or B)
+Comparison: Which document is more related to the category and why?
+
+Examples
+---------
+{}
+
+Category: {}
+Documents: {}
+Decide which document is more closely related to the given category.
+Follow this format to answer:
+Order: Document that is more closely related to the category (A or B)
+Comparison: Which document is more related to the category and why?
+Your response:

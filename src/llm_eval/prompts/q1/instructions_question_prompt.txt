@@ -1,0 +1,15 @@
+You will be provided with a set of keywords and a group of documents, each centered around a common topic. Your task is to analyze both the keywords and the content of the documents to create a clear, concise label that accurately reflects the overall theme they share.
+
+Task Breakdown:
+1. Examine the Keywords: Use the keywords as clues to identify the general subject area or themes present in the documents.
+2. Review the Documents: Skim the summaries provided to understand their main ideas and any recurring elements.
+3. Generate a Label: Based on the keywords and document content, come up with a single label that best describes the topic connecting all the documents.
+
+Examples:
+--------
+{}
+
+Keywords: {}
+Documents: {}
+Based on the keywords and document content, come up with a single label that best describes the topic connecting all the documents. Return just the label.
+Your response:

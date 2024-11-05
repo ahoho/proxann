@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import random
@@ -155,74 +156,103 @@ class Prompter:
         self,
         text_for_prompt: dict,
         question_type: str,
-        category: str = None
+        category: str = None,
+        nr_few_shot: int = 3,
+        path_examples: str = "src/llm_eval/prompts/few_shot_examples.json",
+        base_prompt_path: str = "src/llm_eval/prompts/"
     ) -> Union[str, List[str]]:
+
+        # Read JSON with few-shot examples
+        with open(path_examples, 'r') as file:
+            few_shot_examples = json.load(file)
         
-        def handle_q1(text: dict, topk: int = 10, num_words: int = 100) -> str:
+        def load_template_path(q_type: str) -> str:
+            """Helper function to construct the template path based on question type."""
+            return f"{base_prompt_path}{q_type}/instructions_question_prompt.txt"
+
+        def handle_q1(text: dict, few_shot: dict, topk: int = 10, num_words: int = 100, nr_few_shot=1) -> str:
+            
+            # Few-shot examples
+            examples_q1 = few_shot["q1"][:nr_few_shot]
+            examples = [
+                "KEYWORDS: {}\nDOCUMENTS: {}\nYOUR RESPONSE: {}".format(
+                    ex['example']['keywords'],
+                    ''.join(f"- {doc}\n" for doc in ex['example']['documents']),
+                    ex['example']['response']['label']
+                )
+                for ex in examples_q1
+            ]
+
+            # Actual question to the LLM (keys and docs) 
             docs = "\n".join(f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
             keys = " ".join(text["topic_words"][:topk])
-            return self._load_template("src/llm_eval/prompts/q1/question_prompt.txt").format(keys, docs)
+            template_path = load_template_path("q1")
+            return self._load_template(template_path).format("\n".join(examples), keys, docs)
 
-        def handle_q2(text: dict, topk: int = 10) -> List[str]:
+        def handle_q2(text: dict, few_shot: dict, topk: int = 10, nr_few_shot=1) -> List[str]:
             keys = " ".join(text["topic_words"][:topk])
-            return [self._load_template("src/llm_eval/prompts/q2/question_prompt.txt").format(keys, doc["text"]) for doc in text["eval_docs"]]
+            template_path = load_template_path("q2")
+            return [self._load_template(template_path).format(keys, doc["text"]) for doc in text["eval_docs"]]
 
-        def handle_q3(text: dict, cat: str, num_words: int = 100) -> List[str]:
-            template = self._load_template("src/llm_eval/prompts/q3/question_prompt.txt")
-
+        def handle_q3(text: dict, few_shot: dict, cat: str, num_words: int = 100, nr_few_shot=1) -> List[str]:
+            
+            # Few-shot examples
+            examples_q3 = few_shot["q3"][:nr_few_shot]
+            
+            examples = "\n".join([
+                "CATEGORY: {}\nDOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{}\nYOUR RESPONSE: \nCLOSEST: {} \nRATIONALE: {}".format(
+                    ex['example']['category'],
+                    ex['example']['documents']["A"],
+                    ex['example']['documents']["B"],
+                    ex['example']['response']["order"],
+                    ex['example']['response']["rationale"],
+                )
+                for ex in examples_q3
+            ])
+            
+            # Actual question to the LLM (category and pair of docs) 
             doc_pairs = []
             pair_ids = []
-
-            # We create pairs of documents. In each pair, there is a 'DOCUMENT A' and a 'DOCUMENT B'. We keep track of the original IDs of the documents in pair_ids, which is a list of dictionaries with keys 'A' and 'B', each with the original ID of the document.
             for d1, d2 in itertools.combinations(text["eval_docs"], 2):
-                # Shuffle the documents in the pair
                 docs = [d1, d2]
                 random.shuffle(docs)
-                
                 pair_ids.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
-                
                 doc_a = re.sub(r'^ID\d+\.', 'DOCUMENT A.', f"ID{docs[0]['doc_id']}. {extend_to_full_sentence(docs[0]['text'], num_words)}")
                 doc_b = re.sub(r'^ID\d+\.', 'DOCUMENT B.', f"ID{docs[1]['doc_id']}. {extend_to_full_sentence(docs[1]['text'], num_words)}")
-                
                 doc_pairs.append(f"\n{doc_a}\n{doc_b}")
+                
+            # Load template
+            template_path = load_template_path("q3")
+            template = self._load_template(template_path)
+            return [template.format(examples, cat, pair) for pair in doc_pairs], pair_ids
 
-            return [template.format(cat, pair) for pair in doc_pairs], pair_ids
-        
-        def handle_q1_q2(text: dict, topk: int = 10, num_words: int = 100):
+        def handle_q1_q2(text: dict, few_shot: dict, topk: int = 10, num_words: int = 100, nr_few_shot=1):
             docs = "\n".join(f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
             keys = " ".join(text["topic_words"][:topk])
-            return [self._load_template("src/llm_eval/prompts/q1_q2/question_prompt.txt").format(keys, docs, doc["text"]) for doc in text["eval_docs"]]
-        
-        def handle_q1_q3(text: dict, topk: int = 10, num_words: int = 100):
-            docs = "\n".join(f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
-            keys = " ".join(text["topic_words"][:topk])
+            template_path = load_template_path("q1_q2")
+            return [self._load_template(template_path).format(keys, docs, doc["text"]) for doc in text["eval_docs"]]
             
+        def handle_q1_q3(text: dict, few_shot: dict, topk: int = 10, num_words: int = 100, nr_few_shot=1):
+            docs = "\n".join(f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
+            keys = " ".join(text["topic_words"][:topk])
             doc_pairs = []
             pair_ids = []
-
-            # We create pairs of documents. In each pair, there is a 'DOCUMENT A' and a 'DOCUMENT B'. We keep track of the original IDs of the documents in pair_ids, which is a list of dictionaries with keys 'A' and 'B', each with the original ID of the document.
             for d1, d2 in itertools.combinations(text["eval_docs"], 2):
-                # Shuffle the documents in the pair
                 docs = [d1, d2]
                 random.shuffle(docs)
-                
                 pair_ids.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
-                
                 doc_a = re.sub(r'^ID\d+\.', 'DOCUMENT A.', f"ID{docs[0]['doc_id']}. {extend_to_full_sentence(docs[0]['text'], num_words)}")
                 doc_b = re.sub(r'^ID\d+\.', 'DOCUMENT B.', f"ID{docs[1]['doc_id']}. {extend_to_full_sentence(docs[1]['text'], num_words)}")
-                
                 doc_pairs.append(f"\n{doc_a}\n{doc_b}")
-            
-            template = self._load_template("src/llm_eval/prompts/q1_q3/question_prompt.txt")
-            
-            return [template.format(keys,docs,pair) for pair in doc_pairs], pair_ids
+            template_path = load_template_path("q1_q3")
+            return [self._load_template(template_path).format(keys, docs, pair) for pair in doc_pairs], pair_ids
 
         question_handlers = {
-            "q1": handle_q1,
-            "q2": handle_q2,
-            "q3": lambda text: handle_q3(text, category),
-            "q1_q2": handle_q1_q2,
-            "q1_q3": handle_q1_q3
+            "q1": lambda text: handle_q1(text, few_shot_examples, nr_few_shot=nr_few_shot),
+            "q2": lambda text: handle_q2(text, few_shot_examples, nr_few_shot=nr_few_shot),
+            "q3": lambda text: handle_q3(text, few_shot_examples, category, nr_few_shot=nr_few_shot),
+            "q1_q2": lambda text: handle_q1_q2(text, few_shot_examples, nr_few_shot=nr_few_shot),
+            "q1_q3": lambda text: handle_q1_q3(text, few_shot_examples, nr_few_shot=nr_few_shot)
         }
 
         if question_type not in question_handlers:

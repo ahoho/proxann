@@ -34,13 +34,16 @@ def main():
     """
     for prompt_mode in prompt_modes:
         logging.info(f"-- -- Executing in MODE: {prompt_mode} -- --")
-        for model_id, model_data in config_pilot.items():
+        for model_id, model_data in config_pilot.items(): # this selects the set of topics for a given model (mallet, ctm, etc.)
             logging.info(f"-- -- Model: {model_id}")
-            for cluster_id, cluster_data in model_data.items():
+            for cluster_id, cluster_data in model_data.items(): # each cluster_data is the information for a topic
+                logging.info(f"-- -- Cluster: {cluster_id}")
                 id_ = f"{model_id}/{cluster_id}"
                 model = model_id.split("/")[-1]
                 topic_match_id = topics_per_model[model_id]
-                rank_data = []
+                
+                rank_data = [] # it will store the rank data for each lmm 
+                fit_data = [] # it will store the fit data for each lmm
 
                 for llm_model in model_types:
                     logging.info(f"-- -- -- -- LLM: {llm_model}")
@@ -52,14 +55,14 @@ def main():
                             logging.info("-- Executing Q1...")
                             question = prompter.get_prompt(cluster_data, "q1")
                             category, _ = prompter.prompt("src/llm_eval/prompts/q1/simplified_system_prompt.txt", question, use_context=False)
-                            
+                            print("THIS IS THE CATEGORY ", category)
                             logging.info("-- Executing Q3...")
                             
                             q3_out = prompter.get_prompt(cluster_data, "q3", category)
                             get_label = False
                             
                             if len(q3_out) > 2: ## then is "doing it both ways"
-                                questions_one, pair_ids_one, questions_two, pair_ids_two = q3_out
+                                questions_one, pair_ids_one, doc_pairs, questions_two, pair_ids_two = q3_out
                                 questions = None
                             else:
                                 questions, pair_ids = q3_out
@@ -101,7 +104,7 @@ def main():
                                         label, order, rationale = extract_info_q1_q3(pairwise, get_label=get_label)
                                         if order == "":
                                             logging.warning(f"-- -- No order extracted for model {model_id} and cluster {cluster_id}")
-                                            import pdb; pdb.set_trace()
+                                            #import pdb; pdb.set_trace()
 
                                     if len(ways) > 1 and way_id == 0:
                                         labels_one.append(label)
@@ -120,6 +123,7 @@ def main():
                                         rationales.append(rationale)
                                 except Exception as e:
                                     logging.error(f"-- -- Error extracting info from prompt: {e}")
+                                    import pdb; pdb.set_trace()
 
                                 # Extract logprobs if available
                                 if pairwise_logprobs is not None:
@@ -154,16 +158,6 @@ def main():
                         rank = [true_order.index(doc_id) + 1 for doc_id in ranked_documents['doc_id']]
                         rank = [len(rank) - r + 1 for r in rank] # Invert rank
                         rank_data.append(rank)
-
-                        llm_results_q3.append({
-                            "id": id_,
-                            "model": model,
-                            "n_annotators": len(model_types),
-                            "annotators": model_types,
-                            "topic": cluster_id,
-                            "topic_match_id": topic_match_id,
-                            "rank_data": rank_data
-                        })
                         
                     elif prompt_mode == "q1_then_q2" or prompt_mode == "q1_and_q2":
                         
@@ -176,43 +170,56 @@ def main():
                             questions = prompter.get_prompt(cluster_data, "q2", category)
                             
                             labels = [category] * len(questions)
-                            _, scores, rationales = [], [], []
+                            rationales = []
                             for question in questions:
                                 response_q2, _ = prompter.prompt("src/llm_eval/prompts/q2/simplified_system_prompt.txt", question, use_context=False)
                                 label, score, rationale = extract_info_q1_q2(response_q2, get_label=False)
                                 if score == None:
                                     import pdb; pdb.set_trace()
-                                scores.append(score)
+                                fit_data.append(score)
                                 rationales.append(rationale)
                                                         
                         else: # prompt_mode == "q1_and_q2"
                             questions = prompter.get_prompt(cluster_data, "q1_q2")
                             
-                            labels, scores, rationales = [], [], []
+                            labels, rationales = [], []
                             for question in questions:
                                 response_q2, _ = prompter.prompt("src/llm_eval/prompts/q1_q2/simplified_system_prompt.txt", question, use_context=False)
                                 label, score, rationale = extract_info_q1_q2(response_q2, get_label=True)
                                 labels.append(label)
-                                scores.append(score)
+                                fit_data.append(score)
                                 rationales.append(rationale)
-                        
-                        llm_results_q2.append({
-                            "id": id_,
-                            "model": model,
-                            "n_annotators": len(model_types),
-                            "annotators": model_types,
-                            "topic": cluster_id,
-                            "topic_match_id": topic_match_id,
-                            "labels": labels,
-                            "fit_data": [scores],
-                        })
+                
+                if fit_data != []:
+                    llm_results_q2.append({
+                        "id": id_,
+                        "model": model,
+                        "n_annotators": len(model_types),
+                        "annotators": model_types,
+                        "topic": cluster_id,
+                        "topic_match_id": topic_match_id,
+                        "labels": labels,
+                        "fit_data": [fit_data],
+                    })
+
+                if rank_data != []:
+                    llm_results_q3.append({
+                        "id": id_,
+                        "model": model,
+                        "n_annotators": len(model_types),
+                        "annotators": model_types,
+                        "topic": cluster_id,
+                        "topic_match_id": topic_match_id,
+                        "rank_data": rank_data
+                    })
                         
     if llm_results_q2 == []:
         llm_results_q2 = None
     if llm_results_q3 == []:
         llm_results_q3 = None
         
-    # Correlations with user study data and ground truth    
+    # Correlations with user study data and ground truth 
+    #import pdb; pdb.set_trace()
     responses_by_id = process_responses(args.response_csv, args.config_path.split(","))
     _, _, _, corr_data = collect_fit_rank_data(responses_by_id)
     corr_results = compute_correlations_one(corr_data, rank_llm_data=llm_results_q3, fit_llm_data=llm_results_q2)

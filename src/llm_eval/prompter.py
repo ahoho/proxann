@@ -252,13 +252,14 @@ class Prompter:
                         pair_ids.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
                         doc_pairs.append(f"\n{doc_a}\n{doc_b}")
                     iter += 1
-
+            #print("THIS IS THE CATEGORY ", cat)
+            #import pdb; pdb.set_trace()
             # Load template
             template_path = load_template_path("q3")
             template = self._load_template(template_path)
                         
             if doing_both_ways:
-                return [template.format(examples, cat, pair) for pair in doc_pairs_one], pair_ids_one, [template.format(examples, cat, pair) for pair in doc_pairs_two], pair_ids_two
+                return [template.format(examples, cat, pair) for pair in doc_pairs_one], pair_ids_one, doc_pairs_one, [template.format(examples, cat, pair) for pair in doc_pairs_two], pair_ids_two
             else:
                 return [template.format(examples, cat, pair) for pair in doc_pairs], pair_ids
 

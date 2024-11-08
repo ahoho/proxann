@@ -148,19 +148,19 @@ def extract_info_q1_q3(text, get_label):
     Extracts the label, order, and rationale from the prompt text based on the 'get_label' parameter. If 'get_label' is set to True, the method extracts from the 'q1_q3' prompt; otherwise, it extracts from 'q3'.
     """   
     label_pattern = r'LABEL:\s*(.*?)\s*(?=CLOSEST:|RATIONALE:)'
-    order_pattern = r'\bCLOSEST\b\W*:\W*(?:(?i)DOCUMENT\s*)?([AB])'
+    order_pattern = r'\bCLOSEST\b\W*:\W*(?:DOCUMENT\s*)?([AB])'
     rationale_pattern = r'\bRATIONALE\b\W*:\W*(.*)'
     
     if get_label: 
-        label_match = re.findall(label_pattern, text, re.DOTALL)
+        label_match = re.findall(label_pattern, text, re.DOTALL | re.IGNORECASE)
         label = label_match[0].strip() if label_match else ""
     else:
         label = ""
         
-    order_match = re.findall(order_pattern, text)
+    order_match = re.findall(order_pattern, text, re.IGNORECASE)
     order = order_match[0].strip() if order_match else ""
     
-    rationale_match = re.findall(rationale_pattern, text, re.DOTALL)
+    rationale_match = re.findall(rationale_pattern, text, re.DOTALL | re.IGNORECASE)
     rationale = rationale_match[0].strip() if rationale_match else ""
 
     return label, order, rationale

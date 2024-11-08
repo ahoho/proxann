@@ -91,9 +91,8 @@ def bradley_terry_model(
             params = choix.ilsr_pairwise(n_items, data)
         except Exception as e:
             print(e)
-            print("-- -- Graph is not connected. Printing adjacency matrix:")
+            print("-- -- Graph is not strongly connected. Printing adjacency matrix:")
             graph = nx.DiGraph(data=data)
-            graph.add_edges_from(data)
             adjacency_matrix = nx.to_numpy_array(graph, dtype=int)
             print(adjacency_matrix)
             print("-- -- Using a small regularization factor to solve the issue.--")
@@ -147,11 +146,11 @@ def bradley_terry_model(
 def extract_info_q1_q3(text, get_label):
     """
     Extracts the label, order, and rationale from the prompt text based on the 'get_label' parameter. If 'get_label' is set to True, the method extracts from the 'q1_q3' prompt; otherwise, it extracts from 'q3'.
-    """    
+    """   
     label_pattern = r'LABEL:\s*(.*?)\s*(?=CLOSEST:|RATIONALE:)'
-    order_pattern = r'CLOSEST:\s*(?:DOCUMENT\s*)?([AB])' 
-    rationale_pattern = r'RATIONALE:\s*(.*)'
-
+    order_pattern = r'\bCLOSEST\b\W*:\W*(?:(?i)DOCUMENT\s*)?([AB])'
+    rationale_pattern = r'\bRATIONALE\b\W*:\W*(.*)'
+    
     if get_label: 
         label_match = re.findall(label_pattern, text, re.DOTALL)
         label = label_match[0].strip() if label_match else ""
@@ -183,7 +182,10 @@ def extract_info_q1_q2(text, get_label):
     
     score_match = re.findall(score_pattern, text)
     score = score_match[0].strip() if score_match else ""
-    score = int(score) if score else 0
+    try:
+        score = int(score)
+    except ValueError:
+        score = None
     
     rationale_match = re.findall(rationale_pattern, text, re.DOTALL)
     rationale = rationale_match[0].strip() if rationale_match else ""

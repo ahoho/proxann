@@ -24,7 +24,6 @@ def main():
     topics_per_model = Counter()
     
     # keep dictionary with only first key (for debugging)
-
     """
     inside_dict = {
         '32':  config_pilot['data/models/mallet']['32']
@@ -53,43 +52,104 @@ def main():
                             logging.info("-- Executing Q1...")
                             question = prompter.get_prompt(cluster_data, "q1")
                             category, _ = prompter.prompt("src/llm_eval/prompts/q1/simplified_system_prompt.txt", question, use_context=False)
+                            
                             logging.info("-- Executing Q3...")
-                            questions, pair_ids = prompter.get_prompt(cluster_data, "q3", category)
+                            
+                            q3_out = prompter.get_prompt(cluster_data, "q3", category)
                             get_label = False
-
+                            
+                            if len(q3_out) > 2: ## then is "doing it both ways"
+                                questions_one, pair_ids_one, questions_two, pair_ids_two = q3_out
+                                questions = None
+                            else:
+                                questions, pair_ids = q3_out
+                                questions_one = None
+                                
+                            # questions, pair_ids
                         elif prompt_mode == "q1_and_q3":
                             questions, pair_ids = prompter.get_prompt(cluster_data, "q1_q3")
                             get_label = True
 
-                        labels, orders, rationales, logprobs = [], [], [], []
-                        for question in questions:
-                            pairwise, pairwise_logprobs = prompter.prompt(
-                                "src/llm_eval/prompts/q1_q3/simplified_system_prompt.txt" if prompt_mode == "q1_and_q3" else "src/llm_eval/prompts/q3/simplified_system_prompt.txt",
-                                question, use_context=False)
+                        if questions is None: # we need to save double the data
+                            labels_one, orders_one, rationales_one, logprobs_one = [], [], [], []
+                            labels_two, orders_two, rationales_two, logprobs_two = [], [], [], []
+                        else:
+                            labels, orders, rationales, logprobs = [], [], [], []
+                        
+                        if questions is None: # then it is "doing it both ways"
+                            ways = [[questions_one,pair_ids_one], [questions_two, pair_ids_two]]
+                        else: 
+                            ways = [[questions, pair_ids]]
+                        
+                        for way_id, way in enumerate(ways):
+                            questions, pair_ids = way
+                            
+                            if len(ways) > 1:
+                                logging.info("-- Executing Q3 (both ways)...")
+                                
+                            else:
+                                logging.info("-- Executing Q3 (one way)...")
+                                
+                            for question in questions:
+                                pairwise, pairwise_logprobs = prompter.prompt("src/llm_eval/prompts/q1_q3/simplified_system_prompt.txt" if prompt_mode == "q1_and_q3" else "src/llm_eval/prompts/q3/simplified_system_prompt.txt",question,use_context=False)
 
-                            try:
-                                label, order, rationale = extract_info_q1_q3(pairwise, get_label=get_label)
-                                print(f"\033[92mOrder: {order}\033[0m")
-                                labels.append(label)
-                                orders.append(order)
-                                rationales.append(rationale)
-                            except Exception as e:
-                                logging.error(f"-- -- Error extracting info from prompt: {e}")
+                                try:
+                                    label, order, rationale = extract_info_q1_q3(pairwise, get_label=get_label)
+                                    
+                                    if order == "":
+                                        pairwise, pairwise_logprobs = prompter.prompt("src/llm_eval/prompts/q1_q3/simplified_system_prompt.txt" if prompt_mode == "q1_and_q3" else "src/llm_eval/prompts/q3/simplified_system_prompt.txt",question,use_context=False)
+                                        label, order, rationale = extract_info_q1_q3(pairwise, get_label=get_label)
+                                        if order == "":
+                                            logging.warning(f"-- -- No order extracted for model {model_id} and cluster {cluster_id}")
+                                            import pdb; pdb.set_trace()
 
-                            # Extract logprobs if available
-                            if pairwise_logprobs is not None:
-                                prob_values = extract_logprobs(pairwise_logprobs, prompter.backend,logging)
-                                if prob_values:
-                                    logprobs.append(prob_values[0])
-                                else:
-                                    logging.warning(f"-- -- No logprobs extracted for model {model_id} and cluster {cluster_id}")
+                                    if len(ways) > 1 and way_id == 0:
+                                        labels_one.append(label)
+                                        orders_one.append(order)
+                                        rationales_one.append(rationale)
+                                        print(f"\033[92mOrder: {order}\033[0m")
+                                    elif len(ways) > 1 and way_id == 1:
+                                        labels_two.append(label)
+                                        orders_two.append(order)
+                                        rationales_two.append(rationale)
+                                        print(f"\033[94mOrder: {order}\033[0m")
+                                    else:
+                                        print(f"\033[92mOrder: {order}\033[0m")
+                                        labels.append(label)
+                                        orders.append(order)
+                                        rationales.append(rationale)
+                                except Exception as e:
+                                    logging.error(f"-- -- Error extracting info from prompt: {e}")
 
-                        if not logprobs:
-                            logprobs = None
-                            logging.warning(f"-- -- No logprobs found for model {model_id} and cluster {cluster_id}")
+                                # Extract logprobs if available
+                                if pairwise_logprobs is not None:
+                                    prob_values = extract_logprobs(pairwise_logprobs, prompter.backend,logging)
+                                    if prob_values:
+                                        if len(ways) > 1 and way_id == 0:
+                                            logprobs_one.append(prob_values[0])
+                                        elif len(ways) > 1 and way_id == 1:
+                                            logprobs_two.append(prob_values[0])
+                                        else:
+                                            logprobs.append(prob_values[0])
+                                    else:
+                                        logging.warning(f"-- -- No logprobs extracted for model {model_id} and cluster {cluster_id}")
 
+                        if len(ways) > 1:
+                            if (not logprobs_one or not logprobs_two):
+                                logprobs_one = [None] * len(orders_one)
+                                logprobs_two = [None] * len(orders_two)
+                                logging.warning(f"-- -- No logprobs found for model {model_id} and cluster {cluster_id}")
+                        else:
+                            if not logprobs:
+                                logprobs = [None] * len(orders)
+                                logging.warning(f"-- -- No logprobs found for model {model_id} and cluster {cluster_id}")
+
+                        pair_ids_comb = pair_ids_one + pair_ids_two if len(ways) > 1 else pair_ids
+                        orders_comb = orders_one + orders_two if len(ways) > 1 else orders
+                        logprobs_comb = logprobs_one + logprobs_two if len(ways) > 1 else logprobs
+                                                
                         # Obtain full rank (Bradley-Terry model)
-                        ranked_documents = bradley_terry_model(pair_ids, orders, logprobs)
+                        ranked_documents = bradley_terry_model(pair_ids_comb, orders_comb, logprobs_comb)
                         true_order = [el["doc_id"] for el in cluster_data["eval_docs"]]
                         rank = [true_order.index(doc_id) + 1 for doc_id in ranked_documents['doc_id']]
                         rank = [len(rank) - r + 1 for r in rank] # Invert rank
@@ -120,6 +180,8 @@ def main():
                             for question in questions:
                                 response_q2, _ = prompter.prompt("src/llm_eval/prompts/q2/simplified_system_prompt.txt", question, use_context=False)
                                 label, score, rationale = extract_info_q1_q2(response_q2, get_label=False)
+                                if score == None:
+                                    import pdb; pdb.set_trace()
                                 scores.append(score)
                                 rationales.append(rationale)
                                                         

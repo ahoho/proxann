@@ -157,7 +157,7 @@ class Prompter:
         text_for_prompt: dict,
         question_type: str,
         category: str = None,
-        nr_few_shot: int = 1,
+        nr_few_shot: int = 3,
         doing_both_ways: bool = True,
         path_examples: str = "src/llm_eval/prompts/few_shot_examples.json",
         base_prompt_path: str = "src/llm_eval/prompts/"
@@ -226,24 +226,41 @@ class Prompter:
                 for ex in examples_q3
             ])
             
-            # Actual question to the LLM (category and pair of docs) 
-            doc_pairs = []
-            pair_ids = []
+            # Actual question to the LLM (category and pair of docs)
+            if doing_both_ways:
+                doc_pairs_one, doc_pairs_two = [], []
+                pair_ids_one, pair_ids_two = [], []
+            else:
+                doc_pairs = []
+                pair_ids = []
 
             for d1, d2 in itertools.combinations(text["eval_docs"], 2):
                 docs_list = [[d1, d2], [d2, d1]] if doing_both_ways else [random.sample([d1, d2], 2)] # if doing_both_ways, we have n×(n−1) pairs, n = len(text["eval_docs"]). Otherwise, we have n×(n−1)/2 pairs, but we suffle the order of the docs in the pair so the first doc is not always the same.
+                
+                iter = 0
                 for docs in docs_list:
-                    pair_ids.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
-                    
                     doc_a = re.sub(r'^ID\d+\.', 'DOCUMENT A.', f"ID{docs[0]['doc_id']}. {extend_to_full_sentence(docs[0]['text'], num_words)}")
                     doc_b = re.sub(r'^ID\d+\.', 'DOCUMENT B.', f"ID{docs[1]['doc_id']}. {extend_to_full_sentence(docs[1]['text'], num_words)}")
                     
-                    doc_pairs.append(f"\n{doc_a}\n{doc_b}")
+                    if doing_both_ways and iter % 2 == 0:
+                        doc_pairs_one.append(f"\n{doc_a}\n{doc_b}")
+                        pair_ids_one.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+                    elif doing_both_ways and iter % 2 != 0:
+                        doc_pairs_two.append(f"\n{doc_a}\n{doc_b}")
+                        pair_ids_two.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+                    else:
+                        pair_ids.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+                        doc_pairs.append(f"\n{doc_a}\n{doc_b}")
+                    iter += 1
 
             # Load template
             template_path = load_template_path("q3")
             template = self._load_template(template_path)
-            return [template.format(examples, cat, pair) for pair in doc_pairs], pair_ids
+                        
+            if doing_both_ways:
+                return [template.format(examples, cat, pair) for pair in doc_pairs_one], pair_ids_one, [template.format(examples, cat, pair) for pair in doc_pairs_two], pair_ids_two
+            else:
+                return [template.format(examples, cat, pair) for pair in doc_pairs], pair_ids
 
         def handle_q1_q2(text: dict, few_shot: dict, topk: int = 10, num_words: int = 100, nr_few_shot=1):
             docs = "\n".join(f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])

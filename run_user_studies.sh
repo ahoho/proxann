@@ -8,23 +8,31 @@ log() {
 ##############
 # q1_then_q3 #
 ##############
-log "*** Running: python3 run_user_study.py --model_type chatgpt-4o-latest,llama_cpp,llama3.2 --prompt_mode q1_then_q3"
-python3 run_user_study.py --model_type chatgpt-4o-latest,llama_cpp,llama3.2 --prompt_mode q1_then_q3 2>&1 | tee -a "$LOG_FILE"
+log "*** Running: python3 run_user_study.py --model_type chatgpt-4o-latest,llama3.1:8b-instruct-q8_0,llama3.2 --prompt_mode q1_then_q3"
+python3 run_user_study.py --model_type chatgpt-4o-latest,llama3.1:8b-instruct-q8_0,llama3.2 --prompt_mode q1_then_q3 2>&1 | tee -a "$LOG_FILE"
 if [ $? -eq 0 ]; then
     log "q1_then_q3 completed"
 else
     log "Error in prompt_mode q1_then_q3"
 fi
 
+log "*** Running: python3 run_user_study.py --model_type chatgpt-4o-latest,llama3.1:8b-instruct-q8_0,llama3.2 --prompt_mode q1_then_q3"
+python3 run_user_study.py --model_type chatgpt-4o-latest,llama3.1:8b-instruct-q8_0,llama3.2 --prompt_mode q1_then_q2 2>&1 | tee -a "$LOG_FILE"
+if [ $? -eq 0 ]; then
+    log "q1_then_q2 completed"
+else
+    log "Error in prompt_mode q1_then_q2"
+fi
+
 ##############
 # q1_and_q3 #
 ##############
-log "*** Running: python3 run_user_study.py --model_type chatgpt-4o-latest,llama_cpp,llama3.2 --prompt_mode q1_and_q3"
-python3 run_user_study.py --model_type chatgpt-4o-latest,llama_cpp,llama3.2 --prompt_mode q1_and_q3 2>&1 | tee -a "$LOG_FILE"
-if [ $? -eq 0 ]; then
-    log "q1_and_q3 completed"
-else
-    log "Error in prompt_mode q1_and_q3"
-fi
+#log "*** Running: python3 run_user_study.py --model_type chatgpt-4o-latest,llama_cpp,llama3.2 --prompt_mode q1_and_q3"
+#python3 run_user_study.py --model_type chatgpt-4o-latest,llama_cpp,llama3.2 --prompt_mode q1_and_q3 2>&1 | tee -a "$LOG_FILE"
+#if [ $? -eq 0 ]; then
+#    log "q1_and_q3 completed"
+#else
+#    log "Error in prompt_mode q1_and_q3"
+#fi
 
 log "Script execution completed"

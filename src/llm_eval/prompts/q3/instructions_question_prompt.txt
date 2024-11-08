@@ -15,7 +15,7 @@ Examples
 
 CATEGORY: {}
 DOCUMENTS: {}
-Decide which document is more closely related to the given category.
+Select the document that is more closely related to the specified category. Even if neither document directly pertains to the category, return the one that is 'less unrelated' or the 'least incorrect' choice. You must select either 'A' or 'B.'
 Follow this format to answer:
 CLOSEST:
 RATIONALE:

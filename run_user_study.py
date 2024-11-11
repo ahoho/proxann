@@ -1,9 +1,10 @@
 import argparse
 from collections import Counter
 import logging
+from scipy.stats import rankdata
 import datetime
 from src.llm_eval.prompter import Prompter
-from src.llm_eval.utils import bradley_terry_model, collect_fit_rank_data, compute_correlations_one, compute_correlations_two, extract_info_q1_q3, extract_logprobs, load_config_pilot, process_responses, extract_info_q1_q2
+from src.llm_eval.utils import bradley_terry_model, collect_fit_rank_data, compute_agreement_per_topic, compute_correlations_one, compute_correlations_two, extract_info_q1_q3, extract_logprobs, load_config_pilot, process_responses, extract_info_q1_q2, generate_pairwise_counts
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -16,10 +17,19 @@ def parse_arguments():
 def main():
     args = parse_arguments()
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+    
+    # Read data from user study
     config_pilot = load_config_pilot(args.config_path)
-
+    
+    # Read results from user study
+    responses_by_id = process_responses(args.response_csv, args.config_path.split(","))
+    _, _, _, corr_data = collect_fit_rank_data(responses_by_id)
+    # matrix[0, 1] = 5: Item 0 was ranked higher than Item 1 by 5 annotators.
+   
+    
     model_types = args.model_type.split(",") if args.model_type else []
     prompt_modes = args.prompt_mode.split(",") if args.prompt_mode else []
+    
     llm_results_q3, llm_results_q2 = [], []
     topics_per_model = Counter()
     
@@ -42,6 +52,16 @@ def main():
                 model = model_id.split("/")[-1]
                 topic_match_id = topics_per_model[model_id]
                 
+                users_cats = [user_data["category"] for user_data in responses_by_id[id_]]
+                
+                # get "ground truth" rank
+                users_rank = corr_data[topic_match_id]["rank_data"]
+                gt = generate_pairwise_counts(users_rank)
+                gt_sums = gt.sum(axis=1)
+
+                assert corr_data[topic_match_id]["topic_match_id"] == topic_match_id
+
+                # to store the rank data for each lmm
                 rank_data = [] # it will store the rank data for each lmm 
                 fit_data = [] # it will store the fit data for each lmm
 
@@ -55,14 +75,16 @@ def main():
                             logging.info("-- Executing Q1...")
                             question = prompter.get_prompt(cluster_data, "q1")
                             category, _ = prompter.prompt("src/llm_eval/prompts/q1/simplified_system_prompt.txt", question, use_context=False)
+                            import pdb; pdb.set_trace()
                             print("THIS IS THE CATEGORY ", category)
                             logging.info("-- Executing Q3...")
-                            
+
+                            #import pdb; pdb.set_trace()
                             q3_out = prompter.get_prompt(cluster_data, "q3", category)
                             get_label = False
                             
                             if len(q3_out) > 2: ## then is "doing it both ways"
-                                questions_one, pair_ids_one, doc_pairs, questions_two, pair_ids_two = q3_out
+                                questions_one, pair_ids_one, doc_id_mapping, questions_two, pair_ids_two = q3_out
                                 questions = None
                             else:
                                 questions, pair_ids = q3_out
@@ -92,20 +114,25 @@ def main():
                                 
                             else:
                                 logging.info("-- Executing Q3 (one way)...")
+                            
+                            for id_q, question in enumerate(questions):
+                                #if way_id == 0:
+                                    #print(f"\033[93mQuestion: {question}\033[0m")
+                                    #print(f"WAY: {way_id} (If way is 1, then A is B and B is A).")
+                                    #print(f"DOCUMENTS: {doc_pairs[id_q]}")
                                 
-                            for question in questions:
                                 pairwise, pairwise_logprobs = prompter.prompt("src/llm_eval/prompts/q1_q3/simplified_system_prompt.txt" if prompt_mode == "q1_and_q3" else "src/llm_eval/prompts/q3/simplified_system_prompt.txt",question,use_context=False)
 
                                 try:
                                     label, order, rationale = extract_info_q1_q3(pairwise, get_label=get_label)
-                                    
+                                                                        
                                     if order == "":
                                         pairwise, pairwise_logprobs = prompter.prompt("src/llm_eval/prompts/q1_q3/simplified_system_prompt.txt" if prompt_mode == "q1_and_q3" else "src/llm_eval/prompts/q3/simplified_system_prompt.txt",question,use_context=False)
                                         label, order, rationale = extract_info_q1_q3(pairwise, get_label=get_label)
                                         if order == "":
                                             logging.warning(f"-- -- No order extracted for model {model_id} and cluster {cluster_id}")
                                             #import pdb; pdb.set_trace()
-
+                                    
                                     if len(ways) > 1 and way_id == 0:
                                         labels_one.append(label)
                                         orders_one.append(order)
@@ -147,6 +174,10 @@ def main():
                             if not logprobs:
                                 logprobs = [None] * len(orders)
                                 logging.warning(f"-- -- No logprobs found for model {model_id} and cluster {cluster_id}")
+                                
+                        # print orders of each way in a different color
+                        print(f"\033[92mOrders: {orders_one}\033[0m")
+                        print(f"\033[94mOrders: {orders_two}\033[0m")
 
                         pair_ids_comb = pair_ids_one + pair_ids_two if len(ways) > 1 else pair_ids
                         orders_comb = orders_one + orders_two if len(ways) > 1 else orders
@@ -154,11 +185,19 @@ def main():
                                                 
                         # Obtain full rank (Bradley-Terry model)
                         ranked_documents = bradley_terry_model(pair_ids_comb, orders_comb, logprobs_comb)
+                        
                         true_order = [el["doc_id"] for el in cluster_data["eval_docs"]]
-                        rank = [true_order.index(doc_id) + 1 for doc_id in ranked_documents['doc_id']]
+                        
+                        ranking_indices = {doc_id: idx for idx, doc_id in enumerate(ranked_documents['doc_id'])}
+                        rank = [ranking_indices[doc_id] +1 for doc_id in true_order]    
                         rank = [len(rank) - r + 1 for r in rank] # Invert rank
+                        
                         rank_data.append(rank)
                         
+                        print(f"\033[95mLLM Rank: {rank}\033[0m")
+                        print(f"\033[95mUsers rank: {users_rank}\033[1m")
+                        print(f"\033[95mGT sum: {gt_sums}\033[1m")
+                                            
                     elif prompt_mode == "q1_then_q2" or prompt_mode == "q1_and_q2":
                         
                         if prompt_mode == "q1_then_q2":
@@ -219,9 +258,7 @@ def main():
         llm_results_q3 = None
         
     # Correlations with user study data and ground truth 
-    #import pdb; pdb.set_trace()
-    responses_by_id = process_responses(args.response_csv, args.config_path.split(","))
-    _, _, _, corr_data = collect_fit_rank_data(responses_by_id)
+    agreement_by_topic = compute_agreement_per_topic(responses_by_id)
     corr_results = compute_correlations_one(corr_data, rank_llm_data=llm_results_q3, fit_llm_data=llm_results_q2)
     corr_results2 = compute_correlations_two(responses_by_id, llm_results_q3, llm_results_q2)
     

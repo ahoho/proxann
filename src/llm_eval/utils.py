@@ -1,3 +1,4 @@
+import itertools
 import json
 import re
 from collections import Counter
@@ -93,11 +94,12 @@ def bradley_terry_model(
             print(e)
             print("-- -- Graph is not strongly connected. Printing adjacency matrix:")
             graph = nx.DiGraph(data=data)
+            graph.add_edges_from(data)
             adjacency_matrix = nx.to_numpy_array(graph, dtype=int)
             print(adjacency_matrix)
             print("-- -- Using a small regularization factor to solve the issue.--")
             params = choix.ilsr_pairwise(n_items, data, alpha=0.01) # adding a little bit of regularization when the comparison graph is not connected,
-        
+                     
         # Convert parameters to a DataFrame
         ranked_docs = sorted(
             ((index_to_doc_id[idx], score) for idx, score in enumerate(params)),
@@ -148,7 +150,7 @@ def extract_info_q1_q3(text, get_label):
     Extracts the label, order, and rationale from the prompt text based on the 'get_label' parameter. If 'get_label' is set to True, the method extracts from the 'q1_q3' prompt; otherwise, it extracts from 'q3'.
     """   
     label_pattern = r'LABEL:\s*(.*?)\s*(?=CLOSEST:|RATIONALE:)'
-    order_pattern = r'\bCLOSEST\b\W*:\W*(?:DOCUMENT\s*)?([AB])'
+    order_pattern = r'(?<!\w)CLOSEST(?!\w)\W*:\W*(?:DOCUMENT\s*)?([AB])'
     rationale_pattern = r'\bRATIONALE\b\W*:\W*(.*)'
     
     if get_label: 
@@ -735,3 +737,22 @@ def calculate_corr_npmi(corr_data, npmi_data):
     corr_data = corr_data.merge(npmi_data, on="id")
     pearsonr(corr_data.npmi, corr_data.rank_rho)
     pearsonr(corr_data.npmi, corr_data.rank_rtau)
+    
+
+def generate_pairwise_counts(rankings):
+    n_annotators, n_items = rankings.shape
+    pairwise_counts = np.zeros((n_items, n_items), dtype=int)
+
+    for annotator_ranking in rankings:
+        # Loop through all possible pairs
+        for i, j in itertools.combinations(range(n_items), 2):
+            item_i_rank = annotator_ranking[i]
+            item_j_rank = annotator_ranking[j]
+            
+            # Since rankings are inverted, higher rank means higher preference
+            if item_i_rank > item_j_rank:  # item_i is preferred over item_j
+                pairwise_counts[i, j] += 1
+            elif item_j_rank > item_i_rank:  # item_j is preferred over item_i
+                pairwise_counts[j, i] += 1
+
+    return pairwise_counts

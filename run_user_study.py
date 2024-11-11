@@ -1,8 +1,10 @@
 import argparse
 from collections import Counter
 import logging
-from scipy.stats import rankdata
 import datetime
+import os
+
+import pandas as pd
 from src.llm_eval.prompter import Prompter
 from src.llm_eval.utils import bradley_terry_model, collect_fit_rank_data, compute_agreement_per_topic, compute_correlations_one, compute_correlations_two, extract_info_q1_q3, extract_logprobs, load_config_pilot, process_responses, extract_info_q1_q2, generate_pairwise_counts
 
@@ -25,12 +27,12 @@ def main():
     responses_by_id = process_responses(args.response_csv, args.config_path.split(","))
     _, _, _, corr_data = collect_fit_rank_data(responses_by_id)
     # matrix[0, 1] = 5: Item 0 was ranked higher than Item 1 by 5 annotators.
-   
+
     
     model_types = args.model_type.split(",") if args.model_type else []
     prompt_modes = args.prompt_mode.split(",") if args.prompt_mode else []
     
-    llm_results_q3, llm_results_q2 = [], []
+    llm_results_q1, llm_results_q2, llm_results_q3 = [], [], []
     topics_per_model = Counter()
     
     # keep dictionary with only first key (for debugging)
@@ -64,27 +66,37 @@ def main():
                 # to store the rank data for each lmm
                 rank_data = [] # it will store the rank data for each lmm 
                 fit_data = [] # it will store the fit data for each lmm
-
+                categories = [] # it will store the categories for each lmm
+                
                 for llm_model in model_types:
                     logging.info(f"-- -- -- -- LLM: {llm_model}")
                     prompter = Prompter(model_type=llm_model)
                     
-                    if prompt_mode == "q1_then_q3" or prompt_mode == "q1_and_q3":
+                    if prompt_mode == "q1_then_q3" or prompt_mode == "q1_and_q3" or prompt_mode == "q1_then_q3_fix_cat":
 
-                        if prompt_mode == "q1_then_q3":
+                        if prompt_mode == "q1_then_q3" or prompt_mode == "q1_then_q3_fix_cat":
+                            
+                            #==============================================
+                            # Q1
+                            #==============================================
                             logging.info("-- Executing Q1...")
+                            
                             question = prompter.get_prompt(cluster_data, "q1")
                             category, _ = prompter.prompt("src/llm_eval/prompts/q1/simplified_system_prompt.txt", question, use_context=False)
-                            import pdb; pdb.set_trace()
-                            print("THIS IS THE CATEGORY ", category)
+                            categories.append(category)
+                            print(f"\033[92mUser categories: {users_cats}\033[0m")
+                            print(f"\033[94mModel category: {category}\033[0m")
+                            
+                            #==============================================
+                            # Q3
+                            #==============================================
                             logging.info("-- Executing Q3...")
-
-                            #import pdb; pdb.set_trace()
-                            q3_out = prompter.get_prompt(cluster_data, "q3", category)
+                            do_q3_with_q1_fixed = prompt_mode == "q1_then_q3_fix_cat"
+                            q3_out = prompter.get_prompt(cluster_data, "q3", category, do_q3_with_q1_fixed=do_q3_with_q1_fixed)
                             get_label = False
                             
                             if len(q3_out) > 2: ## then is "doing it both ways"
-                                questions_one, pair_ids_one, doc_id_mapping, questions_two, pair_ids_two = q3_out
+                                questions_one, pair_ids_one, questions_two, pair_ids_two = q3_out
                                 questions = None
                             else:
                                 questions, pair_ids = q3_out
@@ -116,8 +128,9 @@ def main():
                                 logging.info("-- Executing Q3 (one way)...")
                             
                             for id_q, question in enumerate(questions):
-                                #if way_id == 0:
-                                    #print(f"\033[93mQuestion: {question}\033[0m")
+                                if way_id == 0:
+                                    print(f"\033[93mQuestion: {question}\033[0m")
+                                    import pdb; pdb.set_trace()
                                     #print(f"WAY: {way_id} (If way is 1, then A is B and B is A).")
                                     #print(f"DOCUMENTS: {doc_pairs[id_q]}")
                                 
@@ -229,6 +242,18 @@ def main():
                                 fit_data.append(score)
                                 rationales.append(rationale)
                 
+                llm_results_q1.append({
+                    "id": id_,
+                    "model": model,
+                    "n_annotators": len(model_types),
+                    "annotators": model_types,
+                    "topic": cluster_id,
+                    "topic_match_id": topic_match_id,
+                    "categories": categories,
+                    "user_categories": users_cats
+                })
+                
+                
                 if fit_data != []:
                     llm_results_q2.append({
                         "id": id_,
@@ -251,7 +276,7 @@ def main():
                         "topic_match_id": topic_match_id,
                         "rank_data": rank_data
                     })
-                        
+                    
     if llm_results_q2 == []:
         llm_results_q2 = None
     if llm_results_q3 == []:
@@ -260,17 +285,33 @@ def main():
     # Correlations with user study data and ground truth 
     agreement_by_topic = compute_agreement_per_topic(responses_by_id)
     corr_results = compute_correlations_one(corr_data, rank_llm_data=llm_results_q3, fit_llm_data=llm_results_q2)
-    corr_results2 = compute_correlations_two(responses_by_id, llm_results_q3, llm_results_q2)
+        
+    #corr_results2 = compute_correlations_two(responses_by_id, llm_results_q3, llm_results_q2)
     
     # Print and save results
     logging.info("--Correlation results--")
     logging.info(corr_results)
-    logging.info(corr_results2)
-
+    #logging.info(corr_results2)
+    
+    # store also the results of the prompts (llm_results_qX)
+    # create a folder at path_save / {prompt_mode}_{llm_models}_{timestamp} with all the files
+    logging.info("--Saving results--")
+    path_save = "data/files_pilot"
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     llm_models = "_".join(model_types)
-    corr_results.to_excel(f"data/files_pilot/correlation_results_mode1_{prompt_mode}_{llm_models}_{timestamp}.xlsx", index=False)
-    corr_results2.to_excel(f"data/files_pilot/correlation_results_mode2_{prompt_mode}_{llm_models}_{timestamp}.xlsx", index=False)
+    path_save = f"{path_save}/{prompt_mode}_{llm_models}_{timestamp}"
+    os.makedirs(path_save, exist_ok=True)
+    corr_results.to_excel(f"{path_save}/correlation_results_mode1.xlsx", index=False)
+    #corr_results2.to_excel(f"{path_save}/correlation_results_mode2.xlsx", index=False)
+    pd.DataFrame(llm_results_q1).to_excel(f"{path_save}/llm_results_q1.xlsx", index=False)
+    if llm_results_q2:
+        pd.DataFrame(llm_results_q2).to_excel(f"{path_save}/llm_results_q2.xlsx", index=False)
+    if llm_results_q3:
+        pd.DataFrame(llm_results_q3).to_excel(f"{path_save}/llm_results_q3.xlsx", index=False)
+    
+    
+
+    
 
     
 if __name__ == "__main__":

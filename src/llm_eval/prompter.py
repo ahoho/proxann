@@ -157,8 +157,9 @@ class Prompter:
         text_for_prompt: dict,
         question_type: str,
         category: str = None,
-        nr_few_shot: int = 3,
+        nr_few_shot: int = 1,
         doing_both_ways: bool = True,
+        do_q3_with_q1_fixed: bool = False,
         path_examples: str = "src/llm_eval/prompts/few_shot_examples.json",
         base_prompt_path: str = "src/llm_eval/prompts/"
     ) -> Union[str, List[str]]:
@@ -176,7 +177,7 @@ class Prompter:
             # Few-shot examples
             examples_q1 = few_shot["q1"][:nr_few_shot]
             examples = [
-                "KEYWORDS: {}\nDOCUMENTS: {}\nCATEGORY: {}".format(
+                "KEYWORDS: {}\nDOCUMENTS:\n {}\nCATEGORY: {}".format(
                     ex['example']['keywords'],
                     ''.join(f"- {doc}\n" for doc in ex['example']['documents']),
                     ex['example']['response']['label']
@@ -210,59 +211,85 @@ class Prompter:
             template_path = load_template_path("q2")
             return [self._load_template(template_path).format(examples, keys, doc["text"]) for doc in text["eval_docs"]]
 
-        def handle_q3(text: dict, few_shot: dict, cat: str, num_words: int = 100, nr_few_shot=1, doing_both_ways=True) -> List[str]:
+        def handle_q3(
+            text: dict,
+            few_shot: dict,
+            cat: str,
+            num_words: int = 100,
+            topk: int = 10,
+            nr_few_shot=1,
+            doing_both_ways=True,
+            do_q3_with_q1_fixed: bool = False
+        ) -> List[str]:
             
             # Few-shot examples
             examples_q3 = few_shot["q3"][:nr_few_shot]
+            examples_q1 = few_shot.get("q1", [])[:nr_few_shot] if do_q3_with_q1_fixed else []
             
-            examples = "\n".join([
-                "CATEGORY: {}\nDOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{}\nCLOSEST: {} \nRATIONALE: {}".format(
-                    ex['example']['category'],
-                    ex['example']['documents']["A"],
-                    ex['example']['documents']["B"],
-                    ex['example']['response']["order"],
-                    ex['example']['response']["rationale"] + "\n",
-                )
-                for ex in examples_q3
-            ])
-            
-            # Actual question to the LLM (category and pair of docs)
-            if doing_both_ways:
-                doc_pairs_one, doc_pairs_two = [], []
-                pair_ids_one, pair_ids_two = [], []
+            if do_q3_with_q1_fixed and examples_q1:
+                examples = "\n".join([
+                    "KEYWORDS: {}\nEXEMPLAR DOCUMENTS:\n {}\nCATEGORY: {}\nEVAL DOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{}\nCLOSEST: {} \nRATIONALE: {}".format(
+                        ex1['example']['keywords'],
+                        ''.join(f"- {doc}\n" for doc in ex1['example']['documents']),
+                        ex1['example']['response']['label'],
+                        ex3['example']['documents']["A"],
+                        ex3['example']['documents']["B"],
+                        ex3['example']['response']["order"],
+                        ex3['example']['response']["rationale"] + "\n",
+                    )
+                    for ex1, ex3 in zip(examples_q1, examples_q3)
+                ])
+                exemplar_docs = "\n".join(f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
+                keys = " ".join(text["topic_words"][:topk])
             else:
-                doc_pairs = []
-                pair_ids = []
+                examples = "\n".join([
+                    "CATEGORY: {}\nDOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{}\nCLOSEST: {} \nRATIONALE: {}".format(
+                        ex['example']['category'],
+                        ex['example']['documents']["A"],
+                        ex['example']['documents']["B"],
+                        ex['example']['response']["order"],
+                        ex['example']['response']["rationale"] + "\n",
+                    )
+                    for ex in examples_q3
+                ])
+                exemplar_docs, keys = "", ""
+
+            # Document pairs generation
+            doc_pairs_one, doc_pairs_two = [], []
+            pair_ids_one, pair_ids_two = [], []
             
-            eval_docs = random.sample(text["eval_docs"], len(text["eval_docs"])) # shuffle the eval docs so they are not given to the LLM in the topic model order
+            eval_docs = random.sample(text["eval_docs"], len(text["eval_docs"]))
             for d1, d2 in itertools.combinations(eval_docs, 2):
-                docs_list = [[d1, d2], [d2, d1]] if doing_both_ways else [random.sample([d1, d2], 2)] # if doing_both_ways, we have n×(n−1) pairs, n = len(text["eval_docs"]). Otherwise, we have n×(n−1)/2 pairs, but we suffle the order of the docs in the pair so the first doc is not always the same.
+                docs_list = [[d1, d2], [d2, d1]] if doing_both_ways else [random.sample([d1, d2], 2)]
                 
-                iter = 0
-                for docs in docs_list:
+                for i, docs in enumerate(docs_list):
                     doc_a = re.sub(r'^ID\d+\.', '- DOCUMENT A.', f"ID{docs[0]['doc_id']}. {extend_to_full_sentence(docs[0]['text'], num_words)}")
                     doc_b = re.sub(r'^ID\d+\.', '- DOCUMENT B.', f"ID{docs[1]['doc_id']}. {extend_to_full_sentence(docs[1]['text'], num_words)}")
                     
-                    if doing_both_ways and iter % 2 == 0:
+                    if doing_both_ways:
+                        if i % 2 == 0:
+                            doc_pairs_one.append(f"\n{doc_a}\n{doc_b}")
+                            pair_ids_one.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+                        else:
+                            doc_pairs_two.append(f"\n{doc_a}\n{doc_b}")
+                            pair_ids_two.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+                    else:
                         doc_pairs_one.append(f"\n{doc_a}\n{doc_b}")
                         pair_ids_one.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
-                    elif doing_both_ways and iter % 2 != 0:
-                        doc_pairs_two.append(f"\n{doc_a}\n{doc_b}")
-                        pair_ids_two.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
-                    else:
-                        pair_ids.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
-                        doc_pairs.append(f"\n{doc_a}\n{doc_b}")
-                    iter += 1
-            #print("THIS IS THE CATEGORY ", cat)
-            #import pdb; pdb.set_trace()
-            # Load template
-            template_path = load_template_path("q3")
+
+            # Template loading and formatting
+            template_path = load_template_path("q1_then_q3_fix_cat" if do_q3_with_q1_fixed else "q3")
             template = self._load_template(template_path)
-                        
+            
             if doing_both_ways:
-                return [template.format(examples, cat, pair) for pair in doc_pairs_one], pair_ids_one, doc_pairs_one, [template.format(examples, cat, pair) for pair in doc_pairs_two], pair_ids_two
+                return (
+                    [template.format(examples, keys, exemplar_docs, cat, pair) for pair in doc_pairs_one],
+                    pair_ids_one,
+                    [template.format(examples, keys, exemplar_docs, cat, pair) for pair in doc_pairs_two],
+                    pair_ids_two
+                )
             else:
-                return [template.format(examples, cat, pair) for pair in doc_pairs], pair_ids
+                return [template.format(examples, keys, exemplar_docs, cat, pair) for pair in doc_pairs_one], pair_ids_one
 
         def handle_q1_q2(text: dict, few_shot: dict, topk: int = 10, num_words: int = 100, nr_few_shot=1):
             docs = "\n".join(f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
@@ -288,7 +315,7 @@ class Prompter:
         question_handlers = {
             "q1": lambda text: handle_q1(text, few_shot_examples, nr_few_shot=nr_few_shot),
             "q2": lambda text: handle_q2(text, few_shot_examples, category,nr_few_shot=nr_few_shot),
-            "q3": lambda text: handle_q3(text, few_shot_examples, category, nr_few_shot=nr_few_shot, doing_both_ways=doing_both_ways),
+            "q3": lambda text: handle_q3(text, few_shot_examples, category, nr_few_shot=nr_few_shot, doing_both_ways=doing_both_ways, do_q3_with_q1_fixed=do_q3_with_q1_fixed),
             "q1_q2": lambda text: handle_q1_q2(text, few_shot_examples, nr_few_shot=nr_few_shot),
             "q1_q3": lambda text: handle_q1_q3(text, few_shot_examples, nr_few_shot=nr_few_shot)
         }

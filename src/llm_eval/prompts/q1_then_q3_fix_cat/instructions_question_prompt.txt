@@ -14,18 +14,20 @@ Task Breakdown:
 5. Justify your choice by explaining why one document is more relevant than the other.
 
 Response Format:
-CLOSEST: (A or B)
+CLOSEST: Document from EVAL DOCUMENTS that is more closely related to the category (A or B)
 RATIONALE: Which document is more related to the category and why?
 
 Examples
 ---------
 {}
 
+
 KEYWORDS: {}
 EXEMPLAR DOCUMENTS: {}
+
 CATEGORY: {}
 EVAL DOCUMENTS: {}
-Even if neither document is directly related to the category, select the **least unrelated** option. You must choose either 'A' or 'B'.
+Select the document from EVAL DOCUMENTS that is more closely related to the specified category. Even if neither document directly pertains to the category, return the one that is 'less unrelated' or the 'least incorrect' choice. You must select either 'A' or 'B.'
 Follow this format to answer:
 CLOSEST:
 RATIONALE:

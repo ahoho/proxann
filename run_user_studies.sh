@@ -8,8 +8,10 @@ log() {
 ##############
 # q1_then_q3 #
 ##############
-log "*** Running: python3 run_user_study.py --model_type gpt-4-turbo,llama3.1:8b-instruct-q8_0,llama3.2 --prompt_mode q1_then_q3_fix_cat"
-python3 run_user_study.py --model_type gpt-4-turbo,llama3.1:8b-instruct-q8_0,llama3.2 --prompt_mode q1_then_q3_fix_cat 2>&1 | tee -a "$LOG_FILE"
+#gpt-4-turbo
+log "*** Running: python3 run_user_study.py --model_type ,
+llama3.1:8b-instruct-q8_0,llama3.2 --prompt_mode q1_then_q3_fix_cat"
+python3 run_user_study.py --model_type llama3.1:8b-instruct-q8_0,llama3.2 --prompt_mode q1_then_q3_fix_cat 2>&1 | tee -a "$LOG_FILE"
 if [ $? -eq 0 ]; then
     log "q1_then_q3_fix_cat completed"
 else

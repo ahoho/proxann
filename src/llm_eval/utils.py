@@ -704,7 +704,10 @@ def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=N
     corr_data = pd.DataFrame(corr_data)
     return corr_data
 
-def calculate_coherence(eval_data, data_docs):
+def calculate_coherence(config_pilot, data_docs=[
+    "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/files_pilot/document-data/wikitext/processed/labeled/vocab_15k/train.metadata.jsonl",
+    "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/files_pilot/document-data/wikitext/processed/labeled/vocab_15k/test.metadata.jsonl"
+]):
     """Calculate NPMI coherence for each topic in eval_data."""
     docs = []
     for data_doc in data_docs:
@@ -714,37 +717,50 @@ def calculate_coherence(eval_data, data_docs):
     vocab = sorted(set([word for doc in docs for word in doc]))
     data_dict = Dictionary([vocab])
     
-    for cluster_id, cluster_data in tqdm(eval_data.items()):
-        topics = [cluster_data["topic_words"][:15]] # number shown to annotators
-        cm = CoherenceModel(
-            topics=topics,
-            texts=docs,
-            dictionary=data_dict,
-            coherence="c_npmi",
-            window_size=None,
-            processes=1,
-        )
-
-        confirmed_measures = cm.get_coherence_per_topic()
-        mean = cm.aggregate_measures(confirmed_measures)
-        eval_data[cluster_id]["npmi"] = mean
-    npmi_data = pd.DataFrame({'id': id, 'NPMI': data['npmi']} for id, data in eval_data.items())
+    npmi_data = []
+    for model_id, model_data in config_pilot.items(): # this selects the set of topics for a given model (mallet, ctm, etc.)
+        for cluster_id, cluster_data in model_data.items(): # each cluster_data is the information for a topic
+            id_ = f"{model_id}/{cluster_id}"
+            topics = [cluster_data["topic_words"][:15]] # number shown to annotators
+            cm = CoherenceModel(
+                topics=topics,
+                texts=docs,
+                dictionary=data_dict,
+                coherence="c_npmi",
+                window_size=None,
+                processes=1,
+            )
+            confirmed_measures = cm.get_coherence_per_topic()
+            mean = cm.aggregate_measures(confirmed_measures)
+            npmi_data.append({"id": id_, "NPMI": mean})
     
+    npmi_data = pd.DataFrame(npmi_data)
+
     return npmi_data
 
-def calculate_corr_npmi(corr_data, npmi_data):
-    # calculate spearman correlation
-    corr_data = corr_data.merge(npmi_data, on="id")
-    pearsonr(corr_data.npmi, corr_data.rank_rho)
-    pearsonr(corr_data.npmi, corr_data.rank_rtau)
+def calculate_corr_npmi(corr_data, npmi_data, columns_calculate = ["rank_rho", "rank_rtau"]):
     
-
+    corr_data = corr_data.merge(npmi_data, on="id")    
+    corrs = []
+    for column in columns_calculate:
+        spearman_corr, spearman_p = spearmanr(corr_data[column], corr_data['NPMI'])
+        kendall_corr, kendall_p = kendalltau(corr_data[column], corr_data['NPMI'])
+        corrs.append({
+            'Metric': column,
+            'Spearman_rho': spearman_corr,
+            'Spearman_p_value': spearman_p,
+            'Kendall_tau': kendall_corr,
+            'Kendall_p_value': kendall_p
+        })
+    corrs_df = pd.DataFrame(corrs)
+    
+    return corrs_df
+    
 def generate_pairwise_counts(rankings):
     n_annotators, n_items = rankings.shape
     pairwise_counts = np.zeros((n_items, n_items), dtype=int)
 
     for annotator_ranking in rankings:
-        # Loop through all possible pairs
         for i, j in itertools.combinations(range(n_items), 2):
             item_i_rank = annotator_ranking[i]
             item_j_rank = annotator_ranking[j]

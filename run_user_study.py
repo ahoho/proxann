@@ -3,10 +3,11 @@ from collections import Counter
 import logging
 import datetime
 import os
+import time
 
 import pandas as pd
 from src.llm_eval.prompter import Prompter
-from src.llm_eval.utils import bradley_terry_model, collect_fit_rank_data, compute_agreement_per_topic, compute_correlations_one, compute_correlations_two, extract_info_q1_q3, extract_logprobs, load_config_pilot, process_responses, extract_info_q1_q2, generate_pairwise_counts
+from src.llm_eval.utils import bradley_terry_model, calculate_corr_npmi, collect_fit_rank_data, compute_agreement_per_topic, compute_correlations_one, compute_correlations_two, extract_info_q1_q3, extract_logprobs, load_config_pilot, process_responses, extract_info_q1_q2, generate_pairwise_counts, calculate_coherence
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -26,9 +27,20 @@ def main():
     # Read results from user study
     responses_by_id = process_responses(args.response_csv, args.config_path.split(","))
     _, _, _, corr_data = collect_fit_rank_data(responses_by_id)
-    # matrix[0, 1] = 5: Item 0 was ranked higher than Item 1 by 5 annotators.
-
     
+    # Calculate coherence
+    npmi_save = "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/files_pilot/npmi.csv"
+    if os.path.exists(npmi_save):
+        logging.info("-- Loading NPMI data --")
+        npmi_data = pd.read_csv(npmi_save)
+    else:
+        logging.info("-- Calculating NPMI data --")
+        time_start = time.time()
+        npmi_data = calculate_coherence(config_pilot)
+        npmi_data.to_csv(npmi_save, index=False)
+        time_npmi = (time.time() - time_start) / 60
+        logging.info(f"-- NPMI data calculated in {time_npmi} minutes--")
+
     model_types = args.model_type.split(",") if args.model_type else []
     prompt_modes = args.prompt_mode.split(",") if args.prompt_mode else []
     
@@ -36,6 +48,7 @@ def main():
     topics_per_model = Counter()
     
     # keep dictionary with only first key (for debugging)
+
     """
     inside_dict = {
         '32':  config_pilot['data/models/mallet']['32']
@@ -128,9 +141,9 @@ def main():
                                 logging.info("-- Executing Q3 (one way)...")
                             
                             for id_q, question in enumerate(questions):
-                                if way_id == 0:
-                                    print(f"\033[93mQuestion: {question}\033[0m")
-                                    import pdb; pdb.set_trace()
+                                #if way_id == 0:
+                                    #print(f"\033[93mQuestion: {question}\033[0m")
+                                    #import pdb; pdb.set_trace()
                                     #print(f"WAY: {way_id} (If way is 1, then A is B and B is A).")
                                     #print(f"DOCUMENTS: {doc_pairs[id_q]}")
                                 
@@ -138,14 +151,14 @@ def main():
 
                                 try:
                                     label, order, rationale = extract_info_q1_q3(pairwise, get_label=get_label)
-                                                                        
+                                    #import pdb; pdb.set_trace()                       
                                     if order == "":
                                         pairwise, pairwise_logprobs = prompter.prompt("src/llm_eval/prompts/q1_q3/simplified_system_prompt.txt" if prompt_mode == "q1_and_q3" else "src/llm_eval/prompts/q3/simplified_system_prompt.txt",question,use_context=False)
                                         label, order, rationale = extract_info_q1_q3(pairwise, get_label=get_label)
                                         if order == "":
                                             logging.warning(f"-- -- No order extracted for model {model_id} and cluster {cluster_id}")
-                                            #import pdb; pdb.set_trace()
-                                    
+                                            import pdb; pdb.set_trace()
+                                    #import pdb; pdb.set_trace()
                                     if len(ways) > 1 and way_id == 0:
                                         labels_one.append(label)
                                         orders_one.append(order)
@@ -210,7 +223,8 @@ def main():
                         print(f"\033[95mLLM Rank: {rank}\033[0m")
                         print(f"\033[95mUsers rank: {users_rank}\033[1m")
                         print(f"\033[95mGT sum: {gt_sums}\033[1m")
-                                            
+                        
+                        #import pdb; pdb.set_trace()                   
                     elif prompt_mode == "q1_then_q2" or prompt_mode == "q1_and_q2":
                         
                         if prompt_mode == "q1_then_q2":
@@ -285,9 +299,9 @@ def main():
     # Correlations with user study data and ground truth 
     agreement_by_topic = compute_agreement_per_topic(responses_by_id)
     corr_results = compute_correlations_one(corr_data, rank_llm_data=llm_results_q3, fit_llm_data=llm_results_q2)
-        
-    #corr_results2 = compute_correlations_two(responses_by_id, llm_results_q3, llm_results_q2)
-    
+                
+    corr_results2 = compute_correlations_two(responses_by_id, llm_results_q3, llm_results_q2)
+
     # Print and save results
     logging.info("--Correlation results--")
     logging.info(corr_results)
@@ -302,17 +316,17 @@ def main():
     path_save = f"{path_save}/{prompt_mode}_{llm_models}_{timestamp}"
     os.makedirs(path_save, exist_ok=True)
     corr_results.to_excel(f"{path_save}/correlation_results_mode1.xlsx", index=False)
-    #corr_results2.to_excel(f"{path_save}/correlation_results_mode2.xlsx", index=False)
+    corr_results2.to_excel(f"{path_save}/correlation_results_mode2.xlsx", index=False)
     pd.DataFrame(llm_results_q1).to_excel(f"{path_save}/llm_results_q1.xlsx", index=False)
     if llm_results_q2:
         pd.DataFrame(llm_results_q2).to_excel(f"{path_save}/llm_results_q2.xlsx", index=False)
     if llm_results_q3:
         pd.DataFrame(llm_results_q3).to_excel(f"{path_save}/llm_results_q3.xlsx", index=False)
-    
-    
-
-    
-
+        
+    # calculate npmi correlations
+    columns_calculate = [col for col in corr_results.columns if col not in["id", "model", "topic", "n_annotators", "fit_rho", "fit_tau", "fit_agree"]]
+    corr_results = calculate_corr_npmi(corr_results, npmi_data, columns_calculate)
+    corr_results.to_excel(f"{path_save}/corrs_mode1_npmi.xlsx", index=False)
     
 if __name__ == "__main__":
     main()

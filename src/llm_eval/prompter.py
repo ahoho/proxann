@@ -33,6 +33,8 @@ class Prompter:
             self._logger = logging.getLogger(__name__)
         
         self.GPT_MODELS = [
+            'gpt-4o-2024-08-06',
+            'gpt-4o-mini-2024-07-18',
             'chatgpt-4o-latest', 'gpt-4-turbo', 'gpt-4-turbo-2024-04-09', 'gpt-4', 'gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-4o',
             'gpt-4-32k', 'gpt-4-0125-preview', 'gpt-4-1106-preview', 'gpt-4-vision-preview',
             'gpt-3.5-turbo-0125', 'gpt-3.5-turbo-instruct', 'gpt-3.5-turbo-1106',
@@ -228,25 +230,26 @@ class Prompter:
             
             if do_q3_with_q1_fixed and examples_q1:
                 examples = "\n".join([
-                    "KEYWORDS: {}\nEXEMPLAR DOCUMENTS:\n {}\nCATEGORY: {}\nEVAL DOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{}\nCLOSEST: {} \nRATIONALE: {}".format(
+                    "KEYWORDS: {}\nEXEMPLAR DOCUMENTS: {}\n\nEVALUATION DOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{} \nCATEGORY: {}\nCLOSEST: {} \nRATIONALE: {}".format(
                         ex1['example']['keywords'],
-                        ''.join(f"- {doc}\n" for doc in ex1['example']['documents']),
-                        ex1['example']['response']['label'],
+                        ''.join(f"\n- {doc}" for doc in ex1['example']['documents']),
                         ex3['example']['documents']["A"],
                         ex3['example']['documents']["B"],
+                        ex1['example']['response']['label'],
                         ex3['example']['response']["order"],
                         ex3['example']['response']["rationale"] + "\n",
                     )
                     for ex1, ex3 in zip(examples_q1, examples_q3)
                 ])
-                exemplar_docs = "\n".join(f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
+                exemplar_docs = "".join(f"\n- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
                 keys = " ".join(text["topic_words"][:topk])
             else:
                 examples = "\n".join([
-                    "CATEGORY: {}\nDOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{}\nCLOSEST: {} \nRATIONALE: {}".format(
-                        ex['example']['category'],
+                    "DOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{}\nCATEGORY: {}\nRATIONALE: {} \nORDER: {}".format(
+                        
                         ex['example']['documents']["A"],
                         ex['example']['documents']["B"],
+                        ex['example']['category'],
                         ex['example']['response']["order"],
                         ex['example']['response']["rationale"] + "\n",
                     )
@@ -283,13 +286,13 @@ class Prompter:
             
             if doing_both_ways:
                 return (
-                    [template.format(examples, keys, exemplar_docs, cat, pair) for pair in doc_pairs_one],
+                    [template.format(examples, keys, exemplar_docs, pair, cat) for pair in doc_pairs_one],
                     pair_ids_one,
-                    [template.format(examples, keys, exemplar_docs, cat, pair) for pair in doc_pairs_two],
+                    [template.format(examples, keys, exemplar_docs, pair, cat) for pair in doc_pairs_two],
                     pair_ids_two
                 )
             else:
-                return [template.format(examples, keys, exemplar_docs, cat, pair) for pair in doc_pairs_one], pair_ids_one
+                return [template.format(examples, keys, exemplar_docs, pair, cat) for pair in doc_pairs_one], pair_ids_one
 
         def handle_q1_q2(text: dict, few_shot: dict, topk: int = 10, num_words: int = 100, nr_few_shot=1):
             docs = "\n".join(f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])

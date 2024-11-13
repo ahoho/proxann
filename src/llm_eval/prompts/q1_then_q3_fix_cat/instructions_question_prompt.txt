@@ -8,7 +8,6 @@ Your task is to compare the EVAL DOCUMENTS to determine which one is more closel
 
 Response Format:
 CLOSEST: {{Document from EVALUATION DOCUMENTS that is more closely related to the category (A or B)}}
-RATIONALE: {{Which document is more related to the category and why?}}
 
 Examples
 ---------
@@ -24,6 +23,4 @@ CATEGORY: {}
 Select the document from EVALUATION DOCUMENTS that is more closely related to the CATEGORY. Even if neither document directly pertains to the CATEGORY, return the one that is 'most related' or the 'least incorrect' choice. You must **ALWAYS** select either 'A' or 'B.'
 Follow this format to answer:
 CLOSEST:
-RATIONALE:
-
 

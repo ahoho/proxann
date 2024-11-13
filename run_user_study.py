@@ -4,8 +4,10 @@ import logging
 import datetime
 import os
 import time
-
+import itertools
+import numpy as np
 import pandas as pd
+from scipy.stats import ttest_ind
 from src.llm_eval.prompter import Prompter
 from src.llm_eval.utils import bradley_terry_model, calculate_corr_npmi, collect_fit_rank_data, compute_agreement_per_topic, compute_correlations_one, compute_correlations_two, extract_info_q1_q3, extract_logprobs, load_config_pilot, process_responses, extract_info_q1_q2, generate_pairwise_counts, calculate_coherence
 
@@ -48,13 +50,12 @@ def main():
     topics_per_model = Counter()
     
     # keep dictionary with only first key (for debugging)
-
     """
     inside_dict = {
-        '32':  config_pilot['data/models/mallet']['32']
+        '15':  config_pilot['data/models/ctm']['15']
     }
     config_pilot = {
-        'data/models/mallet': inside_dict
+        'data/models/ctm': inside_dict
     }
     """
     for prompt_mode in prompt_modes:
@@ -65,17 +66,28 @@ def main():
                 logging.info(f"-- -- Cluster: {cluster_id}")
                 id_ = f"{model_id}/{cluster_id}"
                 model = model_id.split("/")[-1]
+                topics_per_model[model_id] += 1
                 topic_match_id = topics_per_model[model_id]
                 
                 users_cats = [user_data["category"] for user_data in responses_by_id[id_]]
                 
+                true_order = [el["doc_id"] for el in cluster_data["eval_docs"]]
+                
+                this_corr_data = [c for c in corr_data if c["id"] == id_][0]
+                
                 # get "ground truth" rank
-                users_rank = corr_data[topic_match_id]["rank_data"]
+                users_rank = this_corr_data["rank_data"]
+                # rank data is an array of arrays, each array is the rank of the documents for a user
+                # we need to convert each row as [len(row) - r + 1 for r in row]
+                users_rank_rev = np.array([[len(row) - r + 1 for r in row] for row in users_rank])
                 gt = generate_pairwise_counts(users_rank)
                 gt_sums = gt.sum(axis=1)
-
-                assert corr_data[topic_match_id]["topic_match_id"] == topic_match_id
-
+                rank_to_doc_id = {doc_id: rank for doc_id, rank in zip(true_order, users_rank_rev.T)}
+                
+                # get "ground truth" fit
+                users_fit = this_corr_data["fit_data"].T
+                fit_to_doc_id = {doc_id: fit for doc_id, fit in zip(true_order, users_fit)}
+                
                 # to store the rank data for each lmm
                 rank_data = [] # it will store the rank data for each lmm 
                 fit_data = [] # it will store the fit data for each lmm
@@ -130,35 +142,37 @@ def main():
                             ways = [[questions_one,pair_ids_one], [questions_two, pair_ids_two]]
                         else: 
                             ways = [[questions, pair_ids]]
-                        
-                        for way_id, way in enumerate(ways):
-                            questions, pair_ids = way
-                            
-                            if len(ways) > 1:
-                                logging.info("-- Executing Q3 (both ways)...")
-                                
-                            else:
-                                logging.info("-- Executing Q3 (one way)...")
-                            
-                            for id_q, question in enumerate(questions):
-                                #if way_id == 0:
-                                    #print(f"\033[93mQuestion: {question}\033[0m")
-                                    #import pdb; pdb.set_trace()
-                                    #print(f"WAY: {way_id} (If way is 1, then A is B and B is A).")
-                                    #print(f"DOCUMENTS: {doc_pairs[id_q]}")
-                                
-                                pairwise, pairwise_logprobs = prompter.prompt("src/llm_eval/prompts/q1_q3/simplified_system_prompt.txt" if prompt_mode == "q1_and_q3" else "src/llm_eval/prompts/q3/simplified_system_prompt.txt",question,use_context=False)
+
+                        num_questions = len(ways[0][0])
+                        for id_q in range(num_questions): 
+                            for way_id, way in enumerate(ways):
+                                questions, pair_ids = way
+                                question = questions[id_q]  
+                                if len(ways) > 1:
+                                    logging.info("-- Executing Q3 (both ways)...")
+                                else:
+                                    logging.info("-- Executing Q3 (one way)...")
+
+                                # Run prompt and process the response
+                                pairwise, pairwise_logprobs = prompter.prompt(
+                                    "src/llm_eval/prompts/q1_q3/simplified_system_prompt.txt" if prompt_mode == "q1_and_q3" else "src/llm_eval/prompts/q3/simplified_system_prompt.txt",
+                                    question,
+                                    use_context=False
+                                )
 
                                 try:
                                     label, order, rationale = extract_info_q1_q3(pairwise, get_label=get_label)
-                                    #import pdb; pdb.set_trace()                       
                                     if order == "":
-                                        pairwise, pairwise_logprobs = prompter.prompt("src/llm_eval/prompts/q1_q3/simplified_system_prompt.txt" if prompt_mode == "q1_and_q3" else "src/llm_eval/prompts/q3/simplified_system_prompt.txt",question,use_context=False)
+                                        pairwise, pairwise_logprobs = prompter.prompt(
+                                            "src/llm_eval/prompts/q1_q3/simplified_system_prompt.txt" if prompt_mode == "q1_and_q3" else "src/llm_eval/prompts/q3/simplified_system_prompt.txt",
+                                            question,
+                                            use_context=False
+                                        )
                                         label, order, rationale = extract_info_q1_q3(pairwise, get_label=get_label)
                                         if order == "":
                                             logging.warning(f"-- -- No order extracted for model {model_id} and cluster {cluster_id}")
                                             import pdb; pdb.set_trace()
-                                    #import pdb; pdb.set_trace()
+
                                     if len(ways) > 1 and way_id == 0:
                                         labels_one.append(label)
                                         orders_one.append(order)
@@ -176,11 +190,10 @@ def main():
                                         rationales.append(rationale)
                                 except Exception as e:
                                     logging.error(f"-- -- Error extracting info from prompt: {e}")
-                                    import pdb; pdb.set_trace()
 
                                 # Extract logprobs if available
                                 if pairwise_logprobs is not None:
-                                    prob_values = extract_logprobs(pairwise_logprobs, prompter.backend,logging)
+                                    prob_values = extract_logprobs(pairwise_logprobs, prompter.backend, logging)
                                     if prob_values:
                                         if len(ways) > 1 and way_id == 0:
                                             logprobs_one.append(prob_values[0])
@@ -190,6 +203,67 @@ def main():
                                             logprobs.append(prob_values[0])
                                     else:
                                         logging.warning(f"-- -- No logprobs extracted for model {model_id} and cluster {cluster_id}")
+
+                            # check t-tests
+                            # fit_to_doc_id
+                            # pair_ids[id_q]
+                            t_test_fit = ttest_ind(fit_to_doc_id[pair_ids[id_q]["A"]], fit_to_doc_id[pair_ids[id_q]["B"]])
+                            t_test_rank = ttest_ind(rank_to_doc_id[pair_ids[id_q]["A"]], rank_to_doc_id[pair_ids[id_q]["B"]])
+                            
+                            pvalue_thr = 0.05
+                            if t_test_fit.pvalue < pvalue_thr or t_test_rank.pvalue < pvalue_thr:
+                                output_lines = []
+                                output_lines.append(f"- LLM: {llm_model}")
+                                output_lines.append(f"- Model: {model_id} - Cluster: {cluster_id}")
+                                output_lines.append(f"* CATEGORY: {category}")
+                                output_lines.append(f"* USER CATEGORIES: {users_cats}")
+
+                                for test_name, test in [("Fit", t_test_fit), ("Rank", t_test_rank)]:
+                                    significance = "is" if test.pvalue < pvalue_thr else "is not"
+                                    output_lines.append(f"-- -- {test_name} t-test {significance} statistically significant at {pvalue_thr}: {test}")
+
+                                closest_one = pair_ids_one[id_q]["A"] if orders_one[-1] == "A" else pair_ids_one[id_q]["B"]
+                                closest_two = pair_ids_two[id_q]["A"] if orders_two[-1] == "A" else pair_ids_two[id_q]["B"]
+
+                                output_lines.append(f"-- -- CLOSEST 'one-way' (pair ids: {pair_ids_one[id_q]}): {closest_one}")
+                                output_lines.append(f"-- -- CLOSEST 'other-way' (pair ids: {pair_ids_two[id_q]}): {closest_two}")
+
+                                best_fit = pair_ids[id_q]['A'] if t_test_fit.statistic > 0 else pair_ids[id_q]['B']
+                                best_rank = pair_ids[id_q]['A'] if t_test_rank.statistic > 0 else pair_ids[id_q]['B']
+
+                                for test_name, best in [("fit scores", best_fit), ("rank", best_rank)]:
+                                    output_lines.append(f"-- -- Based on {test_name}, users say that {best} is better")
+
+                                # disagreements and save outputs to file
+                                if closest_one != closest_two:
+                                    output_lines.append("-- -- Disagreement found: LLMs closest documents in each way are different")
+                                    output_lines.append(f"-- -- RATIONALE ONE: {rationales_one[-1]}")
+                                    output_lines.append(f"-- -- RATIONALE TWO: {rationales_two[-1]}")
+                                    
+                                else:
+                                    if closest_one != best_fit:
+                                        output_lines.append("-- -- Disagreement found: The users fit does not agree with the best one")
+                                        output_lines.append(rationales_one[-1])
+                                    else:
+                                        output_lines.append("-- -- The users fit agrees with the best one")
+                                    if closest_one != best_rank:
+                                        output_lines.append("-- -- Disagreement found: The users rank does not agree with the best one")
+                                        output_lines.append(rationales_one[-1])
+                                    else:
+                                        output_lines.append("-- -- The users rank agrees with the best one")
+                                    if best_fit != best_rank:
+                                        output_lines.append("-- -- Disagreement found: The users fit does not agree with the users rank")
+                                    else:
+                                        output_lines.append("-- -- The users fit agrees with the users rank")                                    
+                                #import pdb; pdb.set_trace()
+                                with open('all_topics_logs.txt', 'a') as f:
+                                    f.write('\n'.join(output_lines) + '\n\n')
+                                    
+                                    #import pdb; pdb.set_trace()
+
+                                # Print all outputs
+                                for line in output_lines:
+                                    print(line)
 
                         if len(ways) > 1:
                             if (not logprobs_one or not logprobs_two):

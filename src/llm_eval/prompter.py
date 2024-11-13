@@ -230,14 +230,14 @@ class Prompter:
             
             if do_q3_with_q1_fixed and examples_q1:
                 examples = "\n".join([
-                    "KEYWORDS: {}\nEXEMPLAR DOCUMENTS: {}\n\nEVALUATION DOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{} \nCATEGORY: {}\nCLOSEST: {} \nRATIONALE: {}".format(
+                    "KEYWORDS: {}\nEXEMPLAR DOCUMENTS: {}\n\nEVALUATION DOCUMENTS: \n- DOCUMENT A: {} \n- DOCUMENT B:{} \nCATEGORY: {}\nCLOSEST: {} \n".format(#RATIONALE: {}
                         ex1['example']['keywords'],
                         ''.join(f"\n- {doc}" for doc in ex1['example']['documents']),
                         ex3['example']['documents']["A"],
                         ex3['example']['documents']["B"],
                         ex1['example']['response']['label'],
-                        ex3['example']['response']["order"],
-                        ex3['example']['response']["rationale"] + "\n",
+                        ex3['example']['response']["order"] + "\n"
+                       # ex3['example']['response']["rationale"] + "\n",
                     )
                     for ex1, ex3 in zip(examples_q1, examples_q3)
                 ])

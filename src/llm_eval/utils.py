@@ -150,7 +150,9 @@ def extract_info_q1_q3(text, get_label):
     Extracts the label, order, and rationale from the prompt text based on the 'get_label' parameter. If 'get_label' is set to True, the method extracts from the 'q1_q3' prompt; otherwise, it extracts from 'q3'.
     """   
     label_pattern = r'LABEL:\s*(.*?)\s*(?=CLOSEST:|RATIONALE:)'
-    order_pattern = r'(?<!\w)CLOSEST(?!\w)\W*:\W*(?:DOCUMENT\s*)?([AB])'
+    #order_pattern = r'(?<!\w)CLOSEST(?!\w)\W*[:\-]?\W*(?:DOCUMENT\s*)?([AB])'
+    order_pattern = r'(?<!\w)(?:I would select|CLOSEST|The closest document to)\W*[:\-]?\W*(?:DOCUMENT\s*)?([AB])'
+
     rationale_pattern = r'\bRATIONALE\b\W*:\W*(.*)'
     
     if get_label: 
@@ -204,12 +206,17 @@ def extract_logprobs(pairwise_logprobs, backend, logging):
         if backend == "llama_cpp":
             return [item['probs'][0]['prob'] for item in pairwise_logprobs if item['probs'][0]['tok_str'].strip() in {"A", "B"}]
         else:
-            return [
-                top_logprob.logprob
-                for token_logprob in pairwise_logprobs
-                for top_logprob in token_logprob.top_logprobs
-                if top_logprob.token.strip() in {"A", "B"}
-            ]
+            #return [
+            #    top_logprob.logprob
+            #    for token_logprob in pairwise_logprobs
+            #    for top_logprob in token_logprob.top_logprobs
+            #    if top_logprob.token.strip() in {"A", "B"}
+            #]
+            logprob = pairwise_logprobs[-1].logprob
+            top_logprobs = pairwise_logprobs[-1].top_logprobs
+            top_logprobs = [(top_logprob.token, top_logprob.logprob) for top_logprob in top_logprobs]
+            
+            return logprob, top_logprobs
     except Exception as e:
         logging.error(f"-- -- Error extracting logprobs: {e}")
         return None

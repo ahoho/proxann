@@ -20,7 +20,7 @@ EXEMPLAR DOCUMENTS: {}
 
 EVALUATION DOCUMENTS: {}
 CATEGORY: {}
-Select the document from EVALUATION DOCUMENTS that is more closely related to the CATEGORY. Even if neither document directly pertains to the CATEGORY, return the one that is 'most related' or the 'least incorrect' choice. You must **ALWAYS** select either 'A' or 'B.'
+Select the document from EVALUATION DOCUMENTS that is more closely related to the CATEGORY. Even if neither document directly pertains to the CATEGORY, return the one that is 'most related' or the 'least incorrect' choice. You must **ALWAYS** return either 'A' or 'B' after CLOSEST:
 Follow this format to answer:
 CLOSEST:
 

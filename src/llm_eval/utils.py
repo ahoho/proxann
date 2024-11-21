@@ -196,6 +196,17 @@ def extract_info_q1_q2(text, get_label):
     
     return label, score, rationale
 
+def extract_info_binary_q2(text):
+    
+    # it needs to catch FIT: YES or FIT: NO
+    fit_pattern = r'FIT:\s*(YES|NO)'
+    fit_match = re.findall(fit_pattern, text, re.DOTALL)
+    fit = fit_match[0].strip() if fit_match else ""
+    fit = int(fit == "YES")
+    
+    return fit
+    
+
 def extract_logprobs(pairwise_logprobs, backend, logging):
     """Extracts log probabilities associated with the pairwise rankings (i.e., whether the more related document is A or B) from LLM responses, handling different backends (i.e., LLM types)."""
     
@@ -392,7 +403,6 @@ def compute_agreement_per_topic(
             columns=doc_idxs
         ).T
         bin_fit_data = (fit_data >= fit_threshold).astype(str).add_prefix(f"{topic_id}_")
-        
         rank_data = pd.DataFrame(
             [[doc["rank"] for doc in r["eval_docs"]] for r in group],
             index=ann_idxs,

@@ -1,0 +1,16 @@
+You will be provided with a set of keywords and a group of documents, each centered around a common topic. Your task is to analyze both the keywords and the content of the documents to create a clear, concise label that accurately reflects the overall theme they share.
+
+Task Breakdown:
+1. Examine the Keywords: Use the keywords as clues to identify the general subject area or themes present in the documents.
+2. Review the Documents: Skim the summaries provided to understand their main ideas and any recurring elements.
+3. Generate a Label: Based on the keywords and document content, come up with a single label that best describes the topic connecting all the documents.
+
+Example:
+Keywords: television episode sitcom starring action drama ​​​​​aired
+Documents:
+    - "Lemon of Troy" is the twenty-fourth and penultimate episode of the sixth season of the American animated television series The Simpsons. It originally aired on the Fox network in the United States on May 14, 1995. In the episode, the children of Springfield try to retrieve their beloved lemon tree after it is stolen by the children of Shelbyville.
+    - "Reunion" is the fifth episode of the third season of American television comedy series 30 Rock, and the 41st episode of the series overall. In the episode, Liz Lemon (Tina Fey) is opposed to going to her high school reunion, but her boss, Jack Donaghy (Alec Baldwin), manages to convince her otherwise. Meanwhile, Don Geiss (Rip Torn) wakes up from his coma only to inform Jack of his decision to remain CEO of General Electric (GE).
+    - "The Marine Biologist" is the 78th episode of the American sitcom Seinfeld. It is the 14th episode of the fifth season. It was originally broadcast on NBC on February 10, 1994. In the episode, George pretends to be a marine biologist in order to impress an old crush, which puts him on the spot when they encounter a beached whale. Meanwhile, Elaine attempts to recover her electronic organizer after a renowned Russian author throws it out the window of a moving limousine. Jerry Seinfeld considers the episode one of his favorites.
+    - "Fun Run" is the first and second episode of the fourth season of the American comedy television series The Office. Written and directed by executive producer and showrunner Greg Daniels, the episode first aired on NBC in the United States on September 27, 2007. In the episode, Michael Scott (Steve Carell) believes the office is cursed after he accidentally hits Meredith Palmer (Kate Flannery) with his car. After being taken to the hospital, Meredith is found to have possibly been exposed to rabies.
+
+Your response: American television shows

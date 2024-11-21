@@ -11,7 +11,8 @@
                     "'Fun Run' is the first and second episode of the fourth season of the American comedy television series The Office. Written and directed by executive producer and showrunner Greg Daniels, the episode first aired on NBC in the United States on September 27, 2007. In the episode, Michael Scott (Steve Carell) believes the office is cursed after he accidentally hits Meredith Palmer (Kate Flannery) with his car. After being taken to the hospital, Meredith is found to have possibly been exposed to rabies."
                 ],
                 "response": {
-                    "label": "American television shows"
+                    "label": "American television shows",
+                    "description": "The category 'American Television Shows' refers to TV programs created and produced in the United States. It includes a wide variety of genres, such as comedies, dramas, and action series."
                 }
             }
         }
@@ -25,6 +26,17 @@
                 "response": {
                     "score": 1,
                     "rationale": "The document has no connection to television or related keywords, as it is about a historical speech and event."
+                }
+            }
+        },
+        {
+            "example_id": "q2_1",
+            "example": {
+                "category": "European cities",
+                "document": "\"The Belchies\" is the season premiere of the second season of the animated television series Bob's Burgers, the 14th episode overall. The episode aired on Fox in the United States on March 11, 2012. The episode was written by John Schroeder and directed by Boohwan Lim and Kyounghee Lim. The episode is a parody of the 1985 film The Goonies and features a song by Cyndi Lauper.",
+                "response": {
+                    "score": 1,
+                    "rationale": "The document is unrelated to \"European cities\" focusing solely on a Bob's Burgers episode and its cultural references."
                 }
             }
         }

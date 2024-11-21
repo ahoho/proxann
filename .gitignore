@@ -175,3 +175,5 @@ data/document-data
 src/llm_eval/.venv
 data/modelFiles
 data/files_pilot/document-data
+cache
+data/files_pilot/results_val_data

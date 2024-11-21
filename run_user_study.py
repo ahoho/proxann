@@ -4,12 +4,11 @@ import logging
 import datetime
 import os
 import time
-import itertools
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_ind
 from src.llm_eval.prompter import Prompter
-from src.llm_eval.utils import bradley_terry_model, calculate_corr_npmi, collect_fit_rank_data, compute_agreement_per_topic, compute_correlations_one, compute_correlations_two, extract_info_q1_q3, extract_logprobs, load_config_pilot, process_responses, extract_info_q1_q2, generate_pairwise_counts, calculate_coherence
+from src.llm_eval.utils import bradley_terry_model, calculate_corr_npmi, collect_fit_rank_data, compute_agreement_per_topic, compute_correlations_one, compute_correlations_two, extract_info_binary_q2, extract_info_q1_q3, extract_logprobs, load_config_pilot, process_responses, extract_info_q1_q2, generate_pairwise_counts, calculate_coherence
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -28,6 +27,7 @@ def main():
     
     # Read results from user study
     responses_by_id = process_responses(args.response_csv, args.config_path.split(","))
+    
     _, _, _, corr_data = collect_fit_rank_data(responses_by_id)
     
     # Calculate coherence
@@ -298,8 +298,7 @@ def main():
                         print(f"\033[95mUsers rank: {users_rank}\033[1m")
                         print(f"\033[95mGT sum: {gt_sums}\033[1m")
                         
-                        #import pdb; pdb.set_trace()                   
-                    elif prompt_mode == "q1_then_q2" or prompt_mode == "q1_and_q2":
+                    elif prompt_mode == "q1_then_q2" or prompt_mode == "q1_and_q2" or prompt_mode == "q1_then_binary_q2" or prompt_mode == "q1_then_q2_fix_cat":
                         
                         if prompt_mode == "q1_then_q2":
                             logging.info("-- Executing Q1...")
@@ -319,7 +318,7 @@ def main():
                                 fit_data.append(score)
                                 rationales.append(rationale)
                                                         
-                        else: # prompt_mode == "q1_and_q2"
+                        elif prompt_mode == "q1_and_q2":
                             questions = prompter.get_prompt(cluster_data, "q1_q2")
                             
                             labels, rationales = [], []
@@ -329,6 +328,16 @@ def main():
                                 labels.append(label)
                                 fit_data.append(score)
                                 rationales.append(rationale)
+                                
+                        else: # q1_then_binary_q2 or q1_then_q2_fix_cat
+                            do_q2_with_q1_fixed = args.prompt_mode == "q1_then_q2_fix_cat"
+                            questions = prompter.get_prompt(cluster_data, "binary_q2", category, do_q2_with_q1_fixed=do_q2_with_q1_fixed)
+                            labels = [category] * len(questions)
+                            
+                            for question in questions:
+                                response_q2, _ = prompter.prompt("src/llm_eval/prompts/binary_q2/simplified_system_prompt.txt", question, use_context=False)
+                                score = extract_info_binary_q2(response_q2)
+                                fit_data.append(score)
                 
                 llm_results_q1.append({
                     "id": id_,
@@ -389,18 +398,25 @@ def main():
     llm_models = "_".join(model_types)
     path_save = f"{path_save}/{prompt_mode}_{llm_models}_{timestamp}"
     os.makedirs(path_save, exist_ok=True)
-    corr_results.to_excel(f"{path_save}/correlation_results_mode1.xlsx", index=False)
-    corr_results2.to_excel(f"{path_save}/correlation_results_mode2.xlsx", index=False)
-    pd.DataFrame(llm_results_q1).to_excel(f"{path_save}/llm_results_q1.xlsx", index=False)
+    #corr_results.to_excel(f"{path_save}/correlation_results_mode1.xlsx", index=False)
+    corr_results.to_json(f"{path_save}/correlation_results_mode1.json", orient="records")
+    #corr_results2.to_excel(f"{path_save}/correlation_results_mode2.xlsx", index=False)
+    corr_results2.to_json(f"{path_save}/correlation_results_mode2.json", orient="records")
+    #pd.DataFrame(llm_results_q1).to_excel(f"{path_save}/llm_results_q1.xlsx", index=False)
+    pd.DataFrame(llm_results_q1).to_json(f"{path_save}/llm_results_q1.json", orient="records")
     if llm_results_q2:
-        pd.DataFrame(llm_results_q2).to_excel(f"{path_save}/llm_results_q2.xlsx", index=False)
+        #pd.DataFrame(llm_results_q2).to_excel(f"{path_save}/llm_results_q2.xlsx", index=False)
+        pd.DataFrame(llm_results_q2).to_json(f"{path_save}/llm_results_q2.json", orient="records")
     if llm_results_q3:
-        pd.DataFrame(llm_results_q3).to_excel(f"{path_save}/llm_results_q3.xlsx", index=False)
+        #pd.DataFrame(llm_results_q3).to_excel(f"{path_save}/llm_results_q3.xlsx", index=False)
+        pd.DataFrame(llm_results_q3).to_json(f"{path_save}/llm_results_q3.json", orient="records")
         
     # calculate npmi correlations
-    columns_calculate = [col for col in corr_results.columns if col not in["id", "model", "topic", "n_annotators", "fit_rho", "fit_tau", "fit_agree"]]
+    import pdb; pdb.set_trace()
+    columns_calculate = [col for col in corr_results.columns if col not in["id", "model", "topic", "n_annotators", "fit_rho", "fit_tau", "fit_agree"] and "rank_rho_users" not in col and "rank_tau_users" not in col]
     corr_results = calculate_corr_npmi(corr_results, npmi_data, columns_calculate)
-    corr_results.to_excel(f"{path_save}/corrs_mode1_npmi.xlsx", index=False)
+    # corr_results.to_excel(f"{path_save}/corrs_mode1_npmi.xlsx", index=False)
+    corr_results.to_json(f"{path_save}/corrs_mode1_npmi.json", orient="records")
     
 if __name__ == "__main__":
     main()

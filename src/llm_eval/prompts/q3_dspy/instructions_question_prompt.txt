@@ -1,0 +1,99 @@
+System message:
+
+Your input fields are:
+1. `CATEGORY` (str)
+2. `DOCUMENT_A` (str)
+3. `DOCUMENT_B` (str)
+
+Your output fields are:
+1. `reasoning` (str)
+2. `CLOSEST` (str): Document that is more closely related to the category (A or B)
+
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## CATEGORY ## ]]
+{{CATEGORY}}
+
+[[ ## DOCUMENT_A ## ]]
+{{DOCUMENT_A}}
+
+[[ ## DOCUMENT_B ## ]]
+{{DOCUMENT_B}}
+
+[[ ## reasoning ## ]]
+{{reasoning}}
+
+[[ ## CLOSEST ## ]]
+{{CLOSEST}}
+
+[[ ## completed ## ]]
+
+In adhering to this structure, your objective is:
+        Determine which document is more closely related to the given category
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+UK Churches
+
+[[ ## DOCUMENT_A ## ]]
+St Mary 's Church, Rhodogeidio = St Mary 's Church, Rhodogeidio is a small medieval church, dating from the 15th century, near Llannerch-y-medd, in Anglesey, north Wales. It served as a chapel of ease to another church in the area, St Ceidio 's. Some restoration work was carried out in the 19th century, but St Mary 's has since fallen into disuse and is now largely in ruins. It is a Grade II listed building, a national designation given to" buildings of special interest, which warrant every effort being made to preserve them", in particular because it is" a late Medieval church of exceptionally simple character", and is virtually unaltered despite its poor condition.
+
+[[ ## DOCUMENT_B ## ]]
+Lathrop House ( Vassar College ) = Lathrop House ( known officially as Edward Lathrop House ) was the third quadrangle dormitory built on Vassar College 's campus in the town of Poughkeepsie, New York. Constructed in 1901 and designed by Boston-based Allen & Vance, the brick dorm stands five stories tall. Lathrop houses 180 students who may be any grade or gender. = = History = = Lathrop House was the third residential quadrangle ( quad ) dormitory built on the campus of Vassar College in the town of Poughkeepsie, New York. The college built Lathrop during a period of rapid dorm construction spanning 1893 – 1902 during which the older seminary-style model of housing — a single large hall in which all a college 's residents lived, in Vassar 's case Main Building — was quickly waning in popularity in favor of smaller individual houses.
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## CLOSEST ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+Assistant message:
+
+[[ ## reasoning ## ]]
+Document A is more closely related to the category "UK Churches" as it specifically discusses St Mary's Church, a medieval church located in Wales. It provides details about its history, architectural significance, and current condition, which are all relevant to the topic of churches in the UK. In contrast, Document B focuses on Lathrop House, a dormitory at Vassar College in New York, which has no connection to UK churches.
+
+[[ ## CLOSEST ## ]]
+A
+
+[[ ## completed ## ]]
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+Military Officers
+
+[[ ## DOCUMENT_A ## ]]
+United States Special Operations Command = The United States Special Operations Command ( USSOCOM or SOCOM ) is the Unified Combatant Command charged with overseeing the various Special Operations Component Commands of the Army, Marine Corps, Navy, and Air Force of the United States Armed Forces. The command is part of the Department of Defense and is the only Unified Combatant Command legislated into being by the U.S. Congress. USSOCOM is headquartered at MacDill Air Force Base in Tampa, Florida. The idea of a unified special operations command had its origins in the aftermath of Operation Eagle Claw, the disastrous attempted rescue of hostages at the American embassy in Iran in 1980.
+
+[[ ## DOCUMENT_B ## ]]
+Titan Clydebank = Titan Clydebank is a 150-foot-high ( 46 m ) cantilever crane at Clydebank, West Dunbartonshire, Scotland. It was designed to be used in the lifting of heavy equipment, such as engines and boilers, during the fitting-out of battleships and ocean liners at the John Brown & Company shipyard. It was also the world 's first electrically powered cantilever crane, and the largest crane of its type at the time of its completion. Situated at the end of a U-shaped fitting out basin, the crane was used to construct some of the largest ships of the 20th century, including the Queen Mary, Queen Elizabeth and Queen Elizabeth 2.
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## CLOSEST ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+Assistant message:
+
+[[ ## reasoning ## ]]
+Document A is more closely related to the category "Military Officers" as it discusses the United States Special Operations Command, which is a military organization responsible for overseeing special operations forces. This directly pertains to military officers and their roles within the armed forces. In contrast, Document B focuses on a crane used in shipbuilding, which does not relate to military officers or their functions.
+
+[[ ## CLOSEST ## ]]
+A
+
+[[ ## completed ## ]]
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+{category}
+
+[[ ## DOCUMENT_A ## ]]
+{doc_a}
+
+[[ ## DOCUMENT_B ## ]]
+{doc_b}
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## CLOSEST ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+Response:

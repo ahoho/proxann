@@ -116,8 +116,9 @@ def main():
                             # Q3
                             #==============================================
                             logging.info("-- Executing Q3...")
-                            do_q3_with_q1_fixed = prompt_mode == "q1_then_q3_fix_cat"
-                            q3_out = prompter.get_prompt(cluster_data, "q3", category, do_q3_with_q1_fixed=do_q3_with_q1_fixed)
+                            #do_q3_with_q1_fixed = prompt_mode == "q1_then_q3_fix_cat"
+                            #q3_out = prompter.get_prompt(cluster_data, "q3", category, do_q3_with_q1_fixed=do_q3_with_q1_fixed)
+                            q3_out = prompter.get_prompt(cluster_data, "q3_dspy", category)
                             get_label = False
                             
                             if len(q3_out) > 2: ## then is "doing it both ways"
@@ -188,9 +189,10 @@ def main():
                                         labels.append(label)
                                         orders.append(order)
                                         rationales.append(rationale)
+                                    #import pdb; pdb.set_trace()
                                 except Exception as e:
                                     logging.error(f"-- -- Error extracting info from prompt: {e}")
-
+        
                                 # Extract logprobs if available
                                 if pairwise_logprobs is not None:
                                     prob_values = extract_logprobs(pairwise_logprobs, prompter.backend, logging)
@@ -204,67 +206,6 @@ def main():
                                     else:
                                         logging.warning(f"-- -- No logprobs extracted for model {model_id} and cluster {cluster_id}")
 
-                            # check t-tests
-                            # fit_to_doc_id
-                            # pair_ids[id_q]
-                            t_test_fit = ttest_ind(fit_to_doc_id[pair_ids[id_q]["A"]], fit_to_doc_id[pair_ids[id_q]["B"]])
-                            t_test_rank = ttest_ind(rank_to_doc_id[pair_ids[id_q]["A"]], rank_to_doc_id[pair_ids[id_q]["B"]])
-                            
-                            pvalue_thr = 0.05
-                            if t_test_fit.pvalue < pvalue_thr or t_test_rank.pvalue < pvalue_thr:
-                                output_lines = []
-                                output_lines.append(f"- LLM: {llm_model}")
-                                output_lines.append(f"- Model: {model_id} - Cluster: {cluster_id}")
-                                output_lines.append(f"* CATEGORY: {category}")
-                                output_lines.append(f"* USER CATEGORIES: {users_cats}")
-
-                                for test_name, test in [("Fit", t_test_fit), ("Rank", t_test_rank)]:
-                                    significance = "is" if test.pvalue < pvalue_thr else "is not"
-                                    output_lines.append(f"-- -- {test_name} t-test {significance} statistically significant at {pvalue_thr}: {test}")
-
-                                closest_one = pair_ids_one[id_q]["A"] if orders_one[-1] == "A" else pair_ids_one[id_q]["B"]
-                                closest_two = pair_ids_two[id_q]["A"] if orders_two[-1] == "A" else pair_ids_two[id_q]["B"]
-
-                                output_lines.append(f"-- -- CLOSEST 'one-way' (pair ids: {pair_ids_one[id_q]}): {closest_one}")
-                                output_lines.append(f"-- -- CLOSEST 'other-way' (pair ids: {pair_ids_two[id_q]}): {closest_two}")
-
-                                best_fit = pair_ids[id_q]['A'] if t_test_fit.statistic > 0 else pair_ids[id_q]['B']
-                                best_rank = pair_ids[id_q]['A'] if t_test_rank.statistic > 0 else pair_ids[id_q]['B']
-
-                                for test_name, best in [("fit scores", best_fit), ("rank", best_rank)]:
-                                    output_lines.append(f"-- -- Based on {test_name}, users say that {best} is better")
-
-                                # disagreements and save outputs to file
-                                if closest_one != closest_two:
-                                    output_lines.append("-- -- Disagreement found: LLMs closest documents in each way are different")
-                                    output_lines.append(f"-- -- RATIONALE ONE: {rationales_one[-1]}")
-                                    output_lines.append(f"-- -- RATIONALE TWO: {rationales_two[-1]}")
-                                    
-                                else:
-                                    if closest_one != best_fit:
-                                        output_lines.append("-- -- Disagreement found: The users fit does not agree with the best one")
-                                        output_lines.append(rationales_one[-1])
-                                    else:
-                                        output_lines.append("-- -- The users fit agrees with the best one")
-                                    if closest_one != best_rank:
-                                        output_lines.append("-- -- Disagreement found: The users rank does not agree with the best one")
-                                        output_lines.append(rationales_one[-1])
-                                    else:
-                                        output_lines.append("-- -- The users rank agrees with the best one")
-                                    if best_fit != best_rank:
-                                        output_lines.append("-- -- Disagreement found: The users fit does not agree with the users rank")
-                                    else:
-                                        output_lines.append("-- -- The users fit agrees with the users rank")                                    
-                                #import pdb; pdb.set_trace()
-                                with open('all_topics_logs.txt', 'a') as f:
-                                    f.write('\n'.join(output_lines) + '\n\n')
-                                    
-                                    #import pdb; pdb.set_trace()
-
-                                # Print all outputs
-                                for line in output_lines:
-                                    print(line)
-
                         if len(ways) > 1:
                             if (not logprobs_one or not logprobs_two):
                                 logprobs_one = [None] * len(orders_one)
@@ -276,8 +217,8 @@ def main():
                                 logging.warning(f"-- -- No logprobs found for model {model_id} and cluster {cluster_id}")
                                 
                         # print orders of each way in a different color
-                        print(f"\033[92mOrders: {orders_one}\033[0m")
-                        print(f"\033[94mOrders: {orders_two}\033[0m")
+                        #print(f"\033[92mOrders: {orders_one}\033[0m")
+                        #print(f"\033[94mOrders: {orders_two}\033[0m")
 
                         pair_ids_comb = pair_ids_one + pair_ids_two if len(ways) > 1 else pair_ids
                         orders_comb = orders_one + orders_two if len(ways) > 1 else orders
@@ -297,7 +238,7 @@ def main():
                         print(f"\033[95mLLM Rank: {rank}\033[0m")
                         print(f"\033[95mUsers rank: {users_rank}\033[1m")
                         print(f"\033[95mGT sum: {gt_sums}\033[1m")
-                        
+                                                
                     elif prompt_mode == "q1_then_q2" or prompt_mode == "q1_and_q2" or prompt_mode == "q1_then_binary_q2" or prompt_mode == "q1_then_q2_fix_cat":
                         
                         if prompt_mode == "q1_then_q2":
@@ -330,14 +271,22 @@ def main():
                                 rationales.append(rationale)
                                 
                         else: # q1_then_binary_q2 or q1_then_q2_fix_cat
+                            
+                            logging.info("-- Executing Q1...")
+                            question = prompter.get_prompt(cluster_data, "q1")
+                            category, _ = prompter.prompt("src/llm_eval/prompts/q1/simplified_system_prompt.txt", question, use_context=False)
+                            
                             do_q2_with_q1_fixed = args.prompt_mode == "q1_then_q2_fix_cat"
                             questions = prompter.get_prompt(cluster_data, "binary_q2", category, do_q2_with_q1_fixed=do_q2_with_q1_fixed)
                             labels = [category] * len(questions)
+                            
+                            logging.info("-- Executing Q2...")
                             
                             for question in questions:
                                 response_q2, _ = prompter.prompt("src/llm_eval/prompts/binary_q2/simplified_system_prompt.txt", question, use_context=False)
                                 score = extract_info_binary_q2(response_q2)
                                 fit_data.append(score)
+                        
                 
                 llm_results_q1.append({
                     "id": id_,
@@ -379,44 +328,38 @@ def main():
     if llm_results_q3 == []:
         llm_results_q3 = None
         
-    # Correlations with user study data and ground truth 
-    agreement_by_topic = compute_agreement_per_topic(responses_by_id)
-    corr_results = compute_correlations_one(corr_data, rank_llm_data=llm_results_q3, fit_llm_data=llm_results_q2)
-                
-    corr_results2 = compute_correlations_two(responses_by_id, llm_results_q3, llm_results_q2)
-
-    # Print and save results
-    logging.info("--Correlation results--")
-    logging.info(corr_results)
-    #logging.info(corr_results2)
-    
-    # store also the results of the prompts (llm_results_qX)
-    # create a folder at path_save / {prompt_mode}_{llm_models}_{timestamp} with all the files
-    logging.info("--Saving results--")
+    ################
+    # Save results #
+    ################
     path_save = "data/files_pilot"
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     llm_models = "_".join(model_types)
     path_save = f"{path_save}/{prompt_mode}_{llm_models}_{timestamp}"
     os.makedirs(path_save, exist_ok=True)
-    #corr_results.to_excel(f"{path_save}/correlation_results_mode1.xlsx", index=False)
-    corr_results.to_json(f"{path_save}/correlation_results_mode1.json", orient="records")
-    #corr_results2.to_excel(f"{path_save}/correlation_results_mode2.xlsx", index=False)
-    corr_results2.to_json(f"{path_save}/correlation_results_mode2.json", orient="records")
-    #pd.DataFrame(llm_results_q1).to_excel(f"{path_save}/llm_results_q1.xlsx", index=False)
+        
     pd.DataFrame(llm_results_q1).to_json(f"{path_save}/llm_results_q1.json", orient="records")
     if llm_results_q2:
-        #pd.DataFrame(llm_results_q2).to_excel(f"{path_save}/llm_results_q2.xlsx", index=False)
         pd.DataFrame(llm_results_q2).to_json(f"{path_save}/llm_results_q2.json", orient="records")
     if llm_results_q3:
-        #pd.DataFrame(llm_results_q3).to_excel(f"{path_save}/llm_results_q3.xlsx", index=False)
         pd.DataFrame(llm_results_q3).to_json(f"{path_save}/llm_results_q3.json", orient="records")
         
-    # calculate npmi correlations
-    import pdb; pdb.set_trace()
+    ################
+    # Save corrs   #
+    ################
+    # Correlations with user study data and ground truth 
+    # agreement_by_topic = compute_agreement_per_topic(responses_by_id)
+    corr_results = compute_correlations_one(corr_data, rank_llm_data=llm_results_q3, fit_llm_data=llm_results_q2)
+    corr_results.to_json(f"{path_save}/correlation_results_mode1.json", orient="records")
+                
+    corr_results2 = compute_correlations_two(responses_by_id, llm_results_q3, llm_results_q2)    
+    corr_results2.to_json(f"{path_save}/correlation_results_mode2.json", orient="records")
+        
+    # npmi corrs
     columns_calculate = [col for col in corr_results.columns if col not in["id", "model", "topic", "n_annotators", "fit_rho", "fit_tau", "fit_agree"] and "rank_rho_users" not in col and "rank_tau_users" not in col]
     corr_results = calculate_corr_npmi(corr_results, npmi_data, columns_calculate)
-    # corr_results.to_excel(f"{path_save}/corrs_mode1_npmi.xlsx", index=False)
     corr_results.to_json(f"{path_save}/corrs_mode1_npmi.json", orient="records")
+    
+    import pdb; pdb.set_trace()
     
 if __name__ == "__main__":
     main()

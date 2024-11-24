@@ -89,7 +89,8 @@ def bradley_terry_model(
         
         # Compute parameters using choix's MM algorithm
         try:
-            params = choix.ilsr_pairwise(n_items, data)
+            params = choix.ilsr_pairwise(n_items, data, max_iter=1000)
+            
         except Exception as e:
             print(e)
             print("-- -- Graph is not strongly connected. Printing adjacency matrix:")
@@ -98,8 +99,8 @@ def bradley_terry_model(
             adjacency_matrix = nx.to_numpy_array(graph, dtype=int)
             print(adjacency_matrix)
             print("-- -- Using a small regularization factor to solve the issue.--")
-            params = choix.ilsr_pairwise(n_items, data, alpha=0.01) # adding a little bit of regularization when the comparison graph is not connected,
-                     
+            params = choix.ilsr_pairwise(n_items, data, alpha=0.001) # adding a little bit of regularization when the comparison graph is not connected,
+            
         # Convert parameters to a DataFrame
         ranked_docs = sorted(
             ((index_to_doc_id[idx], score) for idx, score in enumerate(params)),
@@ -107,7 +108,6 @@ def bradley_terry_model(
             reverse=True
         )
         ranked_df = pd.DataFrame(ranked_docs, columns=["doc_id", "score"])
-        
     else:
         # Initialize scores
         scores = {doc_id: 0.0 for doc_id in doc_ids}

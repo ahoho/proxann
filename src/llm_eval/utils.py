@@ -371,8 +371,9 @@ def process_responses(
     
     # Save cluster rank counts
     counts = Counter([r["cluster_id"] for r in responses])
-    with open(f"{path_save}/cluster_rank_counts.json", "w") as outfile:
-        json.dump(counts, outfile, indent=2)
+    if path_save:
+        with open(f"{path_save}/cluster_rank_counts.json", "w") as outfile:
+            json.dump(counts, outfile, indent=2)
 
     return responses_by_id
 
@@ -528,6 +529,23 @@ def compute_correlations_one(
         elif aggregation_method == "concatenate":
             mean_fit_data, mean_rank_data = fit_data.flatten(), rank_data.flatten()
             prob_data = np.tile(prob_data, len(fit_data))
+        elif aggregation_method == "kemeny_young":
+            n_items = fit_data.shape[1]
+            preferences = np.zeros((n_items, n_items))
+            for i, j in combinations(range(n_items), 2):
+                preferences[i,j] = np.sum(rank_data[:, i] < rank_data[:, j])
+                preferences[j,i] = np.sum(rank_data[:, i] > rank_data[:, j])
+            
+            best_score = float('-inf')
+            best_ranking = None
+            for perm in permutations(range(n_items)):
+                score = sum(preferences[i,j] for i, j in combinations(perm, 2))
+                if score > best_score:
+                    best_score = score
+                    best_ranking = perm
+            
+            mean_rank_data = np.array([i + 1 for i in best_ranking])
+            mean_fit_data = fit_data.mean(0)
         else:
             raise ValueError(f"Unknown aggregation method: {aggregation_method}")
         
@@ -536,6 +554,8 @@ def compute_correlations_one(
         rank_rho, _ = spearmanr(mean_rank_data, prob_data)
         fit_tau, _ = kendalltau(mean_fit_data, prob_data)
         rank_tau, _ = kendalltau(mean_rank_data, prob_data)
+        fit_ndcg = ndcg_score([mean_fit_data], [prob_data])
+        rank_ndcg = ndcg_score([mean_rank_data], [prob_data])
         
         # Calculate fit agreement
         fit_agree = np.mean((fit_data >= fit_threshold).astype(int) == d_us["assign_data"])
@@ -547,12 +567,16 @@ def compute_correlations_one(
                 rank_rho_gt, _ = spearmanr(prob_data, r_llm_a)
                 rank_tau_users, _ = kendalltau(mean_rank_data, r_llm_a)
                 rank_tau_gt, _ = kendalltau(prob_data, r_llm_a)
+                rank_ndcg_users = ndcg_score([mean_rank_data], [r_llm_a])
+                rank_ndcg_gt = ndcg_score([r_llm_a], [prob_data])
                 
                 # Add annotator-specific results to the dictionary
                 annotator_results[f"rank_rho_users_{a}"] = rank_rho_users
                 annotator_results[f"rank_rho_tm_{a}"] = rank_rho_gt
                 annotator_results[f"rank_tau_users_{a}"] = rank_tau_users
                 annotator_results[f"rank_tau_tm_{a}"] = rank_tau_gt
+                annotator_results[f"rank_ndcg_users_{a}"] = rank_ndcg_users
+                annotator_results[f"rank_ndcg_tm_{a}"] = rank_ndcg_gt
         
         # LLM correlations if f_llm
         if f_llm is not None:
@@ -578,6 +602,8 @@ def compute_correlations_one(
             "rank_rho": rank_rho,
             "rank_tau": rank_tau,
             "fit_agree": fit_agree,
+            "fit_ndcg": fit_ndcg,
+            "rank_ndcg": rank_ndcg,
             **annotator_results 
         })
     

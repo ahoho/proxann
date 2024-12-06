@@ -366,8 +366,7 @@ class DocSelector(object):
     def _select_ids_nparts(
         self,
         mat: np.ndarray,
-        n_parts: int = 5,
-        bucket_by: str = 'closest_value'
+        n_parts: int = 5
     ) -> List[List[int]]:
         """
         Selects one random value from each of the n_parts segments of each column in the given matrix.
@@ -379,8 +378,6 @@ class DocSelector(object):
             The input matrix of shape (D, K) where D is the number of documents and K is the number of topics.
         n_parts: int
             The number of segments to divide each column (probabilities of each document for a given column = topic) into.
-        bucket_by: str
-            The method to bucket the data. Options are 'rank', 'values', or 'closest_value'.
 
         Returns
         -------
@@ -400,93 +397,35 @@ class DocSelector(object):
         for col in range(mat.shape[1]):
             column_data = mat[:, col]
             this_col_ids = []  # Initialize this_col_ids here
-
-            if bucket_by == 'rank':
-                raise NotImplementedError("Need to account for the exemplar docs assigned -1 before this is called")
-                # Sort in descending order keeping original indices
-                sorted_indices = np.argsort(-column_data)
-                sorted_data = column_data[sorted_indices]
-
-                part_size = len(sorted_data) // n_parts
-
-                # Select one value from each part
-                for i in range(n_parts):
-                    start_index = i * part_size
-                    end_index = (i + 1) * part_size if i < n_parts - 1 else len(sorted_data)
-                    part_indices = sorted_indices[start_index:end_index]
-                    if part_indices.size > 0:
-                        selected_index = np.random.choice(part_indices)
-                        this_col_ids.append(selected_index)
-                    else:
-                        self._logger.warning(f"-- -- Empty segment encountered in column {col}, part {i}")
-
-                # Fallback to ensure n_parts values
-                if len(this_col_ids) < n_parts:
-                    self._logger.warning(f"-- -- Not enough unique values to select {n_parts} parts for column {col}. Fallback to random selection.")
-                    remaining_indices = np.setdiff1d(sorted_indices, this_col_ids)
-                    np.random.shuffle(remaining_indices)
-                    for idx in remaining_indices:
-                        this_col_ids.append(idx)
-                        if len(this_col_ids) == n_parts:
-                            break
-
-            elif bucket_by == 'values':
-                raise NotImplementedError("Need to account for the exemplar docs assigned -1 before this is called")
-                # Determine bin edges using histogram
-                bin_edges = np.histogram_bin_edges(column_data, bins=n_parts)
-
-                # Select one value from each bin
-                for i in range(len(bin_edges) - 1):
-                    bin_mask = (column_data >= bin_edges[i]) & (column_data < bin_edges[i + 1])
-                    part_indices = np.where(bin_mask)[0]
-                    if part_indices.size > 0:
-                        selected_index = np.random.choice(part_indices)
-                        this_col_ids.append(selected_index)
-                    else:
-                        self._logger.warning(f"-- -- Warning: Empty bin encountered in column {col}, bin {i}")
-
-                # Fallback to non-empty bins if necessary
-                if len(this_col_ids) < n_parts:
-                    self._logger.warning(f"-- -- Not enough unique values to select {n_parts} parts for column {col}. Fallback to random selection.")
-                    remaining_indices = np.where(column_data < bin_edges[-1])[0]
-                    np.random.shuffle(remaining_indices)
-                    for idx in remaining_indices:
-                        if idx not in this_col_ids:
-                            this_col_ids.append(idx)
-                            if len(this_col_ids) == n_parts:
-                                break
-
-            elif bucket_by == 'closest_value':
-                max_mat_k = column_data.max()
-                if max_mat_k == 0:
-                    step = 1e-10  # Avoid division by zero
-                else:
-                    step = max_mat_k / (n_parts - 1)
-                
-                try:
-                    for p in np.arange(max_mat_k, -step, -step):
-                        idx = np.abs(column_data - p).argmin()
-                        this_col_ids.append(idx)
-                        column_data[idx] = 1e10  # Exclude from future selection
-                        if len(this_col_ids) == n_parts:
-                            break
-                except Exception as e:
-                    self._logger.error(f"Error occurred when bucketing by closest value: {e}")
-                    return
-
-                # Fallback to ensure n_parts values
-                if len(this_col_ids) < n_parts:
-                    self._logger.warning(f"-- -- Not enough unique values to select {n_parts} parts for column {col}. Fallback to random selection.")
-                    remaining_indices = np.where(0 <= column_data < 1e10)[0]
-                    np.random.shuffle(remaining_indices)
-                    for idx in remaining_indices:
-                        if idx not in this_col_ids:
-                            this_col_ids.append(idx)
-                            if len(this_col_ids) == n_parts:
-                                break
+            
+            max_mat_k = column_data.max()
+            if max_mat_k == 0:
+                step = 1e-10  # Avoid division by zero
             else:
-                self._logger.error(f"Invalid bucket_by value: {bucket_by}")
+                step = max_mat_k / (n_parts - 1)
+            
+            try:
+                for p in np.arange(max_mat_k, -step, -step):
+                    idx = np.abs(column_data - p).argmin()
+                    this_col_ids.append(idx)
+                    column_data[idx] = 1e10  # Exclude from future selection
+                    if len(this_col_ids) == n_parts:
+                        break
+            except Exception as e:
+                self._logger.error(f"Error occurred when bucketing by closest value: {e}")
                 return
+
+            # Fallback to ensure n_parts values
+            if len(this_col_ids) < n_parts:
+                self._logger.warning(f"-- -- Not enough unique values to select {n_parts} parts for column {col}. Fallback to random selection.")
+                remaining_indices = np.where(0 <= column_data < 1e10)[0]
+                np.random.shuffle(remaining_indices)
+                for idx in remaining_indices:
+                    if idx not in this_col_ids:
+                        this_col_ids.append(idx)
+                        if len(this_col_ids) == n_parts:
+                            break
+
 
             # Sort such that probs are in descending order
             this_col_ids = sorted(this_col_ids, key=lambda idx: column_data[idx], reverse=True)

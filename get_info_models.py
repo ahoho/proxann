@@ -64,6 +64,7 @@ def main():
         matrix_sim = betas_mats
 
     elif topic_selection_method == 'wmd':
+        remove_topic_ids = []
         all_topic_keys = []
         for model in config.sections():
             # Skip all section (configuration for all models)
@@ -72,6 +73,7 @@ def main():
             model_config = config[model]
             # if trained with this repo code, we only need the model path
             if model_config.getboolean('trained_with_thetas_eval'):
+                model_path = model_config['model_path']
                 # Load vocab dictionaries
                 vocab_w2id = {}
                 with (pathlib.Path(model_path)/'vocab.txt').open('r', encoding='utf8') as fin:
@@ -103,7 +105,13 @@ def main():
                 for row in betas
             ]
             all_topic_keys.append(keys)
-
+            
+            if model_config["remove_topic_ids"]:
+                remove_topic_ids.append(
+                    [int(el) for el in model_config["remove_topic_ids"].split(",")])
+            else:
+                # append empty list to keep the order
+                remove_topic_ids.append([])
         matrix_sim = all_topic_keys
 
     else:
@@ -113,7 +121,7 @@ def main():
 
     topic_selector = TopicSelector()
     selected_topics = topic_selector.iterative_matching(
-        models=matrix_sim, N=N, metric=topic_selection_method)
+        models=matrix_sim, N=N, metric=topic_selection_method, remove_topic_ids=remove_topic_ids)
 
     print(f"Selected topics: {selected_topics}")
 

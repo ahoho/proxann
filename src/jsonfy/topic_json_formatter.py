@@ -72,13 +72,11 @@ class TopicJsonFormatter:
             JSON formatted dictionary of the model evaluation output.
         """
         exemplar_docs_ids, exemplar_docs_probs = self._doc_selector.get_top_docs(**kwargs)
-        exemplar_docs = [[df[text_column].iloc[doc_id]
-                          for doc_id in k] for k in exemplar_docs_ids]
+        exemplar_docs = [[df[text_column].iloc[doc_id] for doc_id in k] for k in exemplar_docs_ids]
         eval_docs_ids, eval_docs_probs, assigned_to_k = self._doc_selector.get_eval_docs(
             exemplar_docs=exemplar_docs_ids,
             **kwargs)
-        eval_docs = [[df[text_column].iloc[doc_id]
-                      for doc_id in k] for k in eval_docs_ids]
+        eval_docs = [[df[text_column].iloc[doc_id] for doc_id in k] for k in eval_docs_ids]
         topic_ids = range(len(exemplar_docs_ids))
 
         if hard_distractor:
@@ -86,8 +84,7 @@ class TopicJsonFormatter:
                 DISTRACTOR_DOC for _ in range(len(exemplar_docs_ids))]
         else:
             distractor_ids = self._doc_selector.get_doc_distractor(**kwargs)
-            distractor_docs = [df[text_column].iloc[doc_id]
-                               for doc_id in distractor_ids]
+            distractor_docs = [df[text_column].iloc[doc_id] for doc_id in distractor_ids]
 
         json_out = self.jsonfy(
             topic_ids,

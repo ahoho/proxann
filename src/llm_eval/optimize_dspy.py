@@ -85,6 +85,14 @@ class Q3Module(dspy.Module):
 
     def forward(self, category: str, document_a: str, document_b: str):
         closest = self.q3signature(CATEGORY=category, DOCUMENT_A=document_a, DOCUMENT_B=document_b).CLOSEST
+        
+        if "a" in closest.lower():
+            closest = "A"
+        elif "b" in closest.lower():
+            closest = "B"
+        else:
+            closest = "1000"
+        
         return dspy.Prediction(closest = closest)
     
 def get_accuracy(example, pred, trace=None):

@@ -704,7 +704,7 @@ class BERTopicTrainer(TMTrainer):
         no_below: int = 1,
         no_above: float = 1.0,
         stopwords: List[str] = None,
-        sbert_model: str = "multi-qa-mpnet-base-dot-v1",
+        sbert_model: str = "all-MiniLM-L6-v2",
         umap_n_components: int = 5,
         umap_n_neighbors: int = 15,
         umap_min_dist: float = 0.0,
@@ -882,6 +882,7 @@ class BERTopicTrainer(TMTrainer):
             top_n_words=self.topn,
             nr_topics=self.num_topics,
             embedding_model=self._embedding_model,
+            calculate_probabilities=True,
             verbose=True
         )
         
@@ -898,10 +899,34 @@ class BERTopicTrainer(TMTrainer):
             _, probs = self._model.fit_transform(texts)
 
         thetas_approx, _ = self._model.approximate_distribution(texts, use_embedding_model=True)
-        self._logger.info(f"-- -- Thetas shape: {thetas_approx.shape}")
+        # tiebreak with the approximate thetas
+        thetas_overall = probs.round(2) + thetas_approx / 100
+        
+        
+        self.document_info = self._model.get_document_info(texts)
+        
+        """
+        num_docs = len(texts)
+        num_topics = len(self.document_info.Topic.unique())
+        thetas = np.zeros((num_docs, num_topics-1))
+        for id_doc, doc in self.document_info.iterrows():
+            if doc.Topic == -1:
+                continue
+            else:
+                id_topic = doc.Topic
+            thetas[id_doc, id_topic] = doc.Probability
 
+        # tiebreak with the approximate thetas
+        thetas_overall = thetas.round(2) + thetas_approx / 100
+        """
+            
+        self._logger.info(f"-- -- Thetas shape: {thetas_overall.shape}")
+        # Add information about the percentage of the document that relates to the topic
+        topic_distr, _ = self._model.approximate_distribution(texts, batch_size=1000)
+        distributions = [distr[topic] if topic != -1 else 0 for topic, distr in zip(self._model.topics_, topic_distr)]
+        
         betas = self._model.c_tf_idf_.toarray()
-        betas = betas[1:, :] #drout outlier topic and keep (K-1, V) matrix
+        betas = betas[1:, :] #drop out outlier topic and keep (K-1, V) matrix
         self._logger.info(f"-- -- Betas shape: {betas.shape}")
         vocab = self._model.vectorizer_model.get_feature_names_out()
         
@@ -914,8 +939,11 @@ class BERTopicTrainer(TMTrainer):
 
         t_end = time.perf_counter() - t_start
         
-        self._save_model_results(thetas_approx, betas, vocab, keys)
+        # self._save_model_results(thetas_approx, betas, vocab, keys)
+        self._save_model_results(probs, betas, vocab, keys)
         self._save_init_params_to_yaml()
+        # for bertopic we also save the document_topic_info
+        self.document_info.to_csv(self.model_path.joinpath('document_topic_info.csv'), index=False)
 
         return t_end
     
@@ -1005,8 +1033,7 @@ def main():
     if args.trainer_type != "BERTopic":
         not_params.append("vocab_path")
         
-    params = {k: v for k, v in vars(args).items()
-              if v is not None and k not in ["corpus_file", "trainer_type", "text_col"]}
+    params = {k: v for k, v in vars(args).items() if v is not None and k not in ["corpus_file", "trainer_type", "text_col"]}
 
     trainer = create_model(args.trainer_type, **params)
     training_time = trainer.train(args.corpus_file, args.text_col)    

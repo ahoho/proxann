@@ -237,7 +237,7 @@ class TopicSelector(object):
             combs.append((models[i], models[(i+1) % len(models)]))
         return combs
 
-    def iterative_matching(self, models, N, metric='wmd', seed=2357_11):
+    def iterative_matching(self, models, N, metric='wmd', remove_topic_ids=None,seed=2357_11):
         """
         Performs an iterative pairing process between the topics of multiple models.
 
@@ -253,11 +253,18 @@ class TopicSelector(object):
         list of list of tuple
             List of lists with the N matches found. Each match is a list of tuples, where each tuple contains the model index and the topic index.
         """
+        if remove_topic_ids is not None:
+            modified_models = []
+            for i_model, model in enumerate(models):
+                # keep only the topics that are not in remove_topic_ids (model is a list of lists)
+                if len(remove_topic_ids) > 1:
+                    model = [topic for i, topic in enumerate(model) if i not in remove_topic_ids[i_model]]
+                modified_models.append(model)
+            models = modified_models
         random.seed(seed)
         dists = {}
         for modelA, modelB in product(range(len(models)), range(len(models))):
             dists[(modelA, modelB)] = self._get_wmd_mat([models[modelA], models[modelB]])
-
         matches = []
         assert(all(N <= len(m) for m in models))
         while len(matches) < min(len(m) for m in models):

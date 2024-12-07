@@ -7,6 +7,7 @@ import time
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_ind
+from scipy.stats import kendalltau
 from src.llm_eval.prompter import Prompter
 from src.llm_eval.utils import bradley_terry_model, calculate_corr_npmi, collect_fit_rank_data, compute_agreement_per_topic, compute_correlations_one, compute_correlations_two, extract_info_binary_q2, extract_info_q1_q3, extract_logprobs, load_config_pilot, process_responses, extract_info_q1_q2, generate_pairwise_counts, calculate_coherence
 
@@ -116,9 +117,9 @@ def main():
                             # Q3
                             #==============================================
                             logging.info("-- Executing Q3...")
-                            #do_q3_with_q1_fixed = prompt_mode == "q1_then_q3_fix_cat"
-                            #q3_out = prompter.get_prompt(cluster_data, "q3", category, do_q3_with_q1_fixed=do_q3_with_q1_fixed)
-                            q3_out = prompter.get_prompt(cluster_data, "q3_dspy", category)
+                            do_q3_with_q1_fixed = prompt_mode == "q1_then_q3_fix_cat"
+                            q3_out = prompter.get_prompt(cluster_data, "q3", category, do_q3_with_q1_fixed=do_q3_with_q1_fixed)
+                            #q3_out = prompter.get_prompt(cluster_data, "q3_dspy", category)
                             get_label = False
                             
                             if len(q3_out) > 2: ## then is "doing it both ways"
@@ -346,10 +347,23 @@ def main():
     ################
     # Save corrs   #
     ################
+    # Sort corr_data by id
+    corr_data = sorted(corr_data, key=lambda x: x["id"])
+    if llm_results_q3 is not None:
+        llm_results_q3 = sorted(llm_results_q3, key=lambda x: x["id"])
+    if llm_results_q2 is not None:
+        llm_results_q2 = sorted(llm_results_q2, key=lambda x: x["id"])
+    
     # Correlations with user study data and ground truth 
-    # agreement_by_topic = compute_agreement_per_topic(responses_by_id)
     corr_results = compute_correlations_one(corr_data, rank_llm_data=llm_results_q3, fit_llm_data=llm_results_q2)
     corr_results.to_json(f"{path_save}/correlation_results_mode1.json", orient="records")
+    
+    # check tau and significance
+    kendall_tau_tau_tm = kendalltau(corr_results["rank_tau"], corr_results["rank_tau_tm_gpt-4o-mini-2024-07-18"])
+    # save kendalltau
+    kendall_tau_tau_tm = pd.DataFrame([{"tau": kendall_tau_tau_tm.correlation, "p_value": kendall_tau_tau_tm.pvalue}])
+    kendall_tau_tau_tm.to_json(f"{path_save}/kendall_tau_tau_tm.json", orient="records")
+    print(f"Kendall tau: {kendall_tau_tau_tm}")
                 
     corr_results2 = compute_correlations_two(responses_by_id, llm_results_q3, llm_results_q2)    
     corr_results2.to_json(f"{path_save}/correlation_results_mode2.json", orient="records")
@@ -358,7 +372,6 @@ def main():
     columns_calculate = [col for col in corr_results.columns if col not in["id", "model", "topic", "n_annotators", "fit_rho", "fit_tau", "fit_agree"] and "rank_rho_users" not in col and "rank_tau_users" not in col]
     corr_results = calculate_corr_npmi(corr_results, npmi_data, columns_calculate)
     corr_results.to_json(f"{path_save}/corrs_mode1_npmi.json", orient="records")
-    
     import pdb; pdb.set_trace()
     
 if __name__ == "__main__":

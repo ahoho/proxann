@@ -1,0 +1,159 @@
+{
+  "q3signature": {
+    "lm": null,
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "CATEGORY": "film\uff0crole\uff0caward\uff0cacting\uff0cperformance\uff0ccomedy\uff0cdrama",
+        "DOCUMENT_A": "An Unforgettable Summer = An Unforgettable Summer ( French : Un \u00e9t\u00e9 inoubliable ; Romanian : O var\u0103 de neuitat ) is a 1994 drama film directed and produced by Lucian Pintilie. A Romanian-French co-production based on a chapter from a novel by Petru Dumitriu, it stars British actress Kristin Scott Thomas as the Hungarian-born aristocrat Marie-Th\u00e9r\u00e8se Von Debretsy. Her marriage with Romanian Land Forces captain Petre Dumitriu brings her to Southern Dobruja ( present-day northeastern Bulgaria ), where they settle in 1925. There, she witnesses first-hand the violent clashes between, on one hand, the Greater Romanian administration, and, on the other, komitadji brigands of Macedonian origin and ethnic Bulgarian locals.",
+        "DOCUMENT_B": "Edge ( wrestler ) = Adam Joseph Copeland ( born October 30, 1973 ) is a Canadian actor and retired professional wrestler. He is best known for his time with the American professional wrestling promotion WWE, where he performed under the ring name Edge. Copeland was trained by professional wrestlers Sweet Daddy Siki and Ron Hutchinson. Throughout the 1990s, he wrestled in various U.S. independent promotions. During his time in these promotions, he competed in singles and tag team competition, the latter with long-time friend Christian. In 1997, Copeland signed a developmental deal with the WWF and began competing for the company later that year ; he made his televised debut the following June under the ring name Edge.",
+        "reasoning": "Document A is more closely related to the category because it contains specific details about a film (genre: drama, director, production company, etc.), whereas Document B focuses on an individual's career in professional wrestling and acting. The category mentions \"film\", \"role\", \"award\", \"acting\", and \"performance\", which are all relevant to Document A.",
+        "CLOSEST": "A"
+      },
+      {
+        "augmented": true,
+        "CATEGORY": "Basketball players",
+        "DOCUMENT_A": "Jahlil Okafor = Jahlil Okafor ( pronounced \/ \u02c8d\u0292\u0251\u02d0 li\u02d0l \/ ; born December 15, 1995 ) is an American professional basketball player for the Philadelphia 76ers of the National Basketball Association ( NBA ). He played his freshman season of college for the 2014 \u2013 15 Duke national championship team. Okafor was heavily recruited since before high school and had been at the top of the recruiting rankings for several years. He played high school basketball in Chicago, Illinois for Whitney M. Young Magnet High School, where he earned high school national player of the year awards from McDonalds, USA Today and Parade.",
+        "DOCUMENT_B": "Fatbeard =\" Fatbeard\" is the seventh episode of the thirteenth season of the American animated television series South Park. The 188th overall episode of the series, it originally aired on Comedy Central in the United States on April 22, 2009 and in the United Kingdom on April 24, 2009. It was the mid-season finale, marking the final South Park episode for six months. In the episode, Cartman misinterprets news reports about piracy in the Indian Ocean to mean the return of the classic era of swashbuckling pirates, and misleads a handful of South Park boys to voyage to Mogadishu to start a pirate crew.",
+        "reasoning": "Document A is more closely related to the category \"Basketball players\" because it contains information about a professional basketball player, Jahlil Okafor, including his team, playing style, and achievements. Document B, on the other hand, appears to be an episode summary of a TV show and does not contain any relevant information about basketball or sports.",
+        "CLOSEST": "A"
+      },
+      {
+        "category": "Basketball players",
+        "document_a": "Dwyane Wade = Dwyane Tyrone Wade Jr. ( born January 17, 1982 ) is an American professional basketball player for the Chicago Bulls of the National Basketball Association ( NBA ). He has established himself as one of the most well-known and popular players in the league. Wade had the top selling jersey in the NBA for nearly two years, leading the league in jersey sales from the 2005 NBA Playoffs, until the midpoint of the 2006 \u2013 07 season. His first name is pronounced the same as the more common spellings\" Dwayne\" and\" Duane\".",
+        "document_b": "2010 Alabama Crimson Tide football team = The 2010 Alabama Crimson Tide football team ( variously\" Alabama\",\" UA\",\" Bama\" or\" The Tide\" ) represented the University of Alabama in the 2010 NCAA Division I FBS football season. It was the Crimson Tide 's 116th overall season, 77th as a member of the Southeastern Conference ( SEC ) and its 19th within the SEC Western Division. The team was led by head coach Nick Saban, in his fourth year, and played their home games at Bryant \u2013 Denny Stadium in Tuscaloosa, Alabama.",
+        "closest": "A"
+      },
+      {
+        "category": "Professional wrestling events and wrestlers",
+        "document_a": "One Night Stand ( 2007 ) = One Night Stand ( 2007 ) was the third annual One Night Stand professional wrestling pay-per-view event produced by World Wrestling Entertainment ( WWE ) and presented by Gilette. It took place on June 3, 2007, at the Jacksonville Veterans Memorial Arena in Jacksonville, Florida and featured talent from the Raw, SmackDown!, and ECW brands. The event was the final to announce each individual brand as co-promoters of the event during the introductory graphics. The main match on the Raw brand was John Cena versus The Great Khali in a Pinfalls Count Anywhere match for the WWE Championship.",
+        "document_b": "Gregory Helms = Gregory Shane Helms ( born July 12, 1974 ) is an American professional wrestler who is currently signed to Total Nonstop Action Wrestling ( TNA ) under his birth name. In TNA, he is the manager for former TNA X Division Champion Trevor Lee. He is best known for his time with World Wrestling Entertainment ( WWE ), where he wrestled as The Hurricane, Gregory Helms, and Hurricane Helms and also for his time with World Championship Wrestling ( WCW ), where he wrestled as\" Sugar\" Shane Helms.",
+        "closest": "A"
+      },
+      {
+        "category": "Pro Wrestling Events and Performers",
+        "document_a": "TNA Unbreakable = Unbreakable was a professional wrestling pay-per-view ( PPV ) event produced by the Total Nonstop Action Wrestling ( TNA ) promotion that took place on September 11, 2005 at the TNA Impact! Zone in Orlando, Florida. It was the first and only show under the Unbreakable name and ninth event in the 2005 TNA PPV schedule. Nine professional wrestling matches and two pre-show matches were featured on the card, three of which were for championships. The main event at Unbreakable was a Three Way match for the TNA X Division Championship, in which then-champion Christopher Daniels defended the title against the challengers A.",
+        "document_b": "Australian cricket team in England in 1948 = The Australian cricket team in England in 1948 was captained by Don Bradman, who was making his fourth and final tour of England. The team is famous for being the first Test match side to play an entire tour of England without losing a match. This feat earned them the nickname of The Invincibles, and they are regarded as one of the greatest cricket teams of all time. According to the Australian federal government the team\" is one of Australia 's most cherished sporting legends\".",
+        "closest": "A"
+      },
+      {
+        "category": "\"RAAF COMBAT FLYING SQUADRONS 1940-1950\"",
+        "document_a": "Northern Command ( RAAF ) = Northern Command was one of several geographically based commands raised by the Royal Australian Air Force ( RAAF ) during World War II. Established in April 1944, it evolved from No. 9 Operational Group, which had been the RAAF 's primary mobile formation in the South West Pacific theatre since September 1942, but had lately become a garrison force in New Guinea. Northern Command was headquartered initially at Milne Bay and then, from August 1944, in Madang. It conducted operations in New Guinea, New Britain, and Bougainville until the end of the war.",
+        "document_b": "Irfan Pathan = Irfan Khan Pathan ( pronunciation ; born 27 October 1984 ) is an Indian cricketer who made his debut for India in the 2003 \/ 04 Border-Gavaskar Trophy, and was a core member of the national team until a decline in form set in during 2006, forcing him out of the team. Since then, he has been in and out of the limited-overs teams ( ODIs and T20Is ), and has only sporadic appearances in Test cricket. Pathan played his last Test in April, 2008 at the age of 24.",
+        "closest": "A"
+      },
+      {
+        "category": "actor biographies",
+        "document_a": "WWV ( radio station ) = WWV is the call sign of the United States National Institute of Standards and Technology 's ( NIST ) HF (\" shortwave\" ) radio station near Fort Collins, Colorado. WWV continuously transmits official U.S. Government frequency and time signals on 2.5, 5, 10, 15 and 20 MHz. These carrier frequencies and time signals are controlled by local atomic clocks traceable to NIST 's primary standard in Boulder, Colorado by GPS common view observations and other time transfer methods. NIST also operates the very similar radio station WWVH in Kauai, Hawaii.",
+        "document_b": "Christine Langan = Christine Langan ( born January 1965 ) is an English film producer who has been Head of BBC Films since April 2009. After graduating from Cambridge University in 1987 and working in advertising for three years, Langan joined Granada Television 's drama serials department where she script edited daytime soap operas. From there, she transferred to Granada 's newly created comedy department, where she developed the acclaimed television series Cold Feet, and other one-off comedies. In 2000, she left Granada to become a freelance producer, and produced the romantic comedy series Rescue Me for the BBC.",
+        "closest": "B"
+      },
+      {
+        "category": "Sports Legends",
+        "document_a": "Big Four ( tennis ) = In tennis, the term Big Four refers to the quartet of men 's singles players Roger Federer, Rafael Nadal, Novak Djokovic, and Andy Murray. They reigned as the four best players in the world every season from 2008 \u2013 2016. These players were considered dominant in terms of ranking and tournament victories, including Grand Slam tournaments and ATP Masters 1000 events, as well as the ATP World Tour Finals and Olympic Games. Federer was the first to come to prominence after winning Wimbledon in 2003 and established himself as the world No.",
+        "document_b": "Nastia Liukin = Anastasia Valeryevna\" Nastia\" Liukin ( Russian : \u0410\u043d\u0430\u0441\u0442\u0430\u0441\u0438\u044f\" \u041d\u0430\u0441\u0442\u044f\" \u0412\u0430\u043b\u0435\u0440\u044c\u0435\u0432\u043d\u0430 \u041b\u044e\u043a\u0438\u043d\u0430 ; born October 30, 1989 ) is a Russian American retired artistic gymnast. She is the 2008 Olympic individual all-around champion, the 2005 and 2007 world champion on the balance beam, and the 2005 world champion on the uneven bars. She is also a four-time all-around U.S. national champion, winning twice as a junior and twice as a senior. With nine World Championships medals, seven of them individual, Liukin is tied with Shannon Miller for the third-highest tally of World Championship medals ( among U.",
+        "closest": "B"
+      },
+      {
+        "category": "Military Officers",
+        "document_a": "United States Special Operations Command = The United States Special Operations Command ( USSOCOM or SOCOM ) is the Unified Combatant Command charged with overseeing the various Special Operations Component Commands of the Army, Marine Corps, Navy, and Air Force of the United States Armed Forces. The command is part of the Department of Defense and is the only Unified Combatant Command legislated into being by the U.S. Congress. USSOCOM is headquartered at MacDill Air Force Base in Tampa, Florida. The idea of a unified special operations command had its origins in the aftermath of Operation Eagle Claw, the disastrous attempted rescue of hostages at the American embassy in Iran in 1980.",
+        "document_b": "Kevin Clash = Kevin Jeffrey Clash ( born September 17, 1960 ) is an American puppeteer whose characters include Elmo, Clifford, Benny Rabbit, and Hoots the Owl. Clash developed an interest in puppetry at an early age, and began performing for local TV children 's shows in his hometown of Baltimore, Maryland, as a teenager. In the early 1980s, he began working in Captain Kangaroo, and began performing in Sesame Street in 1984. He was the fifth puppeteer to perform Elmo, the character he became the most famous for, and became an executive producer and director for the show.",
+        "closest": "A"
+      },
+      {
+        "category": "Pro Wrestling Events and Performers",
+        "document_a": "Jermain Taylor = Jermain Taylor ( born August 11, 1978 ) is an American former professional boxer. He remains the last undisputed middleweight champion, having unified the WBA, WBC, IBF, WBO, The Ring magazine and lineal titles in 2005 by beating Bernard Hopkins. This made Taylor the first boxer to ever claim each title from all four major boxing sanctioning organizations. He is also a two-time former IBF middleweight champion, having won the title for a second time in 2014. Taylor made his professional debut in 2001 and won his first 25 bouts, which included victories over former champions Ra\u00fal M\u00e1rquez and William Joppy.",
+        "document_b": "Australian cricket team in England in 1948 = The Australian cricket team in England in 1948 was captained by Don Bradman, who was making his fourth and final tour of England. The team is famous for being the first Test match side to play an entire tour of England without losing a match. This feat earned them the nickname of The Invincibles, and they are regarded as one of the greatest cricket teams of all time. According to the Australian federal government the team\" is one of Australia 's most cherished sporting legends\".",
+        "closest": "A"
+      },
+      {
+        "category": "Basketball highlights ",
+        "document_a": "2009 \u2013 10 Big Ten Conference men 's basketball season = The 2009 \u2013 10 Big Ten Conference men 's basketball season marked the continuation of competitive basketball among Big Ten Conference members that began in 1904. On October 16, 2009 five schools celebrated Midnight Madness to mark the beginning of the 2009 \u2013 10 NCAA Division I men 's basketball season. Michigan State, Ohio State, and Purdue ended the season tied for the conference championship with win \u2013 loss records of 14 \u2013 4, followed by Wisconsin at 13 \u2013 5. In the 2010 Big Ten Conference Men 's Basketball Tournament, Ohio State defeated Minnesota for the championship, and the conference named Evan Turner as the tournament 's most outstanding player.",
+        "document_b": "2014 Continental Cup of Curling = The 2014 Continental Cup of Curling was held from January 16 to 19 at the Orleans Arena in Paradise, Nevada, a suburb of Las Vegas. This edition of the Continental Cup of Curling, sponsored by World Financial Group, was the first held outside of Canada. The Continental Cup, based on the Ryder Cup of golf, pits teams from North America against teams from the rest of the World. The tournament featured team events, mixed doubles events, singles competitions, and skins competitions, and the brunt of available points was awarded in the skins competitions.",
+        "closest": "A"
+      },
+      {
+        "category": "Military Officers",
+        "document_a": "United States Special Operations Command = The United States Special Operations Command ( USSOCOM or SOCOM ) is the Unified Combatant Command charged with overseeing the various Special Operations Component Commands of the Army, Marine Corps, Navy, and Air Force of the United States Armed Forces. The command is part of the Department of Defense and is the only Unified Combatant Command legislated into being by the U.S. Congress. USSOCOM is headquartered at MacDill Air Force Base in Tampa, Florida. The idea of a unified special operations command had its origins in the aftermath of Operation Eagle Claw, the disastrous attempted rescue of hostages at the American embassy in Iran in 1980.",
+        "document_b": "Titan Clydebank = Titan Clydebank is a 150-foot-high ( 46 m ) cantilever crane at Clydebank, West Dunbartonshire, Scotland. It was designed to be used in the lifting of heavy equipment, such as engines and boilers, during the fitting-out of battleships and ocean liners at the John Brown & Company shipyard. It was also the world 's first electrically powered cantilever crane, and the largest crane of its type at the time of its completion. Situated at the end of a U-shaped fitting out basin, the crane was used to construct some of the largest ships of the 20th century, including the Queen Mary, Queen Elizabeth and Queen Elizabeth 2.",
+        "closest": "A"
+      },
+      {
+        "category": "UK Churches",
+        "document_a": "Eastcote House Gardens = Eastcote House Gardens is an area of public parkland in Eastcote, within the London Borough of Hillingdon. The site covers 3.63 hectares ( 9 acres ) and incorporates the walled garden, dovecote and coach house of Eastcote House. The house was demolished in 1964 by the Ruislip-Northwood Urban District Council ( RNUDC ), the predecessor of the London Borough of Hillingdon. At the public 's request, the garden and outbuildings were retained and are now maintained by a group of volunteers, the Friends of Eastcote House Gardens, in partnership with the local authority.",
+        "document_b": "Lathrop House ( Vassar College ) = Lathrop House ( known officially as Edward Lathrop House ) was the third quadrangle dormitory built on Vassar College 's campus in the town of Poughkeepsie, New York. Constructed in 1901 and designed by Boston-based Allen & Vance, the brick dorm stands five stories tall. Lathrop houses 180 students who may be any grade or gender. = = History = = Lathrop House was the third residential quadrangle ( quad ) dormitory built on the campus of Vassar College in the town of Poughkeepsie, New York. The college built Lathrop during a period of rapid dorm construction spanning 1893 \u2013 1902 during which the older seminary-style model of housing \u2014 a single large hall in which all a college 's residents lived, in Vassar 's case Main Building \u2014 was quickly waning in popularity in favor of smaller individual houses.",
+        "closest": "A"
+      },
+      {
+        "category": "Wrestling Events",
+        "document_a": "Cliff Compton = Clifford\" Cliff\" Compton ( born November 2, 1979 ) is an American professional wrestler signed to Global Force Wrestling, better known by his ring name Domino. Best known for his work in World Wrestling Entertainment ( WWE ), he works for Ring of Honor ( ROH ) as a free agent, while also working on the independent circuit. Before being promoted to the main WWE roster, Compton was assigned to WWE 's developmental territory Ohio Valley Wrestling ( OVW ) in Louisville, Kentucky in 2005. While situated at OVW, he wrestled under the name Dice Domino and was placed in tag team competition, alongside Deuce Shade.",
+        "document_b": "The Fighting Irish =\" The Fighting Irish\" is the seventeenth episode of NBC 's first season of 30 Rock. It was written by one of the season 's co-executive producers, Jack Burditt and it was directed by Dennie Gordon. It aired on March 8, 2007 in the United States. Guest stars who appeared in this episode were Dan Bakkedahl, Katrina Bowden, Henry Boyle, Anna Chlumsky, Siobhan Fallon Hogan, Chris Hoch, Alice Kremelberg, Nathan Lane, Boris McGiver, John F Mooney, Brian Murray, Maulik Pancholy, Lonny Ross, Molly Shannon, Jason Sudeikis and Kristen Sudeikis.",
+        "closest": "A"
+      },
+      {
+        "category": "Multinational military aircraft",
+        "document_a": "No. 72 Wing RAAF = No. 72 Wing was a Royal Australian Air Force ( RAAF ) wing that operated during World War II. It was formed in April 1943 at Townsville, Queensland, as part of North-Eastern Area Command. Led by Group Captain Charles Eaton, the wing soon deployed to Merauke, Dutch New Guinea, where it comprised three squadrons flying CAC Boomerang and P-40 Kittyhawk fighters, and A-31 Vengeance dive bombers. Eaton was succeeded by Group Captain Allan Walters in mid-1943. No. 72 Wing took part in the defence of Torres Strait, undertaking interception, patrol and occasional ground-attack and anti-shipping duties.",
+        "document_b": "Russian battleship Tsesarevich = Tsesarevich ( Russian : \u0426\u0435\u0441\u0430\u0440\u0435\u0432\u0438\u0447 ) was a pre-dreadnought battleship of the Imperial Russian Navy, built in France at the end of the 19th century. The ship 's design formed the basis of the Russian-built Borodino-class battleships. She was based at Port Arthur, Manchuria after entering service and fought in the Russo-Japanese War of 1904 \u2013 05. Tsesarevich was the flagship of Admiral Wilgelm Vitgeft in the Battle of the Yellow Sea and was interned in Tsingtau after the battle. After the end of the war, the ship was transferred to the Baltic Fleet and helped to suppress the Sveaborg Rebellion in mid-1906.",
+        "closest": "A"
+      },
+      {
+        "category": "Pro Wrestling Events and Performers",
+        "document_a": "M\u00e1scara Dorada = M\u00e1scara Dorada ( born November 3, 1988 ) is a Mexican luchador enmascarado, currently signed to WWE and best known for his decade long stint in Consejo Mundial de Lucha Libre. M\u00e1scara Dorada 's real name has not been officially documented, a tradition in Mexican Lucha Libre where masked wrestler 's real names often are not a matter of public record. The wrestler currently known as M\u00e1scara Dorada made his debut in 2005 and has worked under other names, but achieved most success as M\u00e1scara Dorada. His ring name is Spanish for\" Golden Mask\".",
+        "document_b": "Wendi Richter = Wendi Richter ( born September 6, 1961 ) is a retired American professional wrestler. She began her professional wrestling career in companies such as the National Wrestling Alliance, where she teamed with Joyce Grable, with whom she held the NWA Women 's World Tag Team Championship twice. In the 1980s, she joined the World Wrestling Federation ( WWF ). She held the WWF Women 's Championship twice and feuded with The Fabulous Moolah over the title. She was also involved in a storyline with singer Cyndi Lauper called the\" Rock ' n ' Wrestling Connection.",
+        "closest": "B"
+      }
+    ],
+    "signature": {
+      "instructions": "Determine which document is more closely related to the given category",
+      "fields": [
+        {
+          "prefix": "CATEGORY:",
+          "description": "${CATEGORY}"
+        },
+        {
+          "prefix": "DOCUMENT A:",
+          "description": "${DOCUMENT_A}"
+        },
+        {
+          "prefix": "DOCUMENT B:",
+          "description": "${DOCUMENT_B}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "CLOSEST:",
+          "description": "Document that is more closely related to the category (A or B)"
+        }
+      ]
+    },
+    "extended_signature": {
+      "instructions": "Determine which document is more closely related to the given category",
+      "fields": [
+        {
+          "prefix": "CATEGORY:",
+          "description": "${CATEGORY}"
+        },
+        {
+          "prefix": "DOCUMENT A:",
+          "description": "${DOCUMENT_A}"
+        },
+        {
+          "prefix": "DOCUMENT B:",
+          "description": "${DOCUMENT_B}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "CLOSEST:",
+          "description": "Document that is more closely related to the category (A or B)"
+        }
+      ]
+    }
+  }
+}

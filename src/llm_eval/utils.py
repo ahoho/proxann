@@ -197,15 +197,17 @@ def extract_info_q1_q2(text, get_label):
     return label, score, rationale
 
 def extract_info_binary_q2(text):
-    
-    # it needs to catch FIT: YES or FIT: NO
-    fit_pattern = r'FIT:\s*(YES|NO)'
-    fit_match = re.findall(fit_pattern, text, re.DOTALL)
+    fit_pattern_general = r'FIT:\s*(YES|NO)' 
+    fit_pattern_bracketed = r'\[\[ ## FIT ## \]\]\s*(YES|NO)'  # for dspy prompts
+
+    fit_match = re.findall(fit_pattern_bracketed, text, re.DOTALL)
+    if not fit_match:
+        fit_match = re.findall(fit_pattern_general, text, re.DOTALL)
+
     fit = fit_match[0].strip() if fit_match else ""
-    fit = int(fit == "YES")
+    fit = int("yes" in fit.lower())
     
     return fit
-    
 
 def extract_logprobs(pairwise_logprobs, backend, logging):
     """Extracts log probabilities associated with the pairwise rankings (i.e., whether the more related document is A or B) from LLM responses, handling different backends (i.e., LLM types)."""
@@ -491,6 +493,9 @@ def collect_fit_rank_data(
             "prob_data": prob_data,
             "assign_data": assign_data
         })
+
+    # Sort correlation data by topic ID
+    corr_data = sorted(corr_data, key=lambda x: x["id"])
     
     return model_fit_data, model_rank_data, model_prob_data, corr_data
 
@@ -532,14 +537,14 @@ def compute_correlations_one(
         elif aggregation_method == "kemeny_young":
             n_items = fit_data.shape[1]
             preferences = np.zeros((n_items, n_items))
-            for i, j in combinations(range(n_items), 2):
+            for i, j in itertools.combinations(range(n_items), 2):
                 preferences[i,j] = np.sum(rank_data[:, i] < rank_data[:, j])
                 preferences[j,i] = np.sum(rank_data[:, i] > rank_data[:, j])
             
             best_score = float('-inf')
             best_ranking = None
-            for perm in permutations(range(n_items)):
-                score = sum(preferences[i,j] for i, j in combinations(perm, 2))
+            for perm in itertools.permutations(range(n_items)):
+                score = sum(preferences[i,j] for i, j in itertools.combinations(perm, 2))
                 if score > best_score:
                     best_score = score
                     best_ranking = perm

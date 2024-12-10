@@ -255,17 +255,28 @@ class TopicSelector(object):
         """
         if remove_topic_ids is not None:
             modified_models = []
+            id_mappings = []  # To store mappings for each model
             for i_model, model in enumerate(models):
-                # keep only the topics that are not in remove_topic_ids (model is a list of lists)
-                if len(remove_topic_ids) > 1:
-                    model = [topic for i, topic in enumerate(model) if i not in remove_topic_ids[i_model]]
-                modified_models.append(model)
+                # Create a mapping for this model
+                mapping = {}
+                new_model = []
+                new_topic_id = 0
+                for i, topic in enumerate(model):
+                    if len(remove_topic_ids) > 1 and i not in remove_topic_ids[i_model]:
+                        new_model.append(topic)
+                        mapping[new_topic_id] = i  # Map new topic ID to the original
+                        new_topic_id += 1
+                modified_models.append(new_model)
+                id_mappings.append(mapping)  # Store the mapping for this model
             models = modified_models
         random.seed(seed)
         dists = {}
         for modelA, modelB in product(range(len(models)), range(len(models))):
             dists[(modelA, modelB)] = self._get_wmd_mat([models[modelA], models[modelB]])
-        matches = []
+            
+        matches = []  # Matches with filtered topic IDs
+        matches_original = []  # Matches mapped back to original topic IDs
+
         assert(all(N <= len(m) for m in models))
         while len(matches) < min(len(m) for m in models):
             for seed_model in range(len(models)):
@@ -286,13 +297,30 @@ class TopicSelector(object):
                     for model_idx, indices in min_dists_indices
                 ]
                 matches.append(seed_model_matches)
+                
                 # Remove the matched topics from the distance matrix
                 for modelA, modelA_topic in seed_model_matches:
                     for modelB in range(len(models)):
                         if modelA != modelB:
                             dists[(modelA, modelB)][modelA_topic, :] = np.inf
                             dists[(modelB, modelA)][:, modelA_topic] = np.inf
-        return random.sample(matches, N)
+
+        sampled_matches = random.sample(matches, N)
+
+        # Map the sampled matches to their original topic IDs (sampled_matches are just positions in the betas matrix)
+        sampled_matches_original = [
+            [
+                (model_idx, id_mappings[model_idx][topic_id] if topic_id is not None else None)
+                for model_idx, topic_id in match
+            ]
+            for match in sampled_matches
+        ]
+
+        # Output the sampled matches in both forms
+        print("Sampled Matches (Position IDs):", sampled_matches)
+        print("Sampled Matches (Original Topic IDs):", sampled_matches_original)
+                            
+        return sampled_matches_original
     
     def find_closest_by_wmd(self, models: list, keep_from_first: list = [0, 1, 2]) -> list:
         """Find the closest topics between two models using Word Mover's Distance.

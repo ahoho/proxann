@@ -11,7 +11,7 @@ from dspy.evaluate import Evaluate
 from dspy.teleprompt import BootstrapFewShotWithRandomSearch
 from sklearn.model_selection import train_test_split
 
-from utils import extend_to_full_sentence
+from src.llm_eval.utils import extend_to_full_sentence
 
 class ThetasDataset(Dataset):
 
@@ -23,6 +23,7 @@ class ThetasDataset(Dataset):
         seed: Optional[int] = 11235,
         inputs = ["category", "document_a", "document_b"],
         outputs = ["closest"],
+        mode ="q3",
         num_words_truncate: int = 100,
         *args,
         **kwargs
@@ -40,15 +41,26 @@ class ThetasDataset(Dataset):
         # Read the training data (save as json)
         train_data = pd.read_json(data_fpath)
         
-        # keep first category from each user
-        train_data["category"] = train_data["categories"].apply(lambda x: x[0])
-        train_data["closest"] = train_data.apply(lambda x: "A" if x["users_fit_winner"] == x["doc_id1"] else "B", axis=1)
+        if mode == "q3":
         
-        # truncate the documents to num_words_truncate
-        train_data["document_a"] = train_data["doc1"].apply(lambda x: extend_to_full_sentence(x,num_words_truncate))
-        train_data["document_b"] =  train_data["doc2"].apply(lambda x: extend_to_full_sentence(x,num_words_truncate))
+            # keep first category from each user
+            train_data["category"] = train_data["categories"].apply(lambda x: x[0])
+            train_data["closest"] = train_data.apply(lambda x: "A" if x["users_fit_winner"] == x["doc_id1"] else "B", axis=1)
+            
+            # truncate the documents to num_words_truncate
+            train_data["document_a"] = train_data["doc1"].apply(lambda x: extend_to_full_sentence(x,num_words_truncate))
+            train_data["document_b"] =  train_data["doc2"].apply(lambda x: extend_to_full_sentence(x,num_words_truncate))
+            
+            train_data = train_data[(inputs + outputs)]
         
-        train_data = train_data[(inputs + outputs)]
+        elif mode == "q2":
+            train_data["category"] = train_data["user_label"]
+            train_data["fit"] = train_data.apply(lambda x: "YES" if x["bin_fit"] == 1 else "NO", axis=1)
+            train_data["document"] = train_data["doc"].apply(lambda x: extend_to_full_sentence(x,num_words_truncate))
+            inputs = ["category", "document"]
+            
+        else:
+            raise ValueError("mode must be either 'q2' or 'q3'")
         
         train_data, temp_data = train_test_split(train_data, test_size=dev_size + test_size, random_state=seed)
         dev_data, test_data = train_test_split(
@@ -94,9 +106,35 @@ class Q3Module(dspy.Module):
             closest = "1000"
         
         return dspy.Prediction(closest = closest)
+
+class Q2Signature(dspy.Signature):
+    """Determine whether the DOCUMENT fits with the given CATEGORY or not"""
+    CATEGORY = dspy.InputField()
+    DOCUMENT = dspy.InputField()
+    FIT = dspy.OutputField(desc="Whether the DOCUMENT fits with the given CATEGORY or not (YES or NO)")
+    
+class Q2Module(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.q2signature = dspy.ChainOfThought(Q2Signature)
+
+    def forward(self, category: str, document: str):
+        fit = self.q2signature(CATEGORY=category, DOCUMENT=document).FIT
+        
+        if "yes" in fit.lower():
+            fit = "YES"
+        elif "no" in fit.lower():
+            fit = "NO"
+        else:
+            fit = "10000"
+        
+        return dspy.Prediction(fit = fit)
     
 def get_accuracy(example, pred, trace=None):
     return 1 if example.closest == pred["closest"] else 0
+
+def get_accuracy_fit(example, pred, trace=None):
+    return 1 if example.fit == pred["fit"] else 0
     
 def optimize_module(data_path, mbd=4, mld=16, ncp=16, mr=1, dev_size=0.25):
 
@@ -141,12 +179,60 @@ def optimize_module(data_path, mbd=4, mld=16, ncp=16, mr=1, dev_size=0.25):
     print(f"Compilation Improvement: {compiled_score - uncompiled_score}%")
     
     return compiled_pred
+
+def optimize_q2_module(data_path, mbd=4, mld=16, ncp=16, mr=1, dev_size=0.25):
+
+    dataset = ThetasDataset(data_fpath=data_path, dev_size=dev_size, mode="q2")
+
+    print(f"-- -- Dataset loaded from {data_path}")
+
+    trainset = dataset._train
+    devset = dataset._dev
+    testset = dataset._test
+    
+    print(f"-- -- Dataset split into train, dev, and test. Training module...")
+
+    config = dict(max_bootstrapped_demos=mbd, max_labeled_demos=mld,
+                    num_candidate_programs=ncp, max_rounds=mr)
+    teleprompter = BootstrapFewShotWithRandomSearch(metric=get_accuracy_fit, **config)
+
+    compiled_pred = teleprompter.compile(Q2Module(), trainset=trainset, valset=devset)
+
+    print(f"-- -- Module compiled. Evaluating on test set...")
+
+    tests = []
+    for el in testset:
+        output = compiled_pred(el.category, el.document)
+        tests.append([el.category, el.document, output["fit"], get_accuracy_fit(el, output)])
+
+    df_tests = pd.DataFrame(
+        tests, columns=["category", "document", "fit", "accuracy"])
+
+    print(f"-- -- Test set evaluated. Results:")
+    print(df_tests)
+
+    evaluate = Evaluate(
+        devset=devset, metric=get_accuracy_fit, num_threads=1, display_progress=True)
+    compiled_score = evaluate(compiled_pred)
+    uncompiled_score = evaluate(Q2Module())
+
+    print(
+        f"## Q2Module Score for uncompiled: {uncompiled_score}")
+    print(
+        f"## Q2Module Score for compiled: {compiled_score}")
+    print(f"Compilation Improvement: {compiled_score - uncompiled_score}%")
+    
+    return compiled_pred
         
 if __name__ == "__main__":
-    load_dotenv(".env")
-    api_key = os.getenv("OPENAI_API_KEY")
-    os.environ["OPENAI_API_KEY"] = api_key
-    lm = dspy.LM(model="gpt-4o-mini-2024-07-18")
+    #load_dotenv(".env")
+    #api_key = os.getenv("OPENAI_API_KEY")
+    #os.environ["OPENAI_API_KEY"] = api_key
+    #lm = dspy.LM(model="gpt-4o-mini-2024-07-18")
+    lm = dspy.LM(
+        "ollama_chat/llama3.1:8b-instruct-q8_0",
+        api_base="http://kumo01:11434"
+    )
     dspy.settings.configure(lm=lm)
     
     # test the module
@@ -161,11 +247,12 @@ if __name__ == "__main__":
     # dspy.inspect_history(n=1)
     
     # Optimize the module
-    compiled_pred = optimize_module("data/files_pilot/user_pairs_tr_data.json")
-    compiled_pred.save("data/dspy-saved/compiled-q3-gpt-4o-mini-2024-07-18.json")
+    #compiled_pred = optimize_module("data/files_pilot/user_pairs_tr_data.json")
+    compiled_pred = optimize_q2_module("data/files_pilot/user_fit_tr_data.json")
+    compiled_pred.save("data/dspy-saved/compiled-q2-llama3.1:8b-instruct-q8_0.json")
     
     compiled_classifier = compiled_pred
-    compiled_classifier("<<category>>", "<<document_a>>", "<<document_b>>")
+    compiled_classifier("<<category>>", "<<document>>")
     
     prompt_data = lm.history[-1]
     

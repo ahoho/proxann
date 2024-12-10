@@ -1,0 +1,96 @@
+System message:
+
+Your input fields are:
+1. `CATEGORY` (str)
+2. `DOCUMENT_A` (str)
+3. `DOCUMENT_B` (str)
+
+Your output fields are:
+1. `reasoning` (str)
+2. `CLOSEST` (str): Document that is more closely related to the category (A or B)
+
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## CATEGORY ## ]]
+{{CATEGORY}}
+
+[[ ## DOCUMENT_A ## ]]
+{{DOCUMENT_A}}
+
+[[ ## DOCUMENT_B ## ]]
+{{DOCUMENT_B}}
+
+[[ ## reasoning ## ]]
+{{reasoning}}
+
+[[ ## CLOSEST ## ]]
+{{CLOSEST}}
+
+[[ ## completed ## ]]
+
+In adhering to this structure, your objective is: 
+        Determine which document is more closely related to the given category
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+film，role，award，acting，performance，comedy，drama
+
+[[ ## DOCUMENT_A ## ]]
+An Unforgettable Summer = An Unforgettable Summer ( French : Un été inoubliable ; Romanian : O vară de neuitat ) is a 1994 drama film directed and produced by Lucian Pintilie. A Romanian-French co-production based on a chapter from a novel by Petru Dumitriu, it stars British actress Kristin Scott Thomas as the Hungarian-born aristocrat Marie-Thérèse Von Debretsy. Her marriage with Romanian Land Forces captain Petre Dumitriu brings her to Southern Dobruja ( present-day northeastern Bulgaria ), where they settle in 1925. There, she witnesses first-hand the violent clashes between, on one hand, the Greater Romanian administration, and, on the other, komitadji brigands of Macedonian origin and ethnic Bulgarian locals.
+
+[[ ## DOCUMENT_B ## ]]
+Edge ( wrestler ) = Adam Joseph Copeland ( born October 30, 1973 ) is a Canadian actor and retired professional wrestler. He is best known for his time with the American professional wrestling promotion WWE, where he performed under the ring name Edge. Copeland was trained by professional wrestlers Sweet Daddy Siki and Ron Hutchinson. Throughout the 1990s, he wrestled in various U.S. independent promotions. During his time in these promotions, he competed in singles and tag team competition, the latter with long-time friend Christian. In 1997, Copeland signed a developmental deal with the WWF and began competing for the company later that year ; he made his televised debut the following June under the ring name Edge.
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## CLOSEST ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+Assistant message:
+
+[[ ## reasoning ## ]]
+Document A is more closely related to the category because it contains specific details about a film (genre: drama, director, production company, etc.), whereas Document B focuses on an individual's career in professional wrestling and acting. The category mentions "film", "role", "award", "acting", and "performance", which are all relevant to Document A.
+
+[[ ## CLOSEST ## ]]
+A
+
+[[ ## completed ## ]]
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+Basketball players
+
+[[ ## DOCUMENT_A ## ]]
+Jahlil Okafor = Jahlil Okafor ( pronounced / ˈdʒɑː liːl / ; born December 15, 1995 ) is an American professional basketball player for the Philadelphia 76ers of the National Basketball Association ( NBA ). He played his freshman season of college for the 2014 – 15 Duke national championship team. Okafor was heavily recruited since before high school and had been at the top of the recruiting rankings for several years. He played high school basketball in Chicago, Illinois for Whitney M. Young Magnet High School, where he earned high school national player of the year awards from McDonalds, USA Today and Parade.
+
+[[ ## DOCUMENT_B ## ]]
+Fatbeard =" Fatbeard" is the seventh episode of the thirteenth season of the American animated television series South Park. The 188th overall episode of the series, it originally aired on Comedy Central in the United States on April 22, 2009 and in the United Kingdom on April 24, 2009. It was the mid-season finale, marking the final South Park episode for six months. In the episode, Cartman misinterprets news reports about piracy in the Indian Ocean to mean the return of the classic era of swashbuckling pirates, and misleads a handful of South Park boys to voyage to Mogadishu to start a pirate crew.
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## CLOSEST ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+Assistant message:
+
+[[ ## reasoning ## ]]
+Document A is more closely related to the category "Basketball players" because it contains information about a professional basketball player, Jahlil Okafor, including his team, playing style, and achievements. Document B, on the other hand, appears to be an episode summary of a TV show and does not contain any relevant information about basketball or sports.
+
+[[ ## CLOSEST ## ]]
+A
+
+[[ ## completed ## ]]
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+{category}
+
+[[ ## DOCUMENT_A ## ]]
+{doc_a}
+
+[[ ## DOCUMENT_B ## ]]
+{doc_b}
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## CLOSEST ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.

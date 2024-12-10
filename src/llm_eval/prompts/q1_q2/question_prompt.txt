@@ -1,6 +1,0 @@
-KEYWORDS: {}
-DOCUMENTS: {}
-EXTRA DOCUMENT: {}
-Based on the KEYWORDS and the DOCUMENTS content, come up with a single label that best describes the topic connecting all the documents. Then rate how well the EXTRA DOCUMENT fits with the KEYWORDS and label on a scale from 1 to 5.
-Follow this format to answer:
-Label: LABEL - Score: SCORE - Rationale: RATIONALE

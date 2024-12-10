@@ -192,6 +192,9 @@ def main():
                     for idx in row.argsort()[::-1][:top_words_display]]
                 for row in betas
             ]
+            # print id and top words
+            for i, key in enumerate(keys):
+                print(f"-- -- Topic {i}: {key[:10]}")
 
             #  Get corpus
             corpus_path = pathlib.Path(model_config['corpus_path'])

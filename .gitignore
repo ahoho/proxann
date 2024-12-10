@@ -178,3 +178,5 @@ data/files_pilot/document-data
 cache
 data/files_pilot/results_val_data
 data/training_data
+data/files_pilot/user_fit_tr_data.json
+data/files_pilot/user_pairs_tr_data.json

@@ -102,6 +102,7 @@ def get_cluster_to_rank():
     # url format: /api/cluster_rank?num_words=10&num_questions=10
     num_words = int(request.args.get('num_words', 15)) # words in topic
     id = request.args.get('id', None)
+    filter = request.args.get('filter', None) # filter by some string in the id
     max_chars = int(request.args.get('max_chars', 1_000_000))
     data_file = request.args.get('data_file', app.config["DATA_FILE"])
 
@@ -109,6 +110,8 @@ def get_cluster_to_rank():
     
     # get the data for this cluster
     data = load_data_from_file(data_file)
+    if filter is not None:
+        data = {k: v for k, v in data.items() if filter in k}
     # want to have even sampling, so get cluster with the fewest counts, breaking ties randomly
     if id is None:
         id = min(data.keys(), key=lambda x: counts[x] + random.random())

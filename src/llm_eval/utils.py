@@ -353,14 +353,6 @@ def process_responses(
     ##############################
     # Filters for second round 
     ##############################
-    # TODO: this needs to be removed once bills is ready
-    raw_responses = raw_responses[~raw_responses["id"].str.contains("bills", na=False)]
-    # filter after "2024-12-06 00:00:00"
-    raw_responses["StartDate"] = pd.to_datetime(raw_responses["StartDate"], errors="coerce")
-    raw_responses = raw_responses[
-        raw_responses["StartDate"] > pd.Timestamp("2024-12-06 00:00:00")
-    ]
-    
     for _, row in raw_responses.iterrows():
         r = {}
         
@@ -385,12 +377,21 @@ def process_responses(
         r["failed_practice_rank_strict"] = practice_ranks != [1, 2, 3, 4]
         r["failed_practice_rank_weak"] = practice_ranks[0] not in [1,2] or practice_ranks[3] != 4
 
+        # strict removal
         r["remove"] = (
-            r["failed_purpose"] or r["failed_category"] or r["too_quick"] or
-            r["failed_fit_check"] or r["failed_sponge_check_weak"] or r["failed_practice_rank_weak"] or
-            (r["failed_fam_check"] and (r["failed_practice_rank_strict"] or r["failed_sponge_check_strict"]))
+            r["failed_purpose"]
+            or r["failed_category"]
+            or r["too_quick"]
+            or r["failed_fit_check"]
+            or r["failed_sponge_check_weak"]
+            or r["failed_practice_rank_weak"]
+            or (
+                r["failed_fam_check"]
+                and (r["failed_practice_rank_strict"] or r["failed_sponge_check_strict"])
+            )
         )
         
+        # loose removal
         failure_count = (
             r["failed_sponge_check_weak"] * 2
             + r["failed_fit_check"] * 2
@@ -400,7 +401,7 @@ def process_responses(
             + r["failed_fam_check"]
             + r["failed_practice_rank_weak"]
         )
-        r["remove_alt"] = failure_count > 1
+        r["remove_loose"] = failure_count > 1
                     
         r["StartDate"] = row["StartDate"]
         r["time"] = float(row["Duration (in seconds)"])
@@ -425,12 +426,13 @@ def process_responses(
     # Filter out disqualified responses
     print(f"Total responses: {len(responses)}")
     if removal_condition == "strict":
-        print(f"Removed: {sum(r['remove'] for r in responses)}")
         col_remove = "remove"
+    elif removal_condition == "loose":
+        col_remove = "remove_loose"
     else:
-        print(f"Removed: {sum(r['remove_alt'] for r in responses)}")
-        col_remove = "remove_alt"
-        
+        raise ValueError(f"Invalid removal condition: {removal_condition}")
+    
+    print(f"Removed: {sum(r[col_remove] for r in responses)}")
     responses = [r for r in responses if not r[col_remove]]
     responses_by_id = {cluster_id: [] for cluster_id in eval_data.keys()}
     for r in responses:
@@ -574,8 +576,9 @@ def compute_correlations_one(
     rank_llm_data=None,
     fit_llm_data=None,
     aggregation_method="mean",
-    fit_threshold=4
-    ):
+    fit_threshold=4,
+    rescale_ndcg=True,
+):
     """Compute correlation coefficients for fit and rank data: average rank per question/document over annotators, then correlate those with the topic model probabilities (thetas).
     """
     
@@ -590,16 +593,21 @@ def compute_correlations_one(
             "fit_llm_data does not have the same 'id' keys as corr_data"
     else:
         fit_llm_data = [None] * len(corr_data)
-        
+
+    ndcg_score_ = ndcg_score
+    if rescale_ndcg:
+        n_items = corr_data[0]["rank_data"].shape[-1]
+        rs = range(n_items)
+        min_ndcg = ndcg_score([rs], [rs[::-1]])
+        # rescale to be between 0 and 1
+        ndcg_score_ = lambda x, y: (ndcg_score(x, y) - min_ndcg) / (1 - min_ndcg)
+
     corr_results = []
-    keys = [el["id"] for el in corr_data]
-    for key in keys:
-    #for d_us, d_r_llm, d_f_llm in zip(corr_data, rank_llm_data, fit_llm_data): 
-        d_us = next(el for el in corr_data if el["id"] == key)
-        d_r_llm = next((el for el in rank_llm_data if el["id"] == key), None)
-        d_f_llm = next((el for el in fit_llm_data if el["id"] == key), None)
-    
-        fit_data, rank_data, prob_data = d_us["fit_data"], d_us["rank_data"], d_us["prob_data"]
+    for d_us, d_r_llm, d_f_llm in zip(corr_data, rank_llm_data, fit_llm_data):
+        fit_data = d_us["fit_data"]
+        rank_data = d_us["rank_data"]
+        prob_data = d_us["prob_data"]
+        assign_data = d_us["assign_data"]
         
         annotator_results = {} # to store llm-correlations
         f_llm, r_llm = None, None
@@ -635,18 +643,20 @@ def compute_correlations_one(
             mean_fit_data = fit_data.mean(0)
         else:
             raise ValueError(f"Unknown aggregation method: {aggregation_method}")
-        binarized_fit_data = (np.round(np.mean(fit_data, axis=0)) >= 4).astype(int)
         
         # Compute general correlations
         fit_rho, _ = spearmanr(mean_fit_data, prob_data)
         rank_rho, _ = spearmanr(mean_rank_data, prob_data)
         fit_tau, _ = kendalltau(mean_fit_data, prob_data)
         rank_tau, _ = kendalltau(mean_rank_data, prob_data)
-        fit_ndcg = ndcg_score([mean_fit_data], [prob_data])
-        rank_ndcg = ndcg_score([mean_rank_data], [prob_data])
+        fit_ndcg = ndcg_score_([mean_fit_data], [prob_data])
+        rank_ndcg = ndcg_score_([mean_rank_data], [prob_data])
         
         # Calculate fit agreement
-        fit_agree = np.mean((fit_data >= fit_threshold).astype(int) == d_us["assign_data"])
+        # binarized_fit_data = (fit_data >= fit_threshold).astype(int) # alternative to _mv
+        binarized_fit_mv = (np.round(np.mean(fit_data, axis=0)) >= fit_threshold).astype(int)
+
+        fit_agree = np.mean(binarized_fit_mv == assign_data)
         
         # LLM correlations if r_llm
         if r_llm is not None:
@@ -655,8 +665,8 @@ def compute_correlations_one(
                 rank_rho_gt, _ = spearmanr(prob_data, r_llm_a)
                 rank_tau_users, _ = kendalltau(mean_rank_data, r_llm_a)
                 rank_tau_gt, _ = kendalltau(prob_data, r_llm_a)
-                rank_ndcg_users = ndcg_score([mean_rank_data], [r_llm_a])
-                rank_ndcg_gt = ndcg_score([r_llm_a], [prob_data])
+                rank_ndcg_users = ndcg_score_([mean_rank_data], [r_llm_a])
+                rank_ndcg_gt = ndcg_score_([r_llm_a], [prob_data])
                 
                 # Add annotator-specific results to the dictionary
                 annotator_results[f"rank_rho_users_{a}"] = rank_rho_users
@@ -668,17 +678,16 @@ def compute_correlations_one(
         
         # LLM correlations if f_llm
         if f_llm is not None:
-            binarized_fit_mv = (np.round(np.mean(fit_data, axis=0)) >= 4).astype(int)            
             
             for a, f_llm_a in zip(f_annotators, f_llm):
-                #fit_rho_gt, _ = spearmanr(prob_data, f_llm_a)
-                #fit_person_gt, _ = pearsonr(prob_data, f_llm_a)
-                
+
                 # Add annotator-specific results to the dictionary
-                annotator_results[f"fit_acc_users_{a}"] = np.mean(binarized_fit_mv == f_llm_a)
-                #annotator_results[f"fit_rho_tm_{a}"] = fit_rho_gt
-               # annotator_results[f"fit_pearson_tm_{a}"] = fit_person_gt
-        
+                annotator_results[f"fit_tau_users_{a}"] = kendalltau(mean_fit_data, f_llm_a)[0]
+                annotator_results[f"fit_tau_tm_{a}"] = kendalltau(prob_data, f_llm_a)[0]
+                annotator_results[f"fit_agree_users_{a}"] = np.mean(binarized_fit_mv == f_llm_a)
+                annotator_results[f"fit_agree_tm_{a}"] = np.mean(assign_data == f_llm_a)
+
+
         corr_results.append({
             "id": d_us["id"],
             "model": d_us["model"],

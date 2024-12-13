@@ -81,8 +81,8 @@ def do_q2(prompter, prompt_mode, llm_model, cluster_data, fit_data, category, us
     
     if "dspy" in prompt_mode:
         dft_system_prompt = None
-    else:
-        dft_system_prompt = dft_system_prompt.replace("XXX", "binary_q2")
+    #else:
+    #    dft_system_prompt = dft_system_prompt.replace("XXX", "binary_q2")
     
     if user_cats:
         labels = user_cats * len(questions)
@@ -124,7 +124,6 @@ def do_q3(prompter, prompt_mode, llm_model, cluster_data, rank_data, users_rank,
         logging.info(f"-- Using prompt key: {prompt_key}")
     else:
         prompt_key = "q3"
-    
     q3_out = prompter.get_prompt(cluster_data, prompt_key, category=category, do_q3_with_q1_fixed=do_q3_with_q1_fixed, doing_both_ways=doing_both_ways)
     
 
@@ -263,6 +262,8 @@ def main():
                 topic_match_id = topics_per_model[model_id]
                 
                 # user data (categories, ranks)
+                #users_cats = []
+                #users_rank = []
                 users_cats = [user_data["category"] for user_data in responses_by_id[id_]]
                 this_corr_data = next(c for c in corr_data if c["id"] == id_)
                 users_rank = this_corr_data["rank_data"]
@@ -379,6 +380,8 @@ def main():
         save_results(llm_results_q2, save_path, "llm_results_q2.json")
     if llm_results_q3:
         save_results(llm_results_q3, save_path, "llm_results_q3.json")
+        
+    #import pdb; pdb.set_trace()
             
     # Correlations with user study data and ground truth
     corr_results = compute_correlations_one(corr_data,rank_llm_data=llm_results_q3, fit_llm_data=llm_results_q2)

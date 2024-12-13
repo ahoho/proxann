@@ -31,10 +31,10 @@ In adhering to this structure, your objective is:
 User message:
 
 [[ ## CATEGORY ## ]]
-Prominent Figures in Entertainment and Media
+Wrestling sport, wrestling entertainment, american wrestling, pay-per-view sports
 
 [[ ## DOCUMENT ## ]]
-Dylan Penn = Dylan Frances Penn ( born April 13, 1991 ) is an American model and actress. She is the daughter of Sean Penn and Robin Wright. Her early public roles included modelling campaigns for Gap Inc., a controversial magazine cover for treats!, a music video appearance in Nick Jonas '" Chains" and an acting role in Elvis & Nixon. = = Early life = = Penn 's mother, Robin Wright, had surrendered the role of Maid Marian in Robin Hood : Prince of Thieves due to her pregnancy with Dylan.
+Wendi Richter = Wendi Richter ( born September 6, 1961 ) is a retired American professional wrestler. She began her professional wrestling career in companies such as the National Wrestling Alliance, where she teamed with Joyce Grable, with whom she held the NWA Women 's World Tag Team Championship twice. In the 1980s, she joined the World Wrestling Federation ( WWF ). She held the WWF Women 's Championship twice and feuded with The Fabulous Moolah over the title. She was also involved in a storyline with singer Cyndi Lauper called the" Rock ' n ' Wrestling Connection.
 
 Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## FIT ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
 
@@ -42,54 +42,10 @@ Respond with the corresponding output fields, starting with the field `[[ ## rea
 Assistant message:
 
 [[ ## reasoning ## ]]
-The document is about Dylan Penn's early life, career, and family background. Given that the category is "Prominent Figures in Entertainment and Media", it seems relevant as Dylan Penn is a model and actress.
+The document is about Wendi Richter's career as a professional wrestler in various wrestling promotions, including the WWF. The category "Wrestling sport, wrestling entertainment, american wrestling, pay-per-view sports" encompasses professional wrestling and its related aspects, making it a relevant fit for the document.
 
 [[ ## FIT ## ]]
 YES
-
-[[ ## completed ## ]]
-
-
-User message:
-
-[[ ## CATEGORY ## ]]
-Wrestling Events
-
-[[ ## DOCUMENT ## ]]
-1973 Pacific hurricane season = The 1973 Pacific hurricane season was an event in tropical cyclone meteorology. The most important system this year was Hurricane Ava, which was the most intense Pacific hurricane known at the time. Several other much weaker tropical cyclones came close to, or made landfall on, the Pacific coast of Mexico. The most serious of these was Hurricane Irah, which downed power and communication lines in parts of the Baja California Peninsula ; the other landfalling storms caused rain and some flooding. No tropical cyclone this season caused any deaths.
-
-Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## FIT ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
-
-
-Assistant message:
-
-[[ ## reasoning ## ]]
-The document is about a specific event in tropical cyclone meteorology, which does not seem to be related to wrestling events. The content mentions hurricanes and their impact on Mexico's Pacific coast, but there is no mention of wrestling or any sports-related activity.
-
-[[ ## FIT ## ]]
-NO
-
-[[ ## completed ## ]]
-
-
-User message:
-
-[[ ## CATEGORY ## ]]
-American Professional Wrestling
-
-[[ ## DOCUMENT ## ]]
-Zab Judah = Zabdiel" Zab" Judah ( born Leroy Jones on October 27, 1977 ) is an American professional boxer. He is a five-time world champion at light welterweight and welterweight, and is a former undisputed welterweight world champion. = = Amateur career = = Judah began boxing at the age of six and compiled an amateur record of 110 – 5. He was a two-time US national champion and three-time New York Golden Gloves Champion. He also won the 1996 PAL National Championship. Judah beat Ishe Smith and Hector Camacho, Jr.
-
-Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## FIT ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
-
-
-Assistant message:
-
-[[ ## reasoning ## ]]
-The document is about a professional boxer named Zab Judah, who has won multiple championships in his career. However, it does not mention anything related to American Professional Wrestling.
-
-[[ ## FIT ## ]]
-NO
 
 [[ ## completed ## ]]
 

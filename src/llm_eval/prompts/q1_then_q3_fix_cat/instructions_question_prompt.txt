@@ -4,7 +4,7 @@ You will be provided with:
 - CATEGORY: Represents the common theme among the keywords and exemplar documents.
 - EVALUATION DOCUMENTS: Two documents (A and B) to be compared.
 
-Your task is to compare the EVAL DOCUMENTS to determine which one is more closely related to the CATEGORY.
+Your task is to compare the EVALUATION DOCUMENTS to determine which one is more closely related to the CATEGORY.
 
 Response Format:
 CLOSEST: {{Document from EVALUATION DOCUMENTS that is more closely related to the category (A or B)}}

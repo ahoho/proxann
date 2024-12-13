@@ -1,7 +1,7 @@
 import itertools
 import json
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from copy import deepcopy
 from typing import List
 import choix
@@ -256,13 +256,47 @@ def load_config_pilot(config_paths):
             
     return config
 
+def normalize_key(key, valid_models, valid_datasets, include_id=True):
+    """
+    Convert a cluster_id key to a normalized key using the following format: 
+    '{dataset_name}/{model_name}/{topic_id}'.
+    
+    If include_id is set to False, the topic_id is omitted:
+    '{dataset_name}/{model_name}'.
+    """
+    
+    # We use a different pattern depending on whether we want to include the topic ID or not (from run_user_study.py we need it without)
+    pattern = rf"/({'|'.join(map(re.escape, valid_models))})"
+    if include_id:
+        pattern += r"/.*?(\d+)$"
+    else:
+        pattern += r"(/|$)"
+    
+    # Model (and topic ID)
+    match = re.search(pattern, key)
+    if not match:
+        raise ValueError(f"Key '{key}' does not contain a valid model" + (" or ID" if include_id else ""))
+
+    model = match.group(1)
+    id_part = match.group(2) if include_id else None
+
+    # Dataset key
+    dataset = next((ds for ds in valid_datasets if ds in key), None)
+    if not dataset:
+        raise ValueError(f"Key '{key}' does not contain a valid dataset")
+
+    return f"{dataset}/{model}" + (f"/{id_part}" if include_id else "")
+
 def process_responses(
     response_csv: str,
     data_jsons: str, 
     min_minutes: int = 5, 
     start_date: str="2024-06-28 12:00:00",
     n_eval_docs: int = 7,
-    path_save: str ="data/files_pilot"
+    removal_condition: str = "loose", # strict or loose
+    valid_models={"mallet", "ctm", "bertopic", "category-45"},
+    valid_datasets={"wikitext-labeled", "bills-labeled"},
+    path_save: str ="/Users/lbartolome/Documents/GitHub/theta-evaluation/data/files_pilot"
 ):
     """
     Process responses from the pilot study. The function filters out disqualified responses and returns a dictionary of responses by id, where the id is in the form 'data/models/model_name/topic_id'.
@@ -316,6 +350,17 @@ def process_responses(
     responses = []
     time_cutoff = min(np.quantile(raw_responses["Duration (in seconds)"][2:].astype(float), 0.05), 60 * min_minutes)
     
+    ##############################
+    # Filters for second round 
+    ##############################
+    # TODO: this needs to be removed once bills is ready
+    raw_responses = raw_responses[~raw_responses["id"].str.contains("bills", na=False)]
+    # filter after "2024-12-06 00:00:00"
+    raw_responses["StartDate"] = pd.to_datetime(raw_responses["StartDate"], errors="coerce")
+    raw_responses = raw_responses[
+        raw_responses["StartDate"] > pd.Timestamp("2024-12-06 00:00:00")
+    ]
+    
     for _, row in raw_responses.iterrows():
         r = {}
         
@@ -323,7 +368,9 @@ def process_responses(
             continue
         
         r["cluster_id"] = row["id"]
+                
         r["annotator_id"] = row["Q22"]
+
         cluster_data = eval_data[r["cluster_id"]]
         r["too_quick"] = float(row["Duration (in seconds)"]) < time_cutoff
         r["category"] = row["cluster_label"]
@@ -344,6 +391,17 @@ def process_responses(
             (r["failed_fam_check"] and (r["failed_practice_rank_strict"] or r["failed_sponge_check_strict"]))
         )
         
+        failure_count = (
+            r["failed_sponge_check_weak"] * 2
+            + r["failed_fit_check"] * 2
+            + r["failed_category"] * 2
+            + r["too_quick"]
+            + r["failed_purpose"]
+            + r["failed_fam_check"]
+            + r["failed_practice_rank_weak"]
+        )
+        r["remove_alt"] = failure_count > 1
+                    
         r["StartDate"] = row["StartDate"]
         r["time"] = float(row["Duration (in seconds)"])
         r["eval_docs"] = deepcopy(cluster_data["eval_docs"])
@@ -353,6 +411,8 @@ def process_responses(
         
         label = row["cluster_label"]
         clarity = int(row["cluster_coherence"].split("-")[0].strip())
+        
+        # Normalize the keys
 
         for i in range(n_eval_docs):
             fit_answer = int(row[f"{i+1}_loop_fit_a"].split("-")[0].strip())
@@ -364,32 +424,41 @@ def process_responses(
     
     # Filter out disqualified responses
     print(f"Total responses: {len(responses)}")
-    print(f"Removed: {sum(r['remove'] for r in responses)}")
-    
-    responses = [r for r in responses if not r["remove"]]
+    if removal_condition == "strict":
+        print(f"Removed: {sum(r['remove'] for r in responses)}")
+        col_remove = "remove"
+    else:
+        print(f"Removed: {sum(r['remove_alt'] for r in responses)}")
+        col_remove = "remove_alt"
+        
+    responses = [r for r in responses if not r[col_remove]]
     responses_by_id = {cluster_id: [] for cluster_id in eval_data.keys()}
     for r in responses:
         responses_by_id[r["cluster_id"]].append(r)
-    
+        
+    # normalize the "cluster_id" keys
+    responses_by_id = {normalize_key(key, valid_models, valid_datasets): value for key, value in responses_by_id.items()}
+            
     # Save cluster rank counts
     counts = Counter([r["cluster_id"] for r in responses])
     if path_save:
         with open(f"{path_save}/cluster_rank_counts.json", "w") as outfile:
             json.dump(counts, outfile, indent=2)
-
+            
     return responses_by_id
 
 
 def compute_agreement_per_topic(
     responses_by_id: dict[str, List[dict]],
     fit_threshold: int = 4,
-    n_eval_docs: int = 7
+    n_eval_docs: int = 7, 
 ):
     """
     Compute agreement metrics (Krippendorff's alpha and Gwet's AC2 for fit and rank data) for each topic.
     """
     agreement_data = []
-    bin_fit_data_by_model = {"mallet": [], "ctm": [], "category-45": []}
+    #bin_fit_data_by_model = {"mallet": [], "ctm": [], "category-45": []}
+    bin_fit_data_by_model = defaultdict(list)
 
     for topic_id, group in responses_by_id.items():
         if len(group) < 2:
@@ -416,10 +485,10 @@ def compute_agreement_per_topic(
         fit_cac = CAC(fit_data, weights="ordinal", categories=[1, 2, 3, 4, 5])
         bin_fit_cac = CAC(bin_fit_data, weights="identity", categories=[f"{topic_id}_True", f"{topic_id}_False"])
         rank_cac = CAC(rank_data, weights="ordinal", categories=list(range(1, n_eval_docs+1)))
-
+    
         fit_alpha = fit_cac.krippendorff()["est"]
         fit_ac2 = fit_cac.gwet()["est"]
-
+        
         rank_alpha = rank_cac.krippendorff()["est"]
         rank_ac2 = rank_cac.gwet()["est"]
 
@@ -455,11 +524,12 @@ def collect_fit_rank_data(
     responses_by_id: dict[str, list[dict]],
 ) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], dict[str, np.ndarray], list[dict]]:
     """Collect fit, rank, and probability data for each model."""
-    
+
     # Initialize data dictionaries
-    model_fit_data = {"mallet": [], "ctm": [], "category-45": []}
-    model_rank_data = {"mallet": [], "ctm": [], "category-45": []}
-    model_prob_data = {"mallet": [], "ctm": [], "category-45": []}
+    model_fit_data = defaultdict(list)
+    model_rank_data = defaultdict(list)
+    model_prob_data = defaultdict(list)
+    
     corr_data = []
 
     # Process each topic's response data
@@ -509,14 +579,26 @@ def compute_correlations_one(
     """Compute correlation coefficients for fit and rank data: average rank per question/document over annotators, then correlate those with the topic model probabilities (thetas).
     """
     
-    if rank_llm_data is None:
+    if rank_llm_data is not None:
+        assert [k['id'] for k in corr_data] == [k['id'] for k in rank_llm_data], \
+            "rank_llm_data does not have the same 'id' keys as corr_data"
+    else:
         rank_llm_data = [None] * len(corr_data)
     
-    if fit_llm_data is None:
+    if fit_llm_data is not None:
+        assert [k['id'] for k in corr_data] == [k['id'] for k in fit_llm_data], \
+            "fit_llm_data does not have the same 'id' keys as corr_data"
+    else:
         fit_llm_data = [None] * len(corr_data)
         
     corr_results = []
-    for d_us, d_r_llm, d_f_llm in zip(corr_data, rank_llm_data, fit_llm_data): 
+    keys = [el["id"] for el in corr_data]
+    for key in keys:
+    #for d_us, d_r_llm, d_f_llm in zip(corr_data, rank_llm_data, fit_llm_data): 
+        d_us = next(el for el in corr_data if el["id"] == key)
+        d_r_llm = next((el for el in rank_llm_data if el["id"] == key), None)
+        d_f_llm = next((el for el in fit_llm_data if el["id"] == key), None)
+    
         fit_data, rank_data, prob_data = d_us["fit_data"], d_us["rank_data"], d_us["prob_data"]
         
         annotator_results = {} # to store llm-correlations
@@ -553,6 +635,7 @@ def compute_correlations_one(
             mean_fit_data = fit_data.mean(0)
         else:
             raise ValueError(f"Unknown aggregation method: {aggregation_method}")
+        binarized_fit_data = (np.round(np.mean(fit_data, axis=0)) >= 4).astype(int)
         
         # Compute general correlations
         fit_rho, _ = spearmanr(mean_fit_data, prob_data)
@@ -585,17 +668,16 @@ def compute_correlations_one(
         
         # LLM correlations if f_llm
         if f_llm is not None:
+            binarized_fit_mv = (np.round(np.mean(fit_data, axis=0)) >= 4).astype(int)            
+            
             for a, f_llm_a in zip(f_annotators, f_llm):
-                fit_rho_users, _ = spearmanr(mean_fit_data, f_llm_a)
-                fit_rho_gt, _ = spearmanr(prob_data, f_llm_a)
-                fit_tau_users, _ = kendalltau(mean_fit_data, f_llm_a)
-                fit_tau_gt, _ = kendalltau(prob_data, f_llm_a)
+                #fit_rho_gt, _ = spearmanr(prob_data, f_llm_a)
+                #fit_person_gt, _ = pearsonr(prob_data, f_llm_a)
                 
                 # Add annotator-specific results to the dictionary
-                annotator_results[f"fit_rho_users_{a}"] = fit_rho_users
-                annotator_results[f"fit_rho_tm_{a}"] = fit_rho_gt
-                annotator_results[f"fit_tau_users_{a}"] = fit_tau_users
-                annotator_results[f"fit_tau_tm_{a}"] = fit_tau_gt
+                annotator_results[f"fit_acc_users_{a}"] = np.mean(binarized_fit_mv == f_llm_a)
+                #annotator_results[f"fit_rho_tm_{a}"] = fit_rho_gt
+               # annotator_results[f"fit_pearson_tm_{a}"] = fit_person_gt
         
         corr_results.append({
             "id": d_us["id"],
@@ -616,10 +698,10 @@ def compute_correlations_one(
 
 def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=None, fit_threshold = 4):
     
-    corr_data = []
-    model_fit_data = {"mallet": [], "ctm": [], "category-45": []}
-    model_rank_data = {"mallet": [], "ctm": [], "category-45": []}
-    model_prob_data = {"mallet": [], "ctm": [], "category-45": []}
+    corr_data = []    
+    model_fit_data = defaultdict(list)
+    model_rank_data = defaultdict(list)
+    model_prob_data = defaultdict(list)
 
     # first collect the responses and compute the correlation data
     for id, group in responses_by_id.items():
@@ -803,20 +885,3 @@ def calculate_corr_npmi(corr_data, npmi_data, columns_calculate = ["rank_rho", "
     corrs_df = pd.DataFrame(corrs)
     
     return corrs_df
-    
-def generate_pairwise_counts(rankings):
-    n_annotators, n_items = rankings.shape
-    pairwise_counts = np.zeros((n_items, n_items), dtype=int)
-
-    for annotator_ranking in rankings:
-        for i, j in itertools.combinations(range(n_items), 2):
-            item_i_rank = annotator_ranking[i]
-            item_j_rank = annotator_ranking[j]
-            
-            # Since rankings are inverted, higher rank means higher preference
-            if item_i_rank > item_j_rank:  # item_i is preferred over item_j
-                pairwise_counts[i, j] += 1
-            elif item_j_rank > item_i_rank:  # item_j is preferred over item_i
-                pairwise_counts[j, i] += 1
-
-    return pairwise_counts

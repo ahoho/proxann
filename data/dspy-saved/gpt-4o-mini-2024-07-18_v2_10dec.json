@@ -1,0 +1,163 @@
+{
+  "q3signature": {
+    "lm": null,
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "CATEGORY": "Fighter aircraft",
+        "DOCUMENT_A": "Ilyushin Il-32 = The Ilyushin Il-32 was a Soviet heavy military glider developed after World War II to deliver 7,000 kg ( 15,000 lb ) of cargo. To facilitate loading and unloading the glider 's nose and tail sections were hinged to swing sideways. The Il-32 required a four-engined aircraft to tow it safely ; it was canceled when it became clear that no such tug was going to be available after the Tupolev Tu-75 and Ilyushin Il-18 programs were both canceled because of shortages of their intended Shvetsov ASh-73 engines. = = Development = = After the end of World War II the Soviets devoted a considerable amount of effort to developing heavy transport gliders to deliver troops during an airborne assault.",
+        "DOCUMENT_B": "Lockheed XF-104 = The Lockheed XF-104 was a single-engine, high-performance, supersonic interceptor prototype for a United States Air Force ( USAF ) series of lightweight and simple fighters. Only two aircraft were built, one aircraft was used primarily for aerodynamic research and the other served as an armament testbed. Both prototypes were destroyed in accidents during testing. The XF-104 was the forerunner of over 2,500 Lockheed F-104 Starfighters. During the Korean War, USAF fighter pilots were outclassed by MiG-equipped Soviet pilots. Lockheed engineers, led by Kelly Johnson, designed and submitted a novel design to the Air Force.",
+        "reasoning": "Document B, the Lockheed XF-104, is more closely related to the category of fighter aircraft. It specifically describes a prototype fighter aircraft designed for the United States Air Force, highlighting its role as a high-performance interceptor. In contrast, Document A discusses the Ilyushin Il-32, which is a military glider and not a fighter aircraft, focusing on cargo delivery rather than combat capabilities.",
+        "CLOSEST": "B"
+      },
+      {
+        "augmented": true,
+        "CATEGORY": "Professional wrestling ",
+        "DOCUMENT_A": "Mike Heath ( swimmer ) = Michael Steward Heath ( born April 9, 1964 ) is an American former competition swimmer who specialized in freestyle events. He is a three-time Olympic gold medalist, and a former world record-holder in two relay swimming events. A native of Texas, he won two national collegiate championship competing for the University of Florida. During his elite swimming career, Heath won ten medals in major international championships, including seven golds, two silvers and a bronze, spanning the Olympic Games, FINA World Championships, and Pan Pacific Championships.",
+        "DOCUMENT_B": "1973 Pacific hurricane season = The 1973 Pacific hurricane season was an event in tropical cyclone meteorology. The most important system this year was Hurricane Ava, which was the most intense Pacific hurricane known at the time. Several other much weaker tropical cyclones came close to, or made landfall on, the Pacific coast of Mexico. The most serious of these was Hurricane Irah, which downed power and communication lines in parts of the Baja California Peninsula ; the other landfalling storms caused rain and some flooding. No tropical cyclone this season caused any deaths.",
+        "reasoning": "Neither document is directly related to professional wrestling. However, Document A discusses a swimmer and Document B discusses a hurricane season, both of which are unrelated to the category. Since both documents are irrelevant, I cannot determine a closer relation to professional wrestling.",
+        "CLOSEST": "A"
+      },
+      {
+        "augmented": true,
+        "CATEGORY": "Professional wrestling events and wrestlers",
+        "DOCUMENT_A": "Gregory Helms = Gregory Shane Helms ( born July 12, 1974 ) is an American professional wrestler who is currently signed to Total Nonstop Action Wrestling ( TNA ) under his birth name. In TNA, he is the manager for former TNA X Division Champion Trevor Lee. He is best known for his time with World Wrestling Entertainment ( WWE ), where he wrestled as The Hurricane, Gregory Helms, and Hurricane Helms and also for his time with World Championship Wrestling ( WCW ), where he wrestled as\" Sugar\" Shane Helms.",
+        "DOCUMENT_B": "Espantito = Espantito ( Spanish for\" Little Terror\" or\" Little Scare\" ; born April 24, 1968 ) is the ring name of a Mexican luchador enmascarado, or masked professional wrestler working in the Mini-Estrella (\" Mini-Star\" ) division. Working in the Mini-Estrella division does not automatically mean that Espetrito has Dwarfism as several wrestlers who are just shorter in stature work in the\" Mini\" division. Espantito 's real name is not a matter of public record, as is often the case with masked wrestlers in Mexico where their private lives are kept a secret from the wrestling fans.",
+        "reasoning": "Both documents discuss professional wrestlers, but DOCUMENT_A focuses on Gregory Helms, detailing his career in major wrestling promotions like WWE and TNA, which are significant in the context of professional wrestling events. DOCUMENT_B, while also about a wrestler, discusses Espantito, a luchador in the Mini-Estrella division, which is more niche. Given the broader recognition and impact of Gregory Helms in major wrestling promotions, DOCUMENT_A is more closely related to the category of professional wrestling events and wrestlers.",
+        "CLOSEST": "A"
+      },
+      {
+        "augmented": true,
+        "CATEGORY": "Sports Legends",
+        "DOCUMENT_A": "Magnus Carlsen = Sven Magnus \u00d8en Carlsen ( Norwegian : [ s\u028b\u025bn \u02c8m\u0251\u014bn\u0289s \u00f8\u02d0n \u02c8k\u0251\u02d0\u026dsn \u0329 ] ; born 30 November 1990 ) is a Norwegian chess grandmaster, and the current World Chess Champion. Carlsen is a former chess prodigy. He became a Grandmaster in 2004, at the age of 13 years, 148 days. This made him the third youngest grandmaster in history. In November 2013 Carlsen became World Champion by defeating Viswanathan Anand in the World Chess Championship 2013. On the May 2014 FIDE rating list, Carlsen reached his peak rating of 2882, which is the highest in history.",
+        "DOCUMENT_B": "Georgetown Hoyas = The Georgetown Hoyas are the athletics teams that officially represent Georgetown University in college sports. Part of the NCAA 's Division I, the Hoyas field 23 varsity level sports teams, most of which participate in the Big East Conference, with the exception of the Division I FCS Patriot League in football. In late 2012, Georgetown and six other Catholic, non-FBS schools announced that they were departing the Big East for a new conference. The rowing and sailing teams also participate in east coast conferences. The men 's basketball team is the school 's most famous and most successful program, but Hoyas have achieved success in a wide range of sports.",
+        "reasoning": "Document A focuses on Magnus Carlsen, a prominent figure in the world of chess, which is considered a sport. His achievements and status as a World Chess Champion align with the theme of \"Sports Legends.\" Document B discusses the Georgetown Hoyas, a college athletics program, which while related to sports, does not highlight a single legendary figure in the same way. Therefore, Document A is more closely related to the category of Sports Legends.",
+        "CLOSEST": "A"
+      },
+      {
+        "category": "Award-Winning Actors, Directors, and Critically Acclaimed Films",
+        "document_a": "Shahid Kapoor = Shahid Kapoor ( pronounced [ \u0283a\u02d0\u0266\u026ad \u032a k\u0259\u02c8pu\u02d0r ] ; born 25 February 1981 ), also known as Shahid Khattar, is an Indian actor who appears in Hindi films. The son of actors Pankaj Kapur and Neelima Azeem, Kapoor was born in New Delhi. His parents separated when he was three, and he continued living with his mother. They moved to Mumbai when has was 10, where he joined Shiamak Davar 's dance academy. Kapoor appeared as a background dancer in a few films of the 1990s, and was later featured in music videos and television commercials.",
+        "document_b": "Cottalango Leon = Cottalango Leon ( born 1971 ) is an Indian-American computer graphics technician who won the Academy Award for scientific and technical achievement jointly with Sam Richards and J. Robert Ray in 2016. Leon won the Academy Award for\" the design, engineering and continuous development\" of Sony Pictures Imageworks itView technology, a digital 3D film review software. Leon worked on the itView technology for eight years as the chief contributor. Schooled in India, Leon is an Arizona State University alumnus. He has worked at Sony Pictures Imageworks since 1996, and has contributed to the making of several commercially successful films, including the Spider-Man film series and the Men In Black film series.",
+        "closest": "A"
+      },
+      {
+        "category": "\"RAAF COMBAT FLYING SQUADRONS 1940-1950\"",
+        "document_a": "No. 82 Squadron RAAF = No. 82 Squadron RAAF was a Royal Australian Air Force fighter squadron that operated during World War II and its immediate aftermath. It was formed in June 1943, flying Curtiss P-40 Kittyhawks and, initially, Bell P-39 Airacobras from bases in Queensland and New Guinea. The squadron became operational in September 1944, and undertook ground attack missions against Japanese targets in the Pacific theatre. Following the end of hostilities, No. 82 Squadron was re-equipped with North American P-51 Mustangs and deployed to Japan, where it formed part of the British Commonwealth Occupation Force.",
+        "document_b": "Stuart Milner-Barry = Sir Philip Stuart Milner-Barry KCVO CB OBE ( 20 September 1906 \u2013 25 March 1995 ) was a British chess player, chess writer, World War II codebreaker and civil servant. He represented England in chess both before and after World War II. He worked at Bletchley Park during World War II, and was head of\" Hut 6\", a section responsible for deciphering messages which had been encrypted using the German Enigma machine. He was one of four leading codebreakers at Bletchley to petition the then-Prime Minister Winston Churchill directly for more resources for their work.",
+        "closest": "A"
+      },
+      {
+        "category": "Wrestling PPV Events ",
+        "document_a": "TNA Bound for Glory = Bound for Glory ( frequently abbreviated to BFG ) is a professional wrestling pay-per-view ( PPV ) event produced every October by the American Total Nonstop Action Wrestling ( TNA ) promotion. The event was created in 2005 to be their premier event of the year, similar to the company 's main rival World Wrestling Entertainment ( WWE ) and its WrestleMania event. As of July 2016, eleven events have occurred under the chronology. From its inception in 2005 until 2013, all events were held in the United States.",
+        "document_b": "Espantito = Espantito ( Spanish for\" Little Terror\" or\" Little Scare\" ; born April 24, 1968 ) is the ring name of a Mexican luchador enmascarado, or masked professional wrestler working in the Mini-Estrella (\" Mini-Star\" ) division. Working in the Mini-Estrella division does not automatically mean that Espetrito has Dwarfism as several wrestlers who are just shorter in stature work in the\" Mini\" division. Espantito 's real name is not a matter of public record, as is often the case with masked wrestlers in Mexico where their private lives are kept a secret from the wrestling fans.",
+        "closest": "A"
+      },
+      {
+        "category": "Wrestling on TV",
+        "document_a": "One Night Stand ( 2007 ) = One Night Stand ( 2007 ) was the third annual One Night Stand professional wrestling pay-per-view event produced by World Wrestling Entertainment ( WWE ) and presented by Gilette. It took place on June 3, 2007, at the Jacksonville Veterans Memorial Arena in Jacksonville, Florida and featured talent from the Raw, SmackDown!, and ECW brands. The event was the final to announce each individual brand as co-promoters of the event during the introductory graphics. The main match on the Raw brand was John Cena versus The Great Khali in a Pinfalls Count Anywhere match for the WWE Championship.",
+        "document_b": "Australian Army during World War II = The Australian Army was the largest service in the Australian military during World War II. Prior to the outbreak of war the Australian Army was split into the small full-time Permanent Military Forces ( PMF ) and the larger part-time Militia. Following the outbreak of war, on 14 September 1939 Prime Minister Robert Menzies announced that 40,000 members of the Militia would be called up for training and a 20,000-strong expeditionary force, designated the Second Australian Imperial Force ( Second AIF ), would be formed for overseas service.",
+        "closest": "A"
+      },
+      {
+        "category": "Professional wrestling event",
+        "document_a": "TNA Unbreakable = Unbreakable was a professional wrestling pay-per-view ( PPV ) event produced by the Total Nonstop Action Wrestling ( TNA ) promotion that took place on September 11, 2005 at the TNA Impact! Zone in Orlando, Florida. It was the first and only show under the Unbreakable name and ninth event in the 2005 TNA PPV schedule. Nine professional wrestling matches and two pre-show matches were featured on the card, three of which were for championships. The main event at Unbreakable was a Three Way match for the TNA X Division Championship, in which then-champion Christopher Daniels defended the title against the challengers A.",
+        "document_b": "Zab Judah = Zabdiel\" Zab\" Judah ( born Leroy Jones on October 27, 1977 ) is an American professional boxer. He is a five-time world champion at light welterweight and welterweight, and is a former undisputed welterweight world champion. = = Amateur career = = Judah began boxing at the age of six and compiled an amateur record of 110 \u2013 5. He was a two-time US national champion and three-time New York Golden Gloves Champion. He also won the 1996 PAL National Championship. Judah beat Ishe Smith and Hector Camacho, Jr.",
+        "closest": "A"
+      },
+      {
+        "category": "History of American war ",
+        "document_a": "11th New York Infantry = The 11th New York Volunteer Infantry Regiment was an infantry regiment of the Union Army in the early years of the American Civil War. The regiment was organized in New York City in May 1861 as a Zouave regiment, known for its unusual dress and drill style, by Colonel Elmer E. Ellsworth, a personal friend of U.S. President Abraham Lincoln. Drawn from the ranks of the city 's many volunteer fire companies, the unit was known alternately as the Ellsworth Zouaves, First Fire Zouaves, First Regiment New York Zouaves, and U.",
+        "document_b": "Australian Army during World War II = The Australian Army was the largest service in the Australian military during World War II. Prior to the outbreak of war the Australian Army was split into the small full-time Permanent Military Forces ( PMF ) and the larger part-time Militia. Following the outbreak of war, on 14 September 1939 Prime Minister Robert Menzies announced that 40,000 members of the Militia would be called up for training and a 20,000-strong expeditionary force, designated the Second Australian Imperial Force ( Second AIF ), would be formed for overseas service.",
+        "closest": "A"
+      },
+      {
+        "category": "Historic Churches and Buildings.",
+        "document_a": "A1 in London = The A1 in London is the southern part of the A1 road. It starts at Aldersgate in the City of London, passing through the capital to Borehamwood on the northern fringe of Greater London, before continuing to Edinburgh. The road travels through the City and three London boroughs : Islington, Haringey and Barnet, which include the districts of Islington, Holloway, Highgate, Hendon and Mill Hill, and travels along Upper Street and Holloway Road, crossing the North Circular Road in Hendon, a district in the London Borough of Barnet.",
+        "document_b": "HMS Renown ( 1895 ) = HMS Renown was a second-class predreadnought battleship built for the Royal Navy in the early 1890s. Intended to command cruiser squadrons operating on foreign stations, the ship served as the flagship of the North America and West Indies Station and the Mediterranean Fleet early in her career. Becoming obsolete as cruiser speeds increased, Renown became a royal yacht and had all of her secondary armament removed to make her more suitable for such duties. She became a stoker 's training ship in 1909 and was listed for disposal in 1913.",
+        "closest": "B"
+      },
+      {
+        "category": "Multinational military aircraft",
+        "document_a": "Lavochkin La-150 = The Lavochkin La-150 ( also known as the Izdeliye 150 \u2013 Aircraft or Article 150, USAF \/ DOD designation Type 3 ), was designed by the Lavochkin design bureau ( OKB ) in response to a 1945 order to build a single-seat jet fighter using a single German turbojet. By this time both the Americans and British, as well as the Germans, had already flown jet fighters and the single Soviet jet engine under development ( the Lyulka TR-1 ) was not yet ready for production. The design was completed quickly, but the construction of the five flying prototypes was protracted by the factory 's inexperience in building metal aircraft.",
+        "document_b": "On the Day Before =\" On the Day Before\" is the forty-eighth The West Wing episode and fourth of the third season. It originally aired on NBC October 31, 2001. The episode deals with a suicide bomber in Jerusalem, as well as continued negotiations over the estate tax. Written by Aaron Sorkin, Paul Redford, and Nanda Chitre, and directed by Christopher Misiano, the episode contains the first appearances by H. Richard Greene as Congressman Robert Royce and Thomas Kopache as Assistant Secretary of State Bob\" Bobby\" Slatterly.",
+        "closest": "A"
+      },
+      {
+        "category": "Award winning entertainment and entertainers",
+        "document_a": "Veerapandiya Kattabomman ( film ) = Veerapandiya Kattabomman ( English : Kattabomman, the Brave Warrior ) is a 1959 Indian Tamil-language biographical film directed by B. R. Panthulu. The film 's screenplay was written by Ma. Po. Sivagnanam while its story and dialogue were written by Sakthi T. K. Krishnasamy. The film features Sivaji Ganesan, Gemini Ganesan, Padmini, S. Varalakshmi, and Ragini in the lead roles, with V. K. Ramasamy and Javar Seetharaman in pivotal supporting parts. Produced and distributed by Panthulu under his banner, Padmini Pictures, Veerapandiya Kattabomman is loosely based on the story of the 18th century South Indian chieftain of the same name, who rose in rebellion against the East India Company.",
+        "document_b": "Cottalango Leon = Cottalango Leon ( born 1971 ) is an Indian-American computer graphics technician who won the Academy Award for scientific and technical achievement jointly with Sam Richards and J. Robert Ray in 2016. Leon won the Academy Award for\" the design, engineering and continuous development\" of Sony Pictures Imageworks itView technology, a digital 3D film review software. Leon worked on the itView technology for eight years as the chief contributor. Schooled in India, Leon is an Arizona State University alumnus. He has worked at Sony Pictures Imageworks since 1996, and has contributed to the making of several commercially successful films, including the Spider-Man film series and the Men In Black film series.",
+        "closest": "A"
+      },
+      {
+        "category": "Australian airforce world war 2 Korean War planes",
+        "document_a": "George T. Reynolds = George Thomas Reynolds ( May 27, 1917 \u2013 April 19, 2005 ) was an American physicist best known for his accomplishments in particle physics, biophysics and environmental science. Reynolds received his PhD in physics from Princeton in 1943, writing a thesis of the propagation of shock waves. During World War II, he joined the United States Navy, and served with the Manhattan Project. He worked with George Kistiakowsky on the design of the explosive lenses required by the implosion-type nuclear weapon. He was involved in the investigation of the Port Chicago disaster, served with Project Alberta on Tinian, and was part of the Manhattan Project team sent to Hiroshima and Nagasaki to inspect the bomb damage.",
+        "document_b": "Stuart Milner-Barry = Sir Philip Stuart Milner-Barry KCVO CB OBE ( 20 September 1906 \u2013 25 March 1995 ) was a British chess player, chess writer, World War II codebreaker and civil servant. He represented England in chess both before and after World War II. He worked at Bletchley Park during World War II, and was head of\" Hut 6\", a section responsible for deciphering messages which had been encrypted using the German Enigma machine. He was one of four leading codebreakers at Bletchley to petition the then-Prime Minister Winston Churchill directly for more resources for their work.",
+        "closest": "A"
+      },
+      {
+        "category": "actors and their careers",
+        "document_a": "WWV ( radio station ) = WWV is the call sign of the United States National Institute of Standards and Technology 's ( NIST ) HF (\" shortwave\" ) radio station near Fort Collins, Colorado. WWV continuously transmits official U.S. Government frequency and time signals on 2.5, 5, 10, 15 and 20 MHz. These carrier frequencies and time signals are controlled by local atomic clocks traceable to NIST 's primary standard in Boulder, Colorado by GPS common view observations and other time transfer methods. NIST also operates the very similar radio station WWVH in Kauai, Hawaii.",
+        "document_b": "Christine Langan = Christine Langan ( born January 1965 ) is an English film producer who has been Head of BBC Films since April 2009. After graduating from Cambridge University in 1987 and working in advertising for three years, Langan joined Granada Television 's drama serials department where she script edited daytime soap operas. From there, she transferred to Granada 's newly created comedy department, where she developed the acclaimed television series Cold Feet, and other one-off comedies. In 2000, she left Granada to become a freelance producer, and produced the romantic comedy series Rescue Me for the BBC.",
+        "closest": "B"
+      },
+      {
+        "category": "War figures",
+        "document_a": "United States Special Operations Command = The United States Special Operations Command ( USSOCOM or SOCOM ) is the Unified Combatant Command charged with overseeing the various Special Operations Component Commands of the Army, Marine Corps, Navy, and Air Force of the United States Armed Forces. The command is part of the Department of Defense and is the only Unified Combatant Command legislated into being by the U.S. Congress. USSOCOM is headquartered at MacDill Air Force Base in Tampa, Florida. The idea of a unified special operations command had its origins in the aftermath of Operation Eagle Claw, the disastrous attempted rescue of hostages at the American embassy in Iran in 1980.",
+        "document_b": "Kevin Clash = Kevin Jeffrey Clash ( born September 17, 1960 ) is an American puppeteer whose characters include Elmo, Clifford, Benny Rabbit, and Hoots the Owl. Clash developed an interest in puppetry at an early age, and began performing for local TV children 's shows in his hometown of Baltimore, Maryland, as a teenager. In the early 1980s, he began working in Captain Kangaroo, and began performing in Sesame Street in 1984. He was the fifth puppeteer to perform Elmo, the character he became the most famous for, and became an executive producer and director for the show.",
+        "closest": "A"
+      }
+    ],
+    "signature": {
+      "instructions": "Determine which document is more closely related to the given category",
+      "fields": [
+        {
+          "prefix": "CATEGORY:",
+          "description": "${CATEGORY}"
+        },
+        {
+          "prefix": "DOCUMENT A:",
+          "description": "${DOCUMENT_A}"
+        },
+        {
+          "prefix": "DOCUMENT B:",
+          "description": "${DOCUMENT_B}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "CLOSEST:",
+          "description": "Document that is more closely related to the category (A or B)"
+        }
+      ]
+    },
+    "extended_signature": {
+      "instructions": "Determine which document is more closely related to the given category",
+      "fields": [
+        {
+          "prefix": "CATEGORY:",
+          "description": "${CATEGORY}"
+        },
+        {
+          "prefix": "DOCUMENT A:",
+          "description": "${DOCUMENT_A}"
+        },
+        {
+          "prefix": "DOCUMENT B:",
+          "description": "${DOCUMENT_B}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "CLOSEST:",
+          "description": "Document that is more closely related to the category (A or B)"
+        }
+      ]
+    }
+  }
+}

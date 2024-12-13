@@ -1,0 +1,83 @@
+System message:
+
+Your input fields are:
+1. `CATEGORY` (str)
+2. `DOCUMENT` (str)
+
+Your output fields are:
+1. `reasoning` (str)
+2. `FIT` (str): Whether the DOCUMENT fits with the given CATEGORY or not (YES or NO)
+
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## CATEGORY ## ]]
+{{CATEGORY}}
+
+[[ ## DOCUMENT ## ]]
+{{DOCUMENT}}
+
+[[ ## reasoning ## ]]
+{{reasoning}}
+
+[[ ## FIT ## ]]
+{{FIT}}
+
+[[ ## completed ## ]]
+
+In adhering to this structure, your objective is:
+        Determine whether the DOCUMENT fits with the given CATEGORY or not
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+Relevant religious buildings
+
+[[ ## DOCUMENT ## ]]
+Alchi Monastery = Alchi Monastery or Alchi Gompa is a Buddhist monastery, known more as a monastic complex ( chos- ' khor ) of temples in Alchi village in the Leh District, of the Indian state under the Ladakh Autonomous Hill Development Council of Jammu and Kashmir. The complex comprises four separate settlements in the Alchi village in the lower Ladakh region with monuments dated to different periods. Of these four hamlets, Alchi monastery is said to be the oldest and most famous. It is administered by the Likir Monastery. Alchi is also part of the three villages ( all in lower Ladakh region ) which constitute the ‘ Alchi group of monuments ’ ; the other two villages adjoining Alchi are the Mangyu and Sumda Chun.
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## FIT ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+Assistant message:
+
+[[ ## reasoning ## ]]
+The document describes Alchi Monastery, which is a Buddhist monastery and a significant religious building in the Leh District of India. It provides details about its historical importance, architectural features, and its role within the local religious community. Since the category is "Relevant religious buildings," and the document discusses a specific religious site, it fits well within this category.
+
+[[ ## FIT ## ]]
+YES
+
+[[ ## completed ## ]]
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+America professional basketball
+
+[[ ## DOCUMENT ## ]]
+2007 NBA betting scandal = The 2007 NBA betting scandal was a scandal involving the National Basketball Association ( NBA ) and accusations that an NBA referee used his knowledge of relationships between referees, coaches, players and owners to bet on professional basketball games. In July 2007, reports of an investigation by the Federal Bureau of Investigation ( FBI ) were made public, which alleged that during the 2005 – 06 and 2006 – 07 NBA seasons, referee Tim Donaghy bet on games in which he officiated. On August 15, 2007, Donaghy pleaded guilty to two federal charges related to the investigation, and a year later he was sentenced to 15 months in prison and three years of supervised release.
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## FIT ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+Assistant message:
+
+[[ ## reasoning ## ]]
+The document discusses the 2007 NBA betting scandal, which directly involves the National Basketball Association (NBA) and its referees, players, and the integrity of professional basketball games. This topic is highly relevant to the category of "America professional basketball" as it pertains to a significant event in the history of the league and highlights issues related to gambling and officiating in professional basketball. Therefore, the document fits well within the category.
+
+[[ ## FIT ## ]]
+YES
+
+[[ ## completed ## ]]
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+{category}
+
+[[ ## DOCUMENT ## ]]
+{document}
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## FIT ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.

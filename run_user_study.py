@@ -3,18 +3,20 @@ import logging
 import os
 import time
 import datetime
+import re
 from dotenv import load_dotenv
 import dspy
 import pandas as pd
 from collections import Counter
 from scipy.stats import kendalltau
 from src.llm_eval.optimize_dspy import Q3Module
+import numpy as np
 from src.llm_eval.prompter import Prompter
 from src.llm_eval.utils import (
-    bradley_terry_model, calculate_corr_npmi, collect_fit_rank_data, 
+    bradley_terry_model, calculate_corr_npmi, collect_fit_rank_data, compute_agreement_per_topic, 
     compute_correlations_one, compute_correlations_two, extract_info_binary_q2, 
     extract_info_q1_q3, extract_logprobs, load_config_pilot, 
-    process_responses, calculate_coherence
+    process_responses, calculate_coherence, normalize_key
 )
 
 Q1_THEN_Q2_PROMPTS = {"q1_then_binary_q2", "q1_then_q2_fix_cat", "q1_then_q2_dspy"}
@@ -28,6 +30,9 @@ def parse_arguments():
     parser.add_argument("--response_csv", type=str, help="Path to responses CSV file", default="data/files_pilot/Cluster+Evaluation+-+Sort+and+Rank_July+14%2C+2024_15.13.csv")
     parser.add_argument("--npmi_save", type=str, help="Path to save NPMI data", default="data/files_pilot/npmi.csv")
     parser.add_argument("--do_both_ways", action="store_true", help="Do both ways for Q3", default=False)
+    parser.add_argument("use_user_cats", action="store_true", help="Use user categories for Q2/Q3", default=False)
+    parser.add_argument("--removal_condition", type=str, help="Removal condition for responses", default="loose")
+    parser.add_argument("--path_save_results", type=str, help="Path to save results", default="data/files_pilot/results")
     return parser.parse_args()
 
 def save_results(data, path, filename):
@@ -64,8 +69,8 @@ def do_q1(prompter, cluster_data, users_cats, categories, dft_system_prompt="src
     
     return
 
-def do_q2(prompter, prompt_mode, llm_model, cluster_data, fit_data, category, dft_system_prompt="src/llm_eval/prompts/XXX/simplified_system_prompt.txt", use_context=False):
-    
+def do_q2(prompter, prompt_mode, llm_model, cluster_data, fit_data, category, user_cats=None, dft_system_prompt="src/llm_eval/prompts/XXX/simplified_system_prompt.txt", use_context=False):
+        
     if prompt_mode == "q1_then_q2_dspy":
         prompt_key = "q2_dspy" if "gpt" in llm_model else "q2_dspy_llama"
         logging.info(f"-- Using prompt key: {prompt_key}")
@@ -73,10 +78,32 @@ def do_q2(prompter, prompt_mode, llm_model, cluster_data, fit_data, category, df
     else:    
         do_q2_with_q1_fixed = prompt_mode == "q1_then_q2_fix_cat"
         questions = prompter.get_prompt(cluster_data, "binary_q2", category, do_q2_with_q1_fixed=do_q2_with_q1_fixed)
-        
-    dft_system_prompt = dft_system_prompt.replace("XXX", "binary_q2")
     
-    labels = [category] * len(questions)
+    if "dspy" in prompt_mode:
+        dft_system_prompt = None
+    else:
+        dft_system_prompt = dft_system_prompt.replace("XXX", "binary_q2")
+    
+    if user_cats:
+        labels = user_cats * len(questions)
+        
+        # we do not to make one prompt per user category (each user has a different category), and we want to use each user's category to determine the fit score for each document in the evaluation set
+        for cat in user_cats:
+            if prompt_mode == "q1_then_q2_dspy":
+                prompt_key = "q2_dspy" if "gpt" in llm_model else "q2_dspy_llama"
+                logging.info(f"-- Using prompt key: {prompt_key}")
+                questions = prompter.get_prompt(cluster_data, prompt_key, cat)
+            else:    
+                do_q2_with_q1_fixed = prompt_mode == "q1_then_q2_fix_cat"
+                questions = prompter.get_prompt(cluster_data, "binary_q2", cat, do_q2_with_q1_fixed=do_q2_with_q1_fixed)
+            
+            for question in questions:
+                response_q2, _ = prompter.prompt(dft_system_prompt, question, use_context=use_context)
+                score = extract_info_binary_q2(response_q2)
+                print(f"\033[92mFit: {score}\033[0m")
+                fit_data.append(score)
+    else:
+        labels = [category] * len(questions)
     for question in questions:
         response_q2, _ = prompter.prompt(dft_system_prompt, question, use_context=use_context)
         score = extract_info_binary_q2(response_q2)
@@ -86,6 +113,9 @@ def do_q2(prompter, prompt_mode, llm_model, cluster_data, fit_data, category, df
     return labels
     
 def do_q3(prompter, prompt_mode, llm_model, cluster_data, rank_data, users_rank, category, doing_both_ways, dft_system_prompt="src/llm_eval/prompts/q3/simplified_system_prompt.txt", use_context=False):
+    
+    #if "dspy" in prompt_mode:
+    #   dft_system_prompt = None
     
     do_q3_with_q1_fixed = prompt_mode == "q1_then_q3_fix_cat"
 
@@ -97,6 +127,7 @@ def do_q3(prompter, prompt_mode, llm_model, cluster_data, rank_data, users_rank,
     
     q3_out = prompter.get_prompt(cluster_data, prompt_key, category=category, do_q3_with_q1_fixed=do_q3_with_q1_fixed, doing_both_ways=doing_both_ways)
     
+
     if isinstance(q3_out, tuple) and len(q3_out) > 2:  # Both ways
         questions_one, pair_ids_one, questions_two, pair_ids_two = q3_out
         ways = [[questions_one, pair_ids_one], [questions_two, pair_ids_two]]
@@ -146,6 +177,7 @@ def do_q3(prompter, prompt_mode, llm_model, cluster_data, rank_data, users_rank,
         orders_comb = orders_one
         logprobs_comb = logprobs_one
     
+    
     """
     #lm = dspy.LM(
     #    "ollama_chat/llama3.1:8b-instruct-q8_0",
@@ -158,7 +190,7 @@ def do_q3(prompter, prompt_mode, llm_model, cluster_data, rank_data, users_rank,
     dspy.settings.configure(lm=lm)
     
     q3_dspy_prompter = Q3Module()
-    q3_dspy_prompter.load("/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/dspy-saved/compiled-q3-gpt-4o-mini-2024-07-18.json")
+    q3_dspy_prompter.load("/Users/lbartolome/Documents/GitHub/theta-evaluation/data/dspy-saved/gpt-4o-mini-2024-07-18_v2_10dec.json")
     orders_comb = []
     logprobs_comb = None
     cat, pairs, pair_ids_comb = q3_out
@@ -184,13 +216,22 @@ def do_q3(prompter, prompt_mode, llm_model, cluster_data, rank_data, users_rank,
 def main():
     args = parse_arguments()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
+    
+    # TODO: Pass this as an argument or define somewhere else
+    valid_models={"mallet", "ctm", "bertopic", "category-45"}
+    valid_datasets={"wikitext-labeled", "bills-labeled"}
 
     config_pilot = load_config_pilot(args.config_path)
-    responses_by_id = process_responses(args.response_csv, args.config_path.split(","))
-    _, _, _, corr_data = collect_fit_rank_data(responses_by_id)
+    # normalize keys in config_pilot
+    config_pilot = {normalize_key(key, valid_models, valid_datasets, False): value for key, value in config_pilot.items()}
     
+    responses_by_id = process_responses(args.response_csv, args.config_path.split(","), removal_condition = args.removal_condition)
+    _, _, _, corr_data = collect_fit_rank_data(responses_by_id)
+        
+    res = compute_agreement_per_topic(responses_by_id)
+        
     # Load or calculate NPMI data
-    npmi_data = load_or_calculate_npmi(config_pilot, args.npmi_save)
+    #npmi_data = load_or_calculate_npmi(config_pilot, args.npmi_save)
     
     model_types = args.model_type.split(",") if args.model_type else []
     prompt_modes = args.prompt_mode.split(",") if args.prompt_mode else []
@@ -271,6 +312,8 @@ def main():
                         #==============================================
                         # Q2
                         #==============================================
+                        #if args.use_user_cats:
+                        #    for_q2user_cats = users_cats
                         labels = do_q2(prompter, prompt_mode, llm_model, cluster_data, fit_data, category)
                             
                 # llm loop ends here
@@ -321,12 +364,14 @@ def main():
         llm_results_q2 = sorted(llm_results_q2, key=lambda x: x["id"])
     if llm_results_q3 is not None:
         llm_results_q3 = sorted(llm_results_q3, key=lambda x: x["id"])
-    
+    #npmi_data = npmi_data.sort_values(by=["id"])
+    corr_data = sorted(corr_data, key=lambda x: x["id"])
+        
     ############################################################################
     # Save results
     ############################################################################
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    save_path = f"data/files_pilot/{args.prompt_mode}_{args.model_type}_{timestamp}"
+    save_path = f"{args.path_save_results}/{args.prompt_mode}_{args.model_type}_{timestamp}"
     os.makedirs(save_path, exist_ok=True)
         
     save_results(llm_results_q1, save_path, "llm_results_q1.json")
@@ -334,10 +379,16 @@ def main():
         save_results(llm_results_q2, save_path, "llm_results_q2.json")
     if llm_results_q3:
         save_results(llm_results_q3, save_path, "llm_results_q3.json")
-        
+            
     # Correlations with user study data and ground truth
-    corr_results = compute_correlations_one(corr_data, rank_llm_data=llm_results_q3, fit_llm_data=llm_results_q2)
+    corr_results = compute_correlations_one(corr_data,rank_llm_data=llm_results_q3, fit_llm_data=llm_results_q2)
     save_results(corr_results, save_path, "correlation_results_mode1.json")
+    
+    # aux = pd.DataFrame(corr_data)
+    # aux["fit_bin"] = aux["fit_data"].apply(lambda x: (np.round(np.mean(x, axis=0)) >= 4).astype(int))
+    
+    # corr_results['rank_tau_users_llama3.1:8b-instruct-q8_0'].mean()
+    # kendalltau(corr_results["rank_tau"], corr_results["rank_tau_tm_llama3.1:8b-instruct-q8_0"])
     
     # check tau and significance
     if llm_results_q3 is not None:
@@ -348,13 +399,13 @@ def main():
             save_results(kendall_tau_tau_tm, save_path, f"kendall_tau_tau_tm_{llm_model}.json")
             print(f"Kendall Tau {llm_model}: {kendall_tau_tau_tm}")
     
-    corr_results2 = compute_correlations_two(responses_by_id, llm_results_q3, llm_results_q2)
+    corr_results2 = compute_correlations_two(responses_by_id,llm_results_q3, llm_results_q2)
     save_results(corr_results2, save_path, "correlation_results_mode2.json")
-    
     # NPMI
     columns_calculate = [col for col in corr_results.columns if col not in["id", "model", "topic", "n_annotators", "fit_rho", "fit_tau", "fit_agree"] and "rank_rho_users" not in col and "rank_tau_users" not in col]
-    npmi_corr_results = calculate_corr_npmi(corr_results, npmi_data, columns_calculate)
-    save_results(npmi_corr_results, save_path, "npmi_corr_results.json")
+    #npmi_corr_results = calculate_corr_npmi(corr_results, npmi_data, columns_calculate)
+    #save_results(npmi_corr_results, save_path, "npmi_corr_results.json")
+    
     import pdb; pdb.set_trace()
 
 if __name__ == "__main__":

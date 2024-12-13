@@ -8,8 +8,13 @@ from typing import Union, List
 from dotenv import load_dotenv
 from joblib import Memory
 import requests
-import ollama  # type: ignore
+#import ollama  # type: ignore
+from ollama import Client
 from openai import OpenAI
+ollama_client = Client(
+    host='http://kumo01.tsc.uc3m.es:11434',
+    headers={'x-some-header': 'some-value'}
+)
 memory = Memory(location='cache', verbose=0)
 
 from src.llm_eval.utils import extend_to_full_sentence
@@ -141,13 +146,20 @@ class Prompter:
     def _call_openai_api(template, question, model_type, params):
         """Handles the OpenAI API call."""
         
+        if template is not None:
+             messages=[
+                {"role": "system", "content": template},
+                {"role": "user", "content": question},
+            ]
+        else:
+            messages=[
+                {"role": "user", "content": question},
+            ]
+        
         open_ai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = open_ai_client.chat.completions.create(
             model=model_type,
-            messages=[
-                {"role": "system", "content": template},
-                {"role": "user", "content": question},
-            ],
+            messages=messages,
             stream=False,
             temperature=params["temperature"],
             max_tokens=params.get("max_tokens", 1000),
@@ -162,14 +174,24 @@ class Prompter:
     @staticmethod
     def _call_ollama_api(template, question, model_type, params, context):
         """Handles the OLLAMA API call."""
-        response = ollama.generate(
-            system=template,
-            prompt=question,
-            model=model_type,
-            stream=False,
-            options=params,
-            context=context,
-        )
+        
+        if template is not None:
+            response = ollama_client.generate(
+                system=template,
+                prompt=question,
+                model=model_type,
+                stream=False,
+                options=params,
+                context=context,
+            )
+        else:
+            response = ollama_client.generate(
+                prompt=question,
+                model=model_type,
+                stream=False,
+                options=params,
+                context=context,
+            )
         result = response["response"]
         logprobs = None
         context = response.get("context", None)
@@ -208,8 +230,10 @@ class Prompter:
         """Public method to execute a prompt given a system prompt template and a question."""
 
         # Load the system prompt template
-        with open(system_prompt_template_path, "r") as file:
-            system_prompt_template = file.read()
+        system_prompt_template = None
+        if system_prompt_template_path is not None:
+            with open(system_prompt_template_path, "r") as file:
+                system_prompt_template = file.read()
 
         # Ensure hashable params for caching and get cached data / execute prompt
         params_tuple = tuple(sorted(self.params.items()))
@@ -338,7 +362,7 @@ class Prompter:
             text: dict,
             cat: str,
             num_words: int = 100,
-            template_name: str = "q3_dspy"
+            template_name: str = "q2_dspy"
         ) -> List[str]:
             """Generic function to handle Q2 DSPY and Q2 DSPY LLAMA."""
             
@@ -447,7 +471,7 @@ class Prompter:
             pair_ids_one, pair_ids_two = [], []
             
             eval_docs = sorted(text["eval_docs"], key=lambda x: x["doc_id"])
-            eval_docs = random.sample(eval_docs, len(eval_docs))
+            eval_docs = random.sample(eval_docs, len(eval_docs)) # shuffle the eval docs so the "most related" ones are not shown first
             for d1, d2 in itertools.combinations(eval_docs, 2):
                 docs_list = [[d1, d2], [d2, d1]] if doing_both_ways else [random.sample([d1, d2], 2)]
                 

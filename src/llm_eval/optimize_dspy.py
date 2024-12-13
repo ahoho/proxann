@@ -44,8 +44,7 @@ class ThetasDataset(Dataset):
         if mode == "q3":
         
             # keep first category from each user
-            train_data["category"] = train_data["categories"].apply(lambda x: x[0])
-            train_data["closest"] = train_data.apply(lambda x: "A" if x["users_fit_winner"] == x["doc_id1"] else "B", axis=1)
+            train_data["closest"] = train_data.apply(lambda x: "A" if x["users_rank_winner"] == x["doc_id1"] else "B", axis=1)
             
             # truncate the documents to num_words_truncate
             train_data["document_a"] = train_data["doc1"].apply(lambda x: extend_to_full_sentence(x,num_words_truncate))
@@ -106,6 +105,34 @@ class Q3Module(dspy.Module):
             closest = "1000"
         
         return dspy.Prediction(closest = closest)
+
+"""
+class Q3SignatureWithExemplars(dspy.Signature):
+    #Determine which document is more closely related to the given category
+    KEYWORDS = dspy.InputField(desc="Terms that reflect the core theme of the category.")
+    EXEMPLAR_DOCUMENTS = dspy.InputField(desc="Sample documents focused on a shared topic related to the category.")
+    CATEGORY = dspy.InputField("Represents the common theme among the keywords and exemplar documents.")
+    EVALUATION_DOCUMENT_A = dspy.InputField(desc="Evaluation document A")
+    EVALUATION_DOCUMENT_B = dspy.InputField(desc="Evaluation document B")
+    CLOSEST = dspy.OutputField(desc="Document that is more closely related to the category (A or B)")
+
+class Q3ModuleWithExemplars(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.q3signature = dspy.ChainOfThought(Q3SignatureWithExemplars)
+
+    def forward(self, category: str, document_a: str, document_b: str):
+        closest = self.q3signature(CATEGORY=category, DOCUMENT_A=document_a, DOCUMENT_B=document_b).CLOSEST
+        
+        if "a" in closest.lower():
+            closest = "A"
+        elif "b" in closest.lower():
+            closest = "B"
+        else:
+            closest = "1000"
+        
+        return dspy.Prediction(closest = closest)
+"""
 
 class Q2Signature(dspy.Signature):
     """Determine whether the DOCUMENT fits with the given CATEGORY or not"""
@@ -225,15 +252,22 @@ def optimize_q2_module(data_path, mbd=4, mld=16, ncp=16, mr=1, dev_size=0.25):
     return compiled_pred
         
 if __name__ == "__main__":
-    #load_dotenv(".env")
-    #api_key = os.getenv("OPENAI_API_KEY")
-    #os.environ["OPENAI_API_KEY"] = api_key
-    #lm = dspy.LM(model="gpt-4o-mini-2024-07-18")
+
+    load_dotenv(".env")
+    api_key = os.getenv("OPENAI_API_KEY")
+    print(api_key)
+    os.environ["OPENAI_API_KEY"] = api_key
+    lm = dspy.LM(model="gpt-4o-mini-2024-07-18")
+    dspy.settings.configure(lm=lm)
+    
+    """
     lm = dspy.LM(
         "ollama_chat/llama3.1:8b-instruct-q8_0",
         api_base="http://kumo01:11434"
     )
     dspy.settings.configure(lm=lm)
+    """
+
     
     # test the module
     """
@@ -247,11 +281,18 @@ if __name__ == "__main__":
     # dspy.inspect_history(n=1)
     
     # Optimize the module
-    #compiled_pred = optimize_module("data/files_pilot/user_pairs_tr_data.json")
+    """
+    compiled_pred = optimize_module("data/files_pilot/user_pairs_rank_tr_data.json")
+    """
+    
+
     compiled_pred = optimize_q2_module("data/files_pilot/user_fit_tr_data.json")
-    compiled_pred.save("data/dspy-saved/compiled-q2-llama3.1:8b-instruct-q8_0.json")
+
+    
+    compiled_pred.save("data/dspy-saved/gpt_10dec.json")
     
     compiled_classifier = compiled_pred
+    #compiled_classifier("<<category>>", "<<document>>", "<<document>>")
     compiled_classifier("<<category>>", "<<document>>")
     
     prompt_data = lm.history[-1]

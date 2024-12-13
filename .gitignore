@@ -180,3 +180,7 @@ data/files_pilot/results_val_data
 data/training_data
 data/files_pilot/user_fit_tr_data.json
 data/files_pilot/user_pairs_tr_data.json
+data/files_pilot/cluster_rank_counts.json
+data/files_pilot/user_fit_tr_data.json
+data/files_pilot/user_pairs_rank_tr_data.json
+.vscode

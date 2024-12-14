@@ -266,7 +266,8 @@ def normalize_key(key, valid_models, valid_datasets, include_id=True):
     """
     
     # We use a different pattern depending on whether we want to include the topic ID or not (from run_user_study.py we need it without)
-    pattern = rf"/({'|'.join(map(re.escape, valid_models))})"
+    pattern = rf"(?:data/models(?:/final_models)?/.*?/)?({'|'.join(map(re.escape, valid_models))})" ## MODIFIED
+
     if include_id:
         pattern += r"/.*?(\d+)$"
     else:
@@ -283,7 +284,8 @@ def normalize_key(key, valid_models, valid_datasets, include_id=True):
     # Dataset key
     dataset = next((ds for ds in valid_datasets if ds in key), None)
     if not dataset:
-        raise ValueError(f"Key '{key}' does not contain a valid dataset")
+        # this is because is from the first /second pilot round
+        dataset = "wikitext-labeled" ## MODIFIED
 
     return f"{dataset}/{model}" + (f"/{id_part}" if include_id else "")
 
@@ -856,34 +858,44 @@ def calculate_coherence(config_pilot, data_docs=[
     vocab = sorted(set([word for doc in docs for word in doc]))
     data_dict = Dictionary([vocab])
     
-    npmi_data = []
+    cohr_data = []
     for model_id, model_data in config_pilot.items(): # this selects the set of topics for a given model (mallet, ctm, etc.)
         for cluster_id, cluster_data in model_data.items(): # each cluster_data is the information for a topic
+            print(f"Calculating coherence for {model_id}/{cluster_id}")
             id_ = f"{model_id}/{cluster_id}"
-            topics = [cluster_data["topic_words"][:15]] # number shown to annotators
-            cm = CoherenceModel(
-                topics=topics,
-                texts=docs,
-                dictionary=data_dict,
-                coherence="c_npmi",
-                window_size=None,
-                processes=1,
-            )
-            confirmed_measures = cm.get_coherence_per_topic()
-            mean = cm.aggregate_measures(confirmed_measures)
-            npmi_data.append({"id": id_, "NPMI": mean})
-    
-    npmi_data = pd.DataFrame(npmi_data)
+            topic_words = [cluster_data["topic_words"][:15]] # number shown to annotators
+            
+            this_tpc_cohrs = []
+            for cohr_metric in ["c_npmi", "c_v"]:
 
-    return npmi_data
+                cm = CoherenceModel(
+                    topics=topic_words,
+                    texts=docs,
+                    dictionary=data_dict,
+                    coherence=cohr_metric,
+                    window_size=None,
+                    processes=1,
+                )
+                confirmed_measures = cm.get_coherence_per_topic()
+                mean = cm.aggregate_measures(confirmed_measures)
+                this_tpc_cohrs.append(mean)
+            cohr_data.append(
+                {"id": id_, 
+                "npmi": this_tpc_cohrs[0],
+                "cv": this_tpc_cohrs[1]}
+            )
+    
+    cohr_data = pd.DataFrame(cohr_data)
+
+    return cohr_data
 
 def calculate_corr_npmi(corr_data, npmi_data, columns_calculate = ["rank_rho", "rank_rtau"]):
     
     corr_data = corr_data.merge(npmi_data, on="id")    
     corrs = []
     for column in columns_calculate:
-        spearman_corr, spearman_p = spearmanr(corr_data[column], corr_data['NPMI'])
-        kendall_corr, kendall_p = kendalltau(corr_data[column], corr_data['NPMI'])
+        spearman_corr, spearman_p = spearmanr(corr_data[column], corr_data['npmi'])
+        kendall_corr, kendall_p = kendalltau(corr_data[column], corr_data['npmi'])
         corrs.append({
             'Metric': column,
             'Spearman_rho': spearman_corr,

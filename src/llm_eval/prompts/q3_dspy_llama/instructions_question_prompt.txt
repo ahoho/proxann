@@ -35,13 +35,13 @@ In adhering to this structure, your objective is:
 User message:
 
 [[ ## CATEGORY ## ]]
-film，role，award，acting，performance，comedy，drama
+Actor biographies
 
 [[ ## DOCUMENT_A ## ]]
-An Unforgettable Summer = An Unforgettable Summer ( French : Un été inoubliable ; Romanian : O vară de neuitat ) is a 1994 drama film directed and produced by Lucian Pintilie. A Romanian-French co-production based on a chapter from a novel by Petru Dumitriu, it stars British actress Kristin Scott Thomas as the Hungarian-born aristocrat Marie-Thérèse Von Debretsy. Her marriage with Romanian Land Forces captain Petre Dumitriu brings her to Southern Dobruja ( present-day northeastern Bulgaria ), where they settle in 1925. There, she witnesses first-hand the violent clashes between, on one hand, the Greater Romanian administration, and, on the other, komitadji brigands of Macedonian origin and ethnic Bulgarian locals.
+WWV ( radio station ) = WWV is the call sign of the United States National Institute of Standards and Technology 's ( NIST ) HF (\" shortwave\" ) radio station near Fort Collins, Colorado. WWV continuously transmits official U.S. Government frequency and time signals on 2.5, 5, 10, 15 and 20 MHz. These carrier frequencies and time signals are controlled by local atomic clocks traceable to NIST 's primary standard in Boulder, Colorado by GPS common view observations and other time transfer methods. NIST also operates the very similar radio station WWVH in Kauai, Hawaii.
 
 [[ ## DOCUMENT_B ## ]]
-Edge ( wrestler ) = Adam Joseph Copeland ( born October 30, 1973 ) is a Canadian actor and retired professional wrestler. He is best known for his time with the American professional wrestling promotion WWE, where he performed under the ring name Edge. Copeland was trained by professional wrestlers Sweet Daddy Siki and Ron Hutchinson. Throughout the 1990s, he wrestled in various U.S. independent promotions. During his time in these promotions, he competed in singles and tag team competition, the latter with long-time friend Christian. In 1997, Copeland signed a developmental deal with the WWF and began competing for the company later that year ; he made his televised debut the following June under the ring name Edge.
+Christine Langan = Christine Langan ( born January 1965 ) is an English film producer who has been Head of BBC Films since April 2009. After graduating from Cambridge University in 1987 and working in advertising for three years, Langan joined Granada Television 's drama serials department where she script edited daytime soap operas. From there, she transferred to Granada 's newly created comedy department, where she developed the acclaimed television series Cold Feet, and other one-off comedies. In 2000, she left Granada to become a freelance producer, and produced the romantic comedy series Rescue Me for the BBC.
 
 Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## CLOSEST ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
 
@@ -49,10 +49,10 @@ Respond with the corresponding output fields, starting with the field `[[ ## rea
 Assistant message:
 
 [[ ## reasoning ## ]]
-Document A is more closely related to the category because it contains specific details about a film (genre: drama, director, production company, etc.), whereas Document B focuses on an individual's career in professional wrestling and acting. The category mentions "film", "role", "award", "acting", and "performance", which are all relevant to Document A.
+Document B is more closely related to the category "Actor biographies" because it contains information about a english film producer, Christine Langan, sumamrizing her career. Document A, on the other hand, cites informaiton about the WWV, the United States National Institute of Standards and Technology 's ( NIST ) HF (\" shortwave\" ) radio station including their location and frequencies.
 
 [[ ## CLOSEST ## ]]
-A
+B
 
 [[ ## completed ## ]]
 

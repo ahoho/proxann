@@ -61,7 +61,7 @@ def load_or_calculate_npmi(config_pilot, npmi_save):
 def do_q1(prompter, cluster_data, users_cats, categories, dft_system_prompt="src/llm_eval/prompts/q1/simplified_system_prompt.txt"):
     logging.info("-- Executing Q1...")
     
-    question = prompter.get_prompt(cluster_data, "q1")
+    question = prompter.get_prompt(cluster_data, "q1_bills")
     category, _ = prompter.prompt(dft_system_prompt, question, use_context=False) #max_tokens=10
     
     #pattern = r"\[\[ ## CATEGORY ## \]\]\s*(.+)"
@@ -229,7 +229,7 @@ def main():
     # normalize keys in config_pilot
     config_pilot = {normalize_key(key, valid_models, valid_datasets, False): value for key, value in config_pilot.items()}
     
-    responses_by_id = process_responses(args.response_csv, args.config_path.split(","), removal_condition = args.removal_condition, filter="wiki")
+    responses_by_id = process_responses(args.response_csv, args.config_path.split(","), removal_condition = args.removal_condition)
     _, _, _, corr_data = collect_fit_rank_data(responses_by_id)
         
     #res = compute_agreement_per_topic(responses_by_id)

@@ -1,0 +1,82 @@
+System message:
+
+Your input fields are:
+1. `CATEGORY` (str)
+2. `DOCUMENT` (str)
+
+Your output fields are:
+1. `reasoning` (str)
+2. `FIT` (str): Whether the DOCUMENT fits with the given CATEGORY or not (YES or NO)
+
+All interactions will be structured in the following way, with the appropriate values filled in.
+
+[[ ## CATEGORY ## ]]
+{{CATEGORY}}
+
+[[ ## DOCUMENT ## ]]
+{{DOCUMENT}}
+
+[[ ## reasoning ## ]]
+{{reasoning}}
+
+[[ ## FIT ## ]]
+{{FIT}}
+
+[[ ## completed ## ]]
+
+In adhering to this structure, your objective is:
+        Determine whether the DOCUMENT fits with the given CATEGORY or not
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+Pet protections and pet care
+
+[[ ## DOCUMENT ## ]]
+Pet Transportation Safety Act - Requires commercial airlines to designate specific climate-controlled cargo areas for animal transport and mandates real-time temperature monitoring systems. Establishes minimum space requirements per animal and requires airlines to provide water stations for journeys exceeding three hours.
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## FIT ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+Assistant message:
+
+[[ ## reasoning ## ]]
+This document does fit the category "Pet protectopms and pet care" because it discusses nessessary precautions comercial Airlines have to take in order to transport animals.
+
+[[ ## FIT ## ]]
+YES
+[[ ## completed ## ]]
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+Pet protections and pet care
+
+[[ ## DOCUMENT ## ]]
+School Lunch Affordability Act - Amends the National School Lunch Program to expand free meal eligibility to all students in public K-12 schools where 40% or more of families qualify for federal assistance programs. Establishes a federal fund to reimburse school districts for the cost difference between reduced-price and free meals.
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## FIT ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.
+
+
+Assistant message:
+
+[[ ## reasoning ## ]]
+This document does not fit the category "Pet protectopms and pet care" because it discusses the expansion of eligibility of free School meals for human students in public K-12 Schools.
+
+[[ ## FIT ## ]]
+NO
+
+[[ ## completed ## ]]
+
+
+User message:
+
+[[ ## CATEGORY ## ]]
+{category}
+
+[[ ## DOCUMENT ## ]]
+{document}
+
+Respond with the corresponding output fields, starting with the field `[[ ## reasoning ## ]]`, then `[[ ## FIT ## ]]`, and then ending with the marker for `[[ ## completed ## ]]`.

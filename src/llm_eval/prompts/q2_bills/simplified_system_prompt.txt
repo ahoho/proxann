@@ -1,0 +1,1 @@
+You are a helpful AI assistant tasked with determining if a document fits a given category, aiming to make judgments closely aligned with human reasoning.

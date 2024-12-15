@@ -114,11 +114,14 @@ response_csvs = [
 llm_data_paths = {
     "wiki": {
         "gpt4o": "../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-mini-2024-07-18_20241213_135628",
-        "llama3.1": "../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_135530"
+        #"llama3.1": "../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_135530"
+        "llama3.1": "../data/llm_out/wiki_new/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241215_194908"
     },
     "bills": {
-        "gpt4o": "../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-mini-2024-07-18_20241213_141345",
-        "llama3.1": "../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_133218"
+        #"gpt4o": "../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-mini-2024-07-18_20241213_141345",
+        "gpt4o": "../data/llm_out/bills_examples_bills/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-2024-08-06_20241215_211522",
+        #"llama3.1": "../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_133218"
+        "llama3.1": "../data/llm_out/bills_examples_bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241215_205138"
     }
 }
 

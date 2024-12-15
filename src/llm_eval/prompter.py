@@ -313,6 +313,42 @@ class Prompter:
             return self._load_template(template_path).format("\n".join(examples), keys, docs)
             #template_path = load_template_path("q1_with_desc") if generate_description else load_template_path("q1_dspy")
             #return self._load_template(template_path).format(keywords=keys, documents = docs)
+        
+        def handle_q1_bills(text: dict, few_shot: dict, topk: int = 10, num_words: int = 100, nr_few_shot=1, generate_description:bool=False) -> str:
+            
+            with open("src/llm_eval/prompts/few_shot_examples_bills.json", 'r') as file:
+                few_shot_examples = json.load(file)
+            
+            # Few-shot examples
+            examples_q1 = few_shot_examples["q1"][:nr_few_shot]
+            
+            if generate_description:
+                examples = [
+                    "KEYWORDS: {}\nDOCUMENTS: {}\nCATEGORY: {}\nDESCRIPTION:{}".format(
+                        ex['example']['keywords'],
+                        ''.join(f"\n- {doc}" for doc in ex['example']['documents']),
+                        ex['example']['response']['label'],
+                        ex['example']['response']['description']
+                    )
+                    for ex in examples_q1
+                ]
+            else:            
+                examples = [
+                    "KEYWORDS: {}\nDOCUMENTS: {}\nCATEGORY: {}".format(
+                        ex['example']['keywords'],
+                        ''.join(f"\n- {doc}" for doc in ex['example']['documents']),
+                        ex['example']['response']['label']
+                    )
+                    for ex in examples_q1
+                ]
+
+            # Actual question to the LLM (keys and docs) 
+            docs = "".join(f"\n- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
+        
+            keys = " ".join(text["topic_words"][:topk])
+            
+            template_path = load_template_path("q1_with_desc") if generate_description else load_template_path("q1")
+            return self._load_template(template_path).format("\n".join(examples), keys, docs)
 
         def handle_binary_q2(
             text: dict,
@@ -513,11 +549,14 @@ class Prompter:
         
         question_handlers = {
             "q1": lambda text: handle_q1(text, few_shot_examples, nr_few_shot=nr_few_shot, generate_description=generate_description),
+            "q1_bills": lambda text: handle_q1_bills(text, few_shot_examples, nr_few_shot=nr_few_shot, generate_description=generate_description),
             "binary_q2": lambda text: handle_binary_q2(text, few_shot_examples, category, nr_few_shot=nr_few_shot, do_q2_with_q1_fixed=do_q2_with_q1_fixed),
             "q2_dspy": lambda text: handle_q2_dspy_generic(text, category),
             "q2_dspy_llama": lambda text: handle_q2_dspy_generic(text, category, template_name="q2_dspy_llama"),
+            "q2_bills": lambda text: handle_q2_dspy_generic(text, category, template_name="q2_bills"),
             "q3": lambda text: handle_q3(text, few_shot_examples, category, nr_few_shot=nr_few_shot, doing_both_ways=doing_both_ways, do_q3_with_q1_fixed=do_q3_with_q1_fixed),
             "q3_dspy": lambda text: handle_q3_dspy_generic(text, category, doing_both_ways=doing_both_ways, template_name="q3_dspy"),
+            "q3_bills": lambda text: handle_q3_dspy_generic(text, category, doing_both_ways=doing_both_ways, template_name="q3_bills"),
             "q3_dspy_llama": lambda text: handle_q3_dspy_generic(text, category, doing_both_ways=doing_both_ways, template_name="q3_dspy_llama"),
         }
 

@@ -14,7 +14,9 @@ from plotnine import (
     scale_color_manual,
     labs,
     scale_y_reverse,
-    scale_x_discrete
+    scale_x_discrete,
+    element_rect,
+    element_line
 )
 
 import sys
@@ -24,9 +26,9 @@ from src.llm_eval.utils import process_responses, collect_fit_rank_data, compute
 
 def generate(
     data,
-    human_metrics= ["Human Fit", "Human Rank"],
+    human_metrics= ["Human\\\Fit", "Human\\\Rank"],
     llm_metrics=["Step 2", "Step 3"],
-    cohr_metrics=["$C_{NPMI}$", "$C_{V}$"],
+    cohr_metrics=["$C_{NPMI}$"],#, "$C_{V}$"
     llm_models=["gpt-4-o", "llama3.1"],
     datasets=["Wiki", "Bills"],
 ):  
@@ -37,13 +39,13 @@ def generate(
     nr_left_columns = 2
     headers_first_level = (
         [""] * nr_left_columns # for the first two columns
-        + [f"\multicolumn{{2}}{{c}}{{\\textsc{{{dataset.capitalize()}}}}}" for dataset in datasets]
+        + [f"\multicolumn{{2}}{{c}}{{\\texttt{{{dataset}}}}}" for dataset in datasets]
     )
     headers_second_level = (
         ["", ""]
-        + [metric for _ in datasets for metric in human_metrics]
+        + [f"\makecell{{{metric}}}" for _ in datasets for metric in human_metrics]
     )
-
+    
     column_format = "ll" + "c" * len(datasets) * len(human_metrics)
 
     latex_table = rf"""
@@ -59,16 +61,16 @@ def generate(
     """
     
     # Pivot to structure data as needed
-    aux = data.to_latex(index=False, float_format="{:.2f}".format).split("\\midrule\n")[1].split("\n\\bottomrule")[0].strip().split("\n")
+    aux = data.to_latex(index=False, float_format="{:.3f}".format).split("\\midrule\n")[1].split("\n\\bottomrule")[0].strip().split("\n")
     rows = [el.strip("\\").strip(" ") for el in aux]
-    
+        
     first_row = True
     # coherence
     for i, metric_name in enumerate(cohr_metrics):
         
         print(f"Index: {i}, Metric: {metric_name}, Metric Name: {metric_name}")
         
-        row_label = rf"{'Coherence\n metrics' if first_row else ''} & {metric_name}"
+        row_label = rf"{'Cohr.' if first_row else ''} & {metric_name}"
         first_row = False
         
         row_values = rows[i]
@@ -82,10 +84,14 @@ def generate(
         first_row = True
         for llm_model in llm_models:
             row_label = (
-                rf"{metric_first if first_row else ''} & \textsc{{{llm_model.capitalize()}}}"
+                rf"{metric_first if first_row else ''} & \texttt{{{llm_model.capitalize()}}}"
             )
             first_row = False
-            row_values = rows[(i + 2)]
+            if llm_model == "gpt-4-o":
+                row_id = 2 if metric_first == "Step 2" else 3
+            else:
+                row_id = 4 if metric_first == "Step 2" else 5
+            row_values = rows[row_id]
 
             latex_table += f"{row_label} & {row_values} \\\\\n"
             
@@ -101,7 +107,7 @@ data_jsons = [
     "../data/json_out/config_bills_part1.json"
 ]
 response_csvs = [
-    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+12,+2024_13.07.csv",
+    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
     "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv",
 ]
 
@@ -116,7 +122,7 @@ llm_data_paths = {
     }
 }
 
-cohr_path = "../data/all_cohrs.csv"
+cohr_path = ["../data/all_cohrs_bills.csv", "../data/all_cohrs_wiki.csv"]
 
 start_date = "2024-12-06 09:00:00"
 
@@ -129,7 +135,7 @@ for csv in response_csvs:
 _, _, _, corr_data = collect_fit_rank_data(responses)
 
 # read coherence metrics
-cohrs = pd.read_csv(cohr_path).to_dict(orient="records")
+cohrs = pd.concat([pd.read_csv(cohr_path[0]), pd.read_csv(cohr_path[1])]).to_dict(orient="records")
 
 corr_ids = [x["id"] for x in corr_data]
 corr_metric = "tau"
@@ -184,12 +190,6 @@ for dataset in ["wiki", "bills"]:
         cv_cohrs = [x["cv"] for x in filtered_cohrs]
 
         corrs_mode1_llm = compute_correlations_one(filtered_corr_data, filtered_ranks, filtered_fits, aggregation_method=agg)
-        
-        ############################
-        # TODO: this needs to be removed once all cohr data is ready
-        # filter corrs_mode1_llm to have only the id that are in the cohr data
-        corrs_mode1_llm = corrs_mode1_llm[corrs_mode1_llm["id"].isin([x["id"] for x in filtered_cohrs])]
-        ############################
 
         for user_metric in ["fit", "rank"]:
             user_tm_metric = corrs_mode1_llm[f"{user_metric}_{corr_metric}"]
@@ -218,7 +218,7 @@ print(latex_output_transposed)
 
 
 ### to generate figure
-column_names = ["human_fit", "human_rank"] + ["npmi", "cv"] + [f"{llm}_{metric}" 
+column_names = ["human_fit", "human_rank"] + ["npmi"] + [f"{llm}_{metric}" 
                               for llm in list(llm_data_paths[list(llm_data_paths.keys())[0]].keys()) 
                               for metric in ["fit", "rank"]]
 row_names = ["mallet", "ctm", "bertopic"]
@@ -277,9 +277,11 @@ for dataset in ["wiki", "bills"]:
                 results_df.loc[model_name, f"{llm}_{llm_metric}"] = llm_tm_metric[llm_tm_metric["id"].str.contains(model_name)][llm_tm_metric_name].mean()            
         
         
-    for cohr in ["npmi", "cv"]:
+    for cohr in ["npmi"]:
         
-        cohrs = pd.read_csv(cohr_path)
+        cohrs = pd.concat([pd.read_csv(cohr_path[0]), pd.read_csv(cohr_path[1])])
+        # filter cohrs based on dataset
+        cohrs = cohrs[cohrs["id"].str.contains(dataset)]
         for model_name in row_names:
             # filter cohrs by model type
             cohrs_model = cohrs[cohrs["id"].str.contains(model_name)]
@@ -310,16 +312,16 @@ for dtset in dataset_statistics.keys():
         'bertopic': 'BERTopic'
     })
 
-    desired_order = ['human_fit', 'human_rank', 'npmi', 'cv', 'gpt4o_fit', 'gpt4o_rank', 'llama3.1_fit', 'llama3.1_rank'] # force the order of the metrics
+    desired_order = ['human_fit', 'human_rank', 'npmi', 'gpt4o_fit', 'gpt4o_rank', 'llama3.1_fit', 'llama3.1_rank'] # force the order of the metrics
     data['metric'] = pd.Categorical(data['metric'], categories=desired_order, ordered=True)
 
     metric_labels = {
         'human_fit': 'Human\nFit',
         'human_rank': 'Human\nRank',
-        'npmi': '$C_{NPMI}$',
-        'cv': '$C_V$',
-        'gpt4o_fit': 'GPT-4\nFit',
-        'gpt4o_rank': 'GPT-4\nRank',
+        'npmi': 'NPMI', #'$C_{NPMI}$',
+        #'cv': '$C_V$',
+        'gpt4o_fit': 'GPT-4-o\nFit',
+        'gpt4o_rank': 'GPT-4-o\nRank',
         'llama3.1_fit': 'LLaMA 3.1\nFit',
         'llama3.1_rank': 'LLaMA 3.1\nRank'
     }
@@ -335,9 +337,9 @@ for dtset in dataset_statistics.keys():
         + geom_text(
             aes(label='label'),  # labels only "human_fit"
             na_rm=True,  # remove nan
-            nudge_y=0.3,  # move label up (y)
-            nudge_x=-0.1, # move label left (x)
-            size=12  # size of the labels
+            nudge_y=0.2,  # move label up (y)
+            nudge_x=0.2, # move label left (x)
+            size=18  # size of the labels
         )
         + scale_color_manual(values=colors) 
         + scale_y_reverse(breaks=[1, 2, 3], labels=[1, 2, 3], limits=[3.3, 0.7])  # y = rankings
@@ -345,14 +347,16 @@ for dtset in dataset_statistics.keys():
         + labs(y='Ranking (1 = Best)', x='Metric', color=None, shape=None) 
         + theme_classic() 
         + theme(
-            figure_size=(8, 4),
-            axis_text_x=element_text(size=14, rotation=45, hjust=1),
-            axis_text_y=element_text(size=14),
-            axis_title=element_text(size=14),
+            figure_size=(7, 5),
+            axis_text_x=element_text(size=18, rotation=45, hjust=1, color='black'),
+            axis_text_y=element_text(size=18),
+            axis_title=element_text(size=18),
             legend_position='none', # remove legend
             panel_grid_major=element_blank(),
             panel_grid_minor=element_blank(),
             axis_title_x=element_blank(), # remove x-axis caption
+            panel_border=element_rect(color="black", size=2),  # Añadir borde negro
+            axis_line=element_line(size=1.5)  
         )
     )
     

@@ -62,7 +62,12 @@ def do_q1(prompter, cluster_data, users_cats, categories, dft_system_prompt="src
     logging.info("-- Executing Q1...")
     
     question = prompter.get_prompt(cluster_data, "q1")
-    category, _ = prompter.prompt(dft_system_prompt, question, use_context=False)
+    category, _ = prompter.prompt(dft_system_prompt, question, use_context=False) #max_tokens=10
+    
+    #pattern = r"\[\[ ## CATEGORY ## \]\]\s*(.+)"
+    #match = re.search(pattern, category)
+    #category = match.group(1) if match else category
+    
     categories.append(category)
     print(f"\033[92mUser categories: {users_cats}\033[0m")
     print(f"\033[94mModel category: {category}\033[0m")
@@ -108,6 +113,7 @@ def do_q2(prompter, prompt_mode, llm_model, cluster_data, fit_data, category, us
         response_q2, _ = prompter.prompt(dft_system_prompt, question, use_context=use_context)
         score = extract_info_binary_q2(response_q2)
         print(f"\033[92mFit: {score}\033[0m")
+        import pdb; pdb.set_trace()
         fit_data.append(score)
     
     return labels
@@ -224,15 +230,14 @@ def main():
     # normalize keys in config_pilot
     config_pilot = {normalize_key(key, valid_models, valid_datasets, False): value for key, value in config_pilot.items()}
     
-    #responses_by_id = process_responses(args.response_csv, args.config_path.split(","), removal_condition = args.removal_condition)
-    #_, _, _, corr_data = collect_fit_rank_data(responses_by_id)
+    responses_by_id = process_responses(args.response_csv, args.config_path.split(","), removal_condition = args.removal_condition, filter="wiki")
+    _, _, _, corr_data = collect_fit_rank_data(responses_by_id)
         
     #res = compute_agreement_per_topic(responses_by_id)
         
     # Load or calculate NPMI data
-    npmi_data = load_or_calculate_npmi(config_pilot, args.npmi_save)
+    #npmi_data = load_or_calculate_npmi(config_pilot, args.npmi_save)
     
-    import pdb; pdb.set_trace()
     
     model_types = args.model_type.split(",") if args.model_type else []
     prompt_modes = args.prompt_mode.split(",") if args.prompt_mode else []

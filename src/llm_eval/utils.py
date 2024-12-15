@@ -298,7 +298,8 @@ def process_responses(
     removal_condition: str = "loose", # strict or loose
     valid_models={"mallet", "ctm", "bertopic", "category-45"},
     valid_datasets={"wikitext-labeled", "bills-labeled"},
-    path_save: str ="/Users/lbartolome/Documents/GitHub/theta-evaluation/data/files_pilot"
+    path_save: str ="/Users/lbartolome/Documents/GitHub/theta-evaluation/data/files_pilot",
+    filter=None,
 ):
     """
     Process responses from the pilot study. The function filters out disqualified responses and returns a dictionary of responses by id, where the id is in the form 'data/models/model_name/topic_id'.
@@ -359,6 +360,9 @@ def process_responses(
         r = {}
         
         if str(row["rank_99"]) == "nan":
+            continue
+        
+        if filter is not None and not filter in row["id"]:
             continue
         
         r["cluster_id"] = row["id"]

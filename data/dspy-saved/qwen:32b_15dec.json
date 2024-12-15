@@ -1,0 +1,50 @@
+{
+  "q2signature": {
+    "lm": null,
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "Determine whether the DOCUMENT fits with the given CATEGORY or not",
+      "fields": [
+        {
+          "prefix": "CATEGORY:",
+          "description": "${CATEGORY}"
+        },
+        {
+          "prefix": "DOCUMENT:",
+          "description": "${DOCUMENT}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "FIT:",
+          "description": "Whether the DOCUMENT fits with the given CATEGORY or not (YES or NO)"
+        }
+      ]
+    },
+    "extended_signature": {
+      "instructions": "Determine whether the DOCUMENT fits with the given CATEGORY or not",
+      "fields": [
+        {
+          "prefix": "CATEGORY:",
+          "description": "${CATEGORY}"
+        },
+        {
+          "prefix": "DOCUMENT:",
+          "description": "${DOCUMENT}"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "FIT:",
+          "description": "Whether the DOCUMENT fits with the given CATEGORY or not (YES or NO)"
+        }
+      ]
+    }
+  }
+}

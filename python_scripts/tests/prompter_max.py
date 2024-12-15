@@ -27,6 +27,7 @@ class Prompter:
         top_p: float = 0.1,
         random_seed: int = 1234,
         frequency_penalty: float = 0.0,
+        max_tokens: int = 1000,
         path_open_ai_key: str = ".env",
         ollama_host: str = "http://kumo01.tsc.uc3m.es:11434",
         llama_cpp_host: str = "http://kumo01:11435/v1/chat/completions",
@@ -48,15 +49,15 @@ class Prompter:
         
         self.OLLAMA_MODELS = [
             'llama3.2',
-            'llama3.1:8b-instruct-q8_0',
-            'qwen:32b'
+            'llama3.1:8b-instruct-q8_0'
         ]
         
         self.params = {
             "temperature": temperature,
             "top_p": top_p,
             "seed": random_seed,
-            "frequency_penalty": frequency_penalty
+            "frequency_penalty": frequency_penalty,
+            "max_tokens": max_tokens,
         }    
         
         self.model_type = model_type
@@ -176,6 +177,9 @@ class Prompter:
     def _call_ollama_api(template, question, model_type, params, context):
         """Handles the OLLAMA API call."""
         
+        # update max_tokens in params
+        params["num_predict"] = params.get("max_tokens", 1000)
+        
         if template is not None:
             response = ollama_client.generate(
                 system=template,
@@ -199,7 +203,7 @@ class Prompter:
         return result, logprobs, context
 
     @staticmethod
-    def _call_llama_cpp_api(template, question, params, llama_cpp_host="http://kumo01:11435/v1/chat/completions"):
+    def _call_llama_cpp_api(template, question, params, max_tokens, llama_cpp_host="http://kumo01:11435/v1/chat/completions"):
         """Handles the llama_cpp API call."""
         payload = {
             "messages": [
@@ -207,7 +211,7 @@ class Prompter:
                 {"role": "user", "content": question},
             ],
             "temperature": params.get("temperature", 0.7),
-            "max_tokens": params.get("max_tokens", 100),
+            "max_tokens": max_tokens,
             "logprobs": 1,
             "n_probs": 1,
         }
@@ -227,6 +231,7 @@ class Prompter:
         system_prompt_template_path: str,
         question: str,
         use_context: bool = False,
+        max_tokens: int = 100,
     ) -> Union[str, List[str]]:
         """Public method to execute a prompt given a system prompt template and a question."""
 
@@ -235,6 +240,9 @@ class Prompter:
         if system_prompt_template_path is not None:
             with open(system_prompt_template_path, "r") as file:
                 system_prompt_template = file.read()
+                
+        # update max_tokens in params
+        self.params["max_tokens"] = max_tokens
 
         # Ensure hashable params for caching and get cached data / execute prompt
         params_tuple = tuple(sorted(self.params.items()))
@@ -306,13 +314,10 @@ class Prompter:
 
             # Actual question to the LLM (keys and docs) 
             docs = "".join(f"\n- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
-        
             keys = " ".join(text["topic_words"][:topk])
-            
             template_path = load_template_path("q1_with_desc") if generate_description else load_template_path("q1")
+            
             return self._load_template(template_path).format("\n".join(examples), keys, docs)
-            #template_path = load_template_path("q1_with_desc") if generate_description else load_template_path("q1_dspy")
-            #return self._load_template(template_path).format(keywords=keys, documents = docs)
 
         def handle_binary_q2(
             text: dict,
@@ -525,3 +530,40 @@ class Prompter:
             raise ValueError("Invalid question type")
         
         return question_handlers[question_type](text_for_prompt)
+    
+    
+"""
+        def handle_q3_dspy_generic(
+            text: dict,
+            cat: str,
+            num_words: int = 100,
+            doing_both_ways: bool = True,
+            template_name: str = "q3_dspy",
+            random_seed: int = 1234,
+            return_raw: bool=True
+        ) -> List[str]:
+            
+            random.seed(random_seed)
+            
+            # Document pairs generation
+            doc_pairs, pair_ids = [], []
+            
+            eval_docs = random.sample(text["eval_docs"], len(text["eval_docs"]))
+            for d1, d2 in itertools.combinations(eval_docs, 2):
+                docs = random.sample([d1, d2], 2)
+                                
+                doc_a = extend_to_full_sentence(docs[0]['text'], num_words)
+                doc_b = extend_to_full_sentence(docs[1]['text'], num_words)
+
+                doc_pairs.append([doc_a, doc_b])
+                pair_ids.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+
+            # Template loading and formatting
+            template_path = load_template_path(template_name)
+            template = self._load_template(template_path)
+            
+            if not return_raw:
+                return ([template.format(category=cat, doc_a=pair[0], doc_b=pair[1]) for pair in doc_pairs], pair_ids)
+            else:
+                return (cat, [(pair[0], pair[1]) for pair in doc_pairs], pair_ids)
+"""

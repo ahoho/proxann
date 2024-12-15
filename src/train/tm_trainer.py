@@ -902,28 +902,9 @@ class BERTopicTrainer(TMTrainer):
         # tiebreak with the approximate thetas
         thetas_overall = probs.round(2) + thetas_approx / 100
         
-        
         self.document_info = self._model.get_document_info(texts)
-        
-        """
-        num_docs = len(texts)
-        num_topics = len(self.document_info.Topic.unique())
-        thetas = np.zeros((num_docs, num_topics-1))
-        for id_doc, doc in self.document_info.iterrows():
-            if doc.Topic == -1:
-                continue
-            else:
-                id_topic = doc.Topic
-            thetas[id_doc, id_topic] = doc.Probability
-
-        # tiebreak with the approximate thetas
-        thetas_overall = thetas.round(2) + thetas_approx / 100
-        """
             
         self._logger.info(f"-- -- Thetas shape: {thetas_overall.shape}")
-        # Add information about the percentage of the document that relates to the topic
-        topic_distr, _ = self._model.approximate_distribution(texts, batch_size=1000)
-        distributions = [distr[topic] if topic != -1 else 0 for topic, distr in zip(self._model.topics_, topic_distr)]
         
         betas = self._model.c_tf_idf_.toarray()
         betas = betas[1:, :] #drop out outlier topic and keep (K-1, V) matrix
@@ -939,8 +920,7 @@ class BERTopicTrainer(TMTrainer):
 
         t_end = time.perf_counter() - t_start
         
-        # self._save_model_results(thetas_approx, betas, vocab, keys)
-        self._save_model_results(probs, betas, vocab, keys)
+        self._save_model_results(thetas_overall, betas, vocab, keys)
         self._save_init_params_to_yaml()
         # for bertopic we also save the document_topic_info
         self.document_info.to_csv(self.model_path.joinpath('document_topic_info.csv'), index=False)

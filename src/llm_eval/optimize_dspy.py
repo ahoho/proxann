@@ -82,6 +82,23 @@ class ThetasDataset(Dataset):
 ################################################################################
 # SIGNATURE & MODULE
 ################################################################################
+class Q1Signature(dspy.Signature):
+    """Analyze both the KEYWORDS and the content of the documents to create a clear, concise label that accurately reflects the overall theme they share."""
+    KEYWORDS = dspy.InputField()
+    DOCUMENTS = dspy.InputField()
+    CATEGORY = dspy.OutputField(desc="Category that best describes the topic connecting all the documents")
+    
+class Q1Module(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.q1signature = dspy.Predict(Q1Signature)
+
+    def forward(self, keywords: str, documents: str):
+        category = self.q1signature(KEYWORDS=keywords, DOCUMENTS=documents).CATEGORY
+        
+        return dspy.Prediction(category = category)
+
+
 class Q3Signature(dspy.Signature):
     """Determine which document is more closely related to the given category"""
     CATEGORY = dspy.InputField()
@@ -253,22 +270,22 @@ def optimize_q2_module(data_path, mbd=4, mld=16, ncp=16, mr=1, dev_size=0.25):
         
 if __name__ == "__main__":
 
+    """"
     load_dotenv(".env")
     api_key = os.getenv("OPENAI_API_KEY")
     print(api_key)
     os.environ["OPENAI_API_KEY"] = api_key
     lm = dspy.LM(model="gpt-4o-mini-2024-07-18")
     dspy.settings.configure(lm=lm)
-    
     """
+    
+
     lm = dspy.LM(
-        "ollama_chat/llama3.1:8b-instruct-q8_0",
+        "ollama_chat/qwen:32b",
         api_base="http://kumo01:11434"
     )
     dspy.settings.configure(lm=lm)
-    """
 
-    
     # test the module
     """
     dtset = ThetasDataset(data_fpath="data/files_pilot/user_pairs_tr_data.json")
@@ -285,11 +302,9 @@ if __name__ == "__main__":
     compiled_pred = optimize_module("data/files_pilot/user_pairs_rank_tr_data.json")
     """
     
-
     compiled_pred = optimize_q2_module("data/files_pilot/user_fit_tr_data.json")
-
-    
-    compiled_pred.save("data/dspy-saved/gpt_10dec.json")
+    import pdb; pdb.set_trace()
+    compiled_pred.save("data/dspy-saved/qwen:32b_15dec.json")
     
     compiled_classifier = compiled_pred
     #compiled_classifier("<<category>>", "<<document>>", "<<document>>")

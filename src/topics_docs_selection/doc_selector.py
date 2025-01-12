@@ -24,8 +24,7 @@ class DocSelector(object):
     def __init__(
         self,
         logger: Optional[logging.Logger] = None,
-        path_logs: pathlib.Path = pathlib.Path(
-            __file__).parent.parent.parent / "data/logs"
+        config_path: pathlib.Path = pathlib.Path(__file__).parent.parent.parent / "config/config.conf"
     ) -> None:
         """
         Initialize the DocSelector class.
@@ -37,7 +36,7 @@ class DocSelector(object):
         path_logs : pathlib.Path, optional
             Path for saving logs.
         """
-        self._logger = logger if logger else init_logger(__name__, path_logs)
+        self._logger = logger if logger else init_logger(config_path,__name__)
 
         return
 
@@ -313,7 +312,7 @@ class DocSelector(object):
 
         S3 = np.zeros((len(thetas), len(betas)))
 
-        betas_top = keep_top_k_values(betas, top_words) if top_words else betas
+        betas_top = keep_top_k_values(betas, top_words, self._logger) if top_words else betas
 
         for doc in range(len(thetas)):
             for topic in range(thetas.shape[1]):

@@ -23,13 +23,54 @@ class TopicJsonFormatter:
     - Representative Documents (methods: 'thetas', 'thetas_sample', 'thetas_thr', 'sall', 'spart', 's3')
     - Top Words for Each Topic
     - Evaluation Documents and Their Probabilities
+
+    ######################
+    # Example structure: #
+    ######################
+    {
+        "<topic_id>": {
+            "topic_words": ["word1", "word2", "word3", ...], 
+            "exemplar_docs": [
+                {
+                    "doc_id": 1, 
+                    "text": "Document text goes here.", 
+                    "prob": 0.9, 
+                },
+                {
+                    "doc_id": 2, 
+                    "text": "Document text goes here.", 
+                    "prob": 0.8, 
+                },
+                ...
+            ],
+            "eval_docs": [
+                {
+                    "doc_id": 1, 
+                    "text": "Document text goes here.", 
+                    "prob": 0.9, 
+                    "assigned_to_k": 1
+                },
+                {
+                    "doc_id": 2, 
+                    "text": "Document text goes here.", 
+                    "prob": 0.8, 
+                    "assigned_to_k": 1
+                },
+                ...
+            ],
+            "distractor_doc": {
+                "doc_id": 100,
+                "text": "Document text goes here"
+            }
+        },
+        ...
+    }
     """
 
     def __init__(
         self,
         logger: Optional[logging.Logger] = None,
-        path_logs: pathlib.Path = pathlib.Path(
-            __file__).parent.parent.parent / "data/logs"
+        config_path: pathlib.Path = pathlib.Path(__file__).parent.parent.parent / "config/config.conf"
     ) -> None:
         """
         Initialize the TopicJsonFormatter class.
@@ -41,8 +82,8 @@ class TopicJsonFormatter:
         path_logs : pathlib.Path, optional
             Path for saving logs.
         """
-        self._logger = logger if logger else init_logger(__name__, path_logs)
-        self._doc_selector = DocSelector(self._logger, path_logs)
+        self._logger = logger if logger else init_logger(config_path, __name__)
+        self._doc_selector = DocSelector(self._logger)
 
     def get_model_eval_output(
         self,
@@ -71,12 +112,15 @@ class TopicJsonFormatter:
         dict
             JSON formatted dictionary of the model evaluation output.
         """
-        exemplar_docs_ids, exemplar_docs_probs = self._doc_selector.get_top_docs(**kwargs)
-        exemplar_docs = [[df[text_column].iloc[doc_id] for doc_id in k] for k in exemplar_docs_ids]
+        exemplar_docs_ids, exemplar_docs_probs = self._doc_selector.get_top_docs(
+            **kwargs)
+        exemplar_docs = [[df[text_column].iloc[doc_id]
+                          for doc_id in k] for k in exemplar_docs_ids]
         eval_docs_ids, eval_docs_probs, assigned_to_k = self._doc_selector.get_eval_docs(
             exemplar_docs=exemplar_docs_ids,
             **kwargs)
-        eval_docs = [[df[text_column].iloc[doc_id] for doc_id in k] for k in eval_docs_ids]
+        eval_docs = [[df[text_column].iloc[doc_id]
+                      for doc_id in k] for k in eval_docs_ids]
         topic_ids = range(len(exemplar_docs_ids))
 
         if hard_distractor:
@@ -84,7 +128,8 @@ class TopicJsonFormatter:
                 DISTRACTOR_DOC for _ in range(len(exemplar_docs_ids))]
         else:
             distractor_ids = self._doc_selector.get_doc_distractor(**kwargs)
-            distractor_docs = [df[text_column].iloc[doc_id] for doc_id in distractor_ids]
+            distractor_docs = [df[text_column].iloc[doc_id]
+                               for doc_id in distractor_ids]
 
         json_out = self.jsonfy(
             topic_ids,
@@ -145,7 +190,7 @@ class TopicJsonFormatter:
             topic_ids, exemplar_docs_ids, exemplar_docs, exemplar_docs_probs, topic_words, eval_docs_ids, eval_docs, eval_docs_probs, distractor_docs, assigned_to_k
         ):
             edast_b = [item == k for item in edast]
-            
+
             exemplar_docs_list = [
                 {
                     "doc_id": int(exids_d),

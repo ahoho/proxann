@@ -20,8 +20,7 @@ class TopicSelector(object):
         self,
         wmd_model: str = 'word2vec-google-news-300',
         logger: Optional[logging.Logger] = None,
-        path_logs: pathlib.Path = pathlib.Path(
-            __file__).parent.parent.parent / "data/logs"
+        config_path: pathlib.Path = pathlib.Path(__file__).parent.parent.parent / "config/config.conf"
     ) -> None:
         """
         Initialize the TopicSelector class.
@@ -33,7 +32,7 @@ class TopicSelector(object):
         path_logs : pathlib.Path, optional
             Path for saving logs.
         """
-        self._logger = logger if logger else init_logger(__name__, path_logs)
+        self._logger = logger if logger else init_logger(config_path, __name__)
         self._wmd_model = api.load(wmd_model)      
 
         return

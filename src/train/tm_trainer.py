@@ -3,37 +3,35 @@ import json
 import logging
 import os
 import pathlib
-import sys
 import shutil
-from subprocess import check_output
+import sys
 import time
-from typing import List
 from abc import ABC, abstractmethod
+from subprocess import check_output
+from typing import List
 
-import numpy as np
-import pandas as pd
-from tqdm import tqdm
-import yaml
-from gensim.corpora import Dictionary
-from scipy import sparse
-from sklearn.preprocessing import normalize
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tomotopy as tp
+import yaml
 from bertopic import BERTopic
 from bertopic.representation import KeyBERTInspired, MaximalMarginalRelevance
 from bertopic.vectorizers import ClassTfidfTransformer
 from gensim.corpora import Dictionary
 from hdbscan import HDBSCAN
+from scipy import sparse
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.preprocessing import normalize
 from tqdm import tqdm
-#from umap import UMAP
-from cuml.manifold import UMAP
+from umap import UMAP
 
-from src.utils.utils import file_lines, get_embeddings_from_str, load_vocab_from_txt, pickler, init_logger
+from src.utils.utils import (file_lines, get_embeddings_from_str, init_logger,
+                             load_vocab_from_txt, pickler, read_dataframe)
+
+#from cuml.manifold import UMAP
+
 
 class TMTrainer(ABC):
     """
@@ -46,7 +44,7 @@ class TMTrainer(ABC):
         topn: int = 15,
         model_path: str = None,
         logger: logging.Logger = None,
-        path_logs: pathlib.Path = pathlib.Path(__file__).parent.parent.parent / "data/logs"
+        config_path: pathlib.Path = pathlib.Path(__file__).parent.parent.parent / "config/config.conf"
     ) -> None:
         """
         Initialize the TMTrainer class.
@@ -65,7 +63,7 @@ class TMTrainer(ABC):
             Path for saving logs.
         """
         
-        self._logger = logger if logger else init_logger(__name__, path_logs)
+        self._logger = logger if logger else init_logger(config_path, __name__)
 
         self.model_path = pathlib.Path(model_path)
         if self.model_path.exists():
@@ -220,17 +218,7 @@ class TMTrainer(ABC):
         path_to_data = pathlib.Path(path_to_data)
         self.text_col = text_data
 
-        try:
-            if path_to_data.suffix == ".parquet":
-                df = pd.read_parquet(path_to_data)
-            elif path_to_data.suffix in [".json", ".jsonl"]:
-                df = pd.read_json(path_to_data, lines=True)
-            else:
-                self._logger.error(f"-- -- Unrecognized file extension for data path. Exiting...")
-                return
-        except Exception as e:
-            self._logger.error(f"-- -- An exception occurred when loading data: {e}. Exiting...")
-            return
+        df = read_dataframe(path_to_data, self._logger)
 
         self.df = df
         self.train_data = [doc.split() for doc in df[text_data]]
@@ -782,7 +770,7 @@ class BERTopicTrainer(TMTrainer):
                     vocab_w2id = json.load(infile)
 
             elif vocab_path.endswith()(".txt"):
-                vocab_w2id = load_vocab_from_txt(vocab_path)
+                vocab_w2id = load_vocab_from_txt(vocab_path, self._logger)
                 
             else:
                 raise NotImplementedError("Need to account for other forms of loading the vocabulary.")

@@ -7,4 +7,4 @@ cd "$SCRIPT_DIR/.."
 # Current working directory
 pwd
 
-python3 get_info_models.py --config "config/config_pilot.conf"
+python3 get_info_models.py --config "config/config_test.conf"

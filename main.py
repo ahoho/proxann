@@ -50,6 +50,7 @@ def main():
     #                           EMBEDDINGS                                 #
     ########################################################################
     parser_embeddings = subparsers.add_parser('generate_embeddings')
+    parser_embeddings.add_argument("--config_path", type=str, default="config/config.conf")
     parser_embeddings.add_argument("--source_file", type=str, required=True)
     parser_embeddings.add_argument("--output_file", type=str, required=True)
     parser_embeddings.add_argument("--batch_size", type=int, default=128)
@@ -59,7 +60,7 @@ def main():
     parser_embeddings.set_defaults(func=generate_embeddings)
 
     ########################################################################
-    #                          TM   TRAINING                               #
+    #                          TM TRAINING                                 #
     ########################################################################
     parser_tm_training = subparsers.add_parser('train_tm')
     parser_tm_training.add_argument("--corpus_file", type=str, default="/export/usuarios_ml4ds/lbartolome/Repos/umd/fluffy-train/data/train.metadata.enriched.parquet", required=False)

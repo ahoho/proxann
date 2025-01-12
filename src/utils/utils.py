@@ -3,10 +3,12 @@ import logging
 import pathlib
 import pickle
 from datetime import datetime
+import sys
 from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+from scipy import sparse
 
 
 def log_or_print(
@@ -347,3 +349,19 @@ def read_dataframe(
         err_msg = f"An error occurred while reading the data: {e}"
         log_or_print(err_msg, level="error", logger=logger)
         raise RuntimeError(err_msg)
+
+
+def safe_load_npy(file_path, logger, description):
+    if file_path is not None and pathlib.Path(file_path).exists():
+        try:
+            if file_path.endswith(".npy"):
+                return np.load(file_path)
+            elif file_path.endswith(".npz"):
+                return sparse.load_npz(file_path).toarray()
+        except Exception as e:
+            logger.error(f"Error loading {description} from {file_path}: {e}")
+            sys.exit(1)
+    else:
+        logger.warning(
+            f"{description} file path is missing or invalid: {file_path}")
+        return None

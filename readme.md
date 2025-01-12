@@ -1,6 +1,23 @@
 # THETA-EVALUATION
 
-## Modules
+This repository contains the code and data for reproducing experiments from our paper, *ProxAnn: Use-Oriented Evaluations of Topic Models and Document Clustering.*
+
+## Features
+
+1. **Human User Study Generation**:
+   - Use the script `get_user_study_data.py` to generate a JSON file for conducting user studies.
+2. **Proxy-Based Evaluation**:
+   - Run LLM proxy annotations using `run_proxy_ann_study.py`.
+3. **Topic Model Training**:
+   - Train topic models for evaluation using the `TMTrainer` class.
+
+## Data
+
+## Installation
+
+## Use
+
+## OLD
 
 ### Embedder
 

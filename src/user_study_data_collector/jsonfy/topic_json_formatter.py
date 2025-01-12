@@ -9,8 +9,8 @@ import numpy as np
 from scipy import sparse
 from typing import List, Dict, Any
 import pandas as pd
-from src.topics_docs_selection.doc_selector import DocSelector
-from src.utils.utils import init_logger
+from src.user_study_data_collector.topics_docs_selection.doc_selector import DocSelector
+from src.utils.utils import init_logger, read_dataframe, safe_load_npy
 
 
 DISTRACTOR_DOC = "There is nothing negative to say about these sponges. They are absorbent, made well, clean up well and so far no odors. I bought them to use on my new ceramic cook ware and they are GREAT! They do not scratch my cook ware, stove top or anything else. I'm not a fan of sponges, but I really like these. I have only used one so far and it is holding up nicely. I have been using it about 2-3 weeks. Normally, I'd have thrown it away by now, but, again, no odors and whatever I clean up comes right out of the sponge. I do use a liquid cleaner on these after use. I'd recommend these."
@@ -70,7 +70,7 @@ class TopicJsonFormatter:
     def __init__(
         self,
         logger: Optional[logging.Logger] = None,
-        config_path: pathlib.Path = pathlib.Path(__file__).parent.parent.parent / "config/config.conf"
+        config_path: pathlib.Path = pathlib.Path("config/config.conf")
     ) -> None:
         """
         Initialize the TopicJsonFormatter class.
@@ -319,55 +319,70 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config_path",
+        help="Path to the configuration file.",
+        type=str,
+        default="config/config.conf",
+        required=False
+    )
+    parser.add_argument(
         '--method',
         type=str,
         required=True,
-        help="Method to use for selecting top documents. Several methods can be specified by providing them as a string separated by commas. Available methods: 'thetas', 'thetas_sample', 'thetas_thr', 'sall', 'spart', 's3'")
+        default="elbow",
+        help="Method to use for selecting top documents. Several methods can be specified by providing them as a string separated by commas. Available methods: 'thetas', 'thetas_sample', 'thetas_thr', 'sall', 'spart', 's3', 'elbow'.")
     parser.add_argument(
         '--thetas_path',
         type=str,
         required=False,
-        help='Path to the thetas numpy file.'
+        default=None,
+        help='Path to the thetas numpy file.',
     )
     parser.add_argument(
         '--bow_path',
         type=str,
         required=False,
+        default=None,
         help='Path to the bag-of-words numpy file.')
     parser.add_argument(
         '--betas_path',
         type=str,
         required=False,
+        default=None,
         help='Path to the betas numpy file.'
     )
     parser.add_argument(
         '--corpus_path',
         type=str,
         required=False,
+        default=None,
         help='Path to the corpus file.'
     )
     parser.add_argument(
         '--vocab_path',
         type=str,
         required=False,
+        default=None,
         help='Path to the vocabulary file (word to index mapping).'
     )
     parser.add_argument(
         '--model_path',
         type=str,
         required=False,
+        default=None,
         help='Path to the model directory.'
     )
     parser.add_argument(
         '--top_words',
         type=int,
         required=False,
+        default=15,
         help='Number of top words to keep in the betas matrix when using S3.')
     parser.add_argument(
         '--top_words_display',
         type=int,
-        default=100,
         required=False,
+        default=100,
         help='Number of top words per topic to display in the TopicJsonFormatter output.')
     parser.add_argument(
         '--thr',
@@ -404,12 +419,14 @@ def main():
 
     args = parser.parse_args()
 
-    formatter = TopicJsonFormatter()
+    # Initialize the logger
+    logger = init_logger(args.config_path, TopicJsonFormatter.__name__)
+
+    formatter = TopicJsonFormatter(logger=logger)
 
     if args.trained_with_thetas_eval:
         model_path = pathlib.Path(args.model_path)
         try:
-            # Load matrices
             thetas = sparse.load_npz(model_path / "thetas.npz").toarray()
             betas = np.load(model_path / "betas.npy")
             bow = sparse.load_npz(model_path / "bow.npz").toarray()
@@ -422,46 +439,35 @@ def main():
                     vocab_w2id[wd] = i
 
         except Exception as e:
-            print(
+            logger.info(
                 f"-- -- Error occurred when loading info from model {model_path.as_posix(): e}")
 
     else:
-        # Load matrices
-        thetas = np.load(args.thetas_path) if args.thetas_path else None
-        try:
-            bow = np.load(args.bow_path) if args.bow_path else None
-        except Exception as e:
-            # print(f"-- -- No BoW file found. Setting to None...")
-            bow = None
-        betas = np.load(args.betas_path) if args.betas_path else None
-
+        thetas = safe_load_npy(args.thetas_path, logger, "Thetas numpy file")
+        bow = safe_load_npy(args.bow_path, logger, "Bag-of-words numpy file")
+        betas = safe_load_npy(args.betas_path, logger, "Betas numpy file")
         if args.vocab_path.endswith(".json"):
             with open(args.vocab_path) as infile:
                 vocab_w2id = json.load(infile)
-
-        elif args.vocab_path.endswith()(".txt"):
+            # vocab_id2w = dict(zip(vocab_w2id.values(), vocab_w2id.keys()))
+        elif args.vocab_path.endswith(".txt"):
             vocab_w2id = load_vocab_from_txt(args.vocab_path)
         else:
-            print(
+            logger.info(
                 f"-- -- File does not have the required extension for loading the vocabulary. Exiting...")
             sys.exit()
-
+    
     #  Get keys
     vocab_id2w = dict(zip(vocab_w2id.values(), vocab_w2id.keys()))
     keys = [
-        [vocab_id2w[idx] for idx in row.argsort()[::-1][:args.top_words_display]]
+        [vocab_id2w[idx]
+            for idx in row.argsort()[::-1][:args.top_words_display]]
         for row in betas
     ]
-
-    corpus_path = pathlib.Path(args.corpus_path)
-    if corpus_path.suffix == ".parquet":
-        df = pd.read_parquet(corpus_path)
-    elif corpus_path.suffix in [".json", ".jsonl"]:
-        df = pd.read_json(corpus_path, lines=True)
-    else:
-        print(
-            f"-- -- Unrecognized file extension for data path: {corpus_path.suffix}. Exiting...")
-        sys.exit()
+    # print id and top words
+    for i, key in enumerate(keys):
+        print(f"-- -- Topic {i}: {key[:10]}")
+    df = read_dataframe(pathlib.Path(args.corpus_path), logger=logger)
 
     df["text_split"] = df[args.text_column].apply(lambda x: x.split())
     corpus = df["text_split"].values.tolist()

@@ -20,8 +20,7 @@ class Embedder(object):
         aggregate_embeddings: bool = False,
         use_gpu: bool = True,
         logger: logging.Logger = None,
-        config_path: pathlib.Path = pathlib.Path(
-            __file__).parent.parent.parent / "config/config.conf"
+        config_path: pathlib.Path = pathlib.Path("config/config.conf")
     ) -> None:
 
         self._logger = logger if logger else init_logger(config_path, __name__)
@@ -118,7 +117,6 @@ def main():
         default="config/config.conf",
         required=False
     )
-
     argparser.add_argument(
         "--source_file",
         help="Path to the source file containing the data to be processed. The file should be in JSON format.",

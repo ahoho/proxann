@@ -12,8 +12,7 @@ from kneed import KneeLocator
 from scipy import sparse
 from scipy.ndimage import uniform_filter1d
 
-from src.topics_docs_selection.topic_selector import TopicSelector
-from src.utils.utils import init_logger, keep_top_k_values
+from src.utils.utils import init_logger, keep_top_k_values, safe_load_npy
 
 
 class DocSelector(object):
@@ -574,7 +573,7 @@ class DocSelector(object):
         if method == "thetas_sample":
             mat = thetas.copy()
             mat = mat / mat.sum(axis=0)
-            top_docs = []
+            most_representative_per_tpc = []
             for col in range(len(mat.T)):
                 top_docs_per_topic = []
                 for _ in range(ntop):
@@ -582,8 +581,7 @@ class DocSelector(object):
                     top_docs_per_topic.append((sampled_idx, mat[sampled_idx, col]))
                 # Sort by the probs in descending order and append just idxs
                 top_docs_per_topic.sort(key=lambda x: x[1], reverse=True)
-                top_docs.append([doc[0] for doc in top_docs_per_topic])
-            return top_docs
+                most_representative_per_tpc.append([doc[0] for doc in top_docs_per_topic])
         
         elif method == "elbow":
             mat = thetas.copy()
@@ -627,12 +625,12 @@ class DocSelector(object):
                     sorted_docs_indices = np.argsort(mat.T[k])[::-1]
                     top = sorted_docs_indices[:ntop].tolist()
                     most_representative_per_tpc.append(top)
-                    
         else:
             mat = self._get_mat_for_top(
                 method, thetas, bow, betas, corpus, vocab_w2id, model_path, top_words, thr)
             
             most_representative_per_tpc = self._get_most_representative_per_tpc(mat, ntop)
+
         exemplar_docs_probs = [[thetas.T[k][doc_id] for doc_id in id_docs]
             for k, id_docs in enumerate(most_representative_per_tpc)]
             
@@ -703,77 +701,9 @@ class DocSelector(object):
         try:
             assigned_to_k = self._get_assign_tpc(thetas_)[eval_docs]
         except Exception as e:
-            import pdb; pdb.set_trace()
-
+            self._logger.error(f"Error occurred when assigning topics to evaluation docs: {e}")
+            assigned_to_k = None
         return eval_docs, eval_probs, assigned_to_k
-
-    def get_doc_distractor(
-        self,
-        method: str,
-        thetas: np.ndarray = None,
-        bow: np.ndarray = None,
-        betas: np.ndarray = None,
-        corpus: List[List[str]] = None,
-        vocab_w2id: dict = None,
-        model_path: str = None,
-        top_words: int = None,
-        thr: tuple = None,
-        ntop: int = 5
-    ) -> List[List[int]]:
-        """
-        Get the top documents based on the specified method (see _get_mat_for_top for details).
-
-        Parameters
-        ----------
-        method : str
-            Method to use for selecting top documents.
-        exemplar_docs : List[int]
-            List of IDs of the exemplar documents.
-        thetas : np.ndarray, optional
-            Topic proportions for documents.
-        bow : np.ndarray, optional
-            Bag-of-words representation of the corpus.
-        betas : np.ndarray, optional
-            Topic-word distributions.
-        corpus : List[List[str]], optional
-            The corpus as a list of lists of words.
-        vocab_w2id : dict, optional
-            Vocabulary word-to-id mapping.
-        model_path : str, optional
-            Path to the model.
-        top_words : int, optional
-            Number of top words to consider.
-        thr : tuple, optional
-            Threshold values for filtering topics.
-        ntop : int, default=5
-            Number of top documents to select.
-
-        Returns
-        -------
-        List[int]:
-            A list of the indices of the selected documents, each one being the most representative 
-        """
-
-        #  Get the matrix to be used for selecting the top documents
-        if method == "thetas_sample" or method == "elbow":
-            method = "thetas"
-            
-        mat = self._get_mat_for_top(
-            method, thetas, bow, betas, corpus, vocab_w2id, model_path, top_words, thr)
-
-        topic_selector = TopicSelector()
-        disimilar_pairs = topic_selector.find_most_dissimilar_pairs(
-            betas, betas)
-        disimilar_pairs = sorted(disimilar_pairs, key=lambda x: x[0])
-        # For each topic, select the a representative document of the most dissimilar topic
-        dis_docs = []
-        for topic_from, topic_to in disimilar_pairs:
-            dis_topic_distrb = mat[:, topic_to]
-            dis_doc = int(np.argmax(dis_topic_distrb))
-            dis_docs.append(dis_doc)
-        import pdb; pdb.set_trace()
-        return dis_docs
-
 
 def main():
 
@@ -785,70 +715,86 @@ def main():
                 vocab_w2id[wd] = i
         return vocab_w2id
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument(
+        "--config_path",
+        help="Path to the configuration file.",
+        type=str,
+        default="config/config.conf",
+        required=False
+    )
+    argparser.add_argument(
         '--method',
         type=str,
         required=True,
-        help="Method to use for selecting top documents. Several methods can be specified by providing them as a string separated by commas. Available methods: 'thetas', 'thetas_sample', 'thetas_thr', 'sall', 'spart', 's3'")
-    parser.add_argument(
+        default="elbow",
+        help="Method to use for selecting top documents. Several methods can be specified by providing them as a string separated by commas. Available methods: 'thetas', 'thetas_sample', 'thetas_thr', 'sall', 'spart', 's3', 'elbow'.")
+    argparser.add_argument(
         '--thetas_path',
         type=str,
         required=False,
+        default=None,
         help='Path to the thetas numpy file.'
     )
-    parser.add_argument(
+    argparser.add_argument(
         '--bow_path',
         type=str,
         required=False,
+        default=None,
         help='Path to the bag-of-words numpy file.')
-    parser.add_argument(
+    argparser.add_argument(
         '--betas_path',
         type=str,
         required=False,
+        default=None,
         help='Path to the betas numpy file.'
     )
-    parser.add_argument(
+    argparser.add_argument(
         '--corpus_path',
         type=str,
         required=False,
+        default=None,
         help='Path to the corpus file.'
     )
-    parser.add_argument(
+    argparser.add_argument(
         '--vocab_path',
         type=str,
         required=False,
+        default=None,
         help='Path to the vocabulary file (word to index mapping).'
     )
-    parser.add_argument(
+    argparser.add_argument(
         '--model_path',
         type=str,
         required=False,
+        default=None,
         help='Path to the model directory.'
     )
-    parser.add_argument(
+    argparser.add_argument(
         '--top_words',
         type=int,
         required=False,
+        default=15,
         help='Number of top words to keep in the betas matrix when using S3.')
-    parser.add_argument(
+    argparser.add_argument(
         '--thr',
         type=str,
         required=False,
+        default="0.1,0.8",
         help='Threshold values for the thetas_thr method, as (thr_inf,thr_sup)'
     )
-    parser.add_argument(
+    argparser.add_argument(
         '--ntop',
         type=int,
         default=5,
         help='Number of top documents to select.'
     )
-    parser.add_argument(
+    argparser.add_argument(
         '--trained_with_thetas_eval',
         action='store_true',
         help="Whether the model given by model_path was trained using this code"
     )
-    parser.add_argument(
+    argparser.add_argument(
         '--text_column',
         type=str,
         required=False,
@@ -856,9 +802,12 @@ def main():
         help='Column of corpus_path that was used for training the model.'
     )
 
-    args = parser.parse_args()
+    args = argparser.parse_args()
 
-    doc_selector = DocSelector()
+    # Initialize the logger
+    logger = init_logger(args.config_path, DocSelector.__name__)
+
+    doc_selector = DocSelector(logger=logger)
 
     if args.trained_with_thetas_eval:
         model_path = pathlib.Path(args.model_path)
@@ -875,22 +824,22 @@ def main():
                     vocab_w2id[wd] = i
 
         except Exception as e:
-            print(
+            logger.info(
                 f"-- -- Error occurred when loading info from model {model_path.as_posix(): e}")
 
     else:
-        thetas = np.load(args.thetas_path) if args.thetas_path else None
-        bow = np.load(args.bow_path) if args.bow_path else None
-        betas = np.load(args.betas_path) if args.betas_path else None
+        thetas = safe_load_npy(args.thetas_path, logger, "Thetas numpy file")
+        bow = safe_load_npy(args.bow_path, logger, "Bag-of-words numpy file")
+        betas = safe_load_npy(args.betas_path, logger, "Betas numpy file")
 
         if args.vocab_path.endswith(".json"):
             with open(args.vocab_path) as infile:
                 vocab_w2id = json.load(infile)
             # vocab_id2w = dict(zip(vocab_w2id.values(), vocab_w2id.keys()))
-        elif args.vocab_path.endswith()(".txt"):
+        elif args.vocab_path.endswith(".txt"):
             vocab_w2id = load_vocab_from_txt(args.vocab_path)
         else:
-            print(
+            logger.info(
                 f"-- -- File does not have the required extension for loading the vocabulary. Exiting...")
             sys.exit()
 
@@ -900,7 +849,7 @@ def main():
     elif corpus_path.suffix in [".json", ".jsonl"]:
         df = pd.read_json(corpus_path, lines=True)
     else:
-        print(
+        logger.info(
             f"-- -- Unrecognized file extension for data path: {corpus_path.suffix}. Exiting...")
         sys.exit()
 
@@ -918,7 +867,6 @@ def main():
         except Exception as e:
             print("The threshold values introduced are not valid. Please, introduce something in the format (inf_thr, sup_thr). Exiting...")
             sys.exit()
-
     for method in methods:
         print(f"Getting with {method}")
         top_docs, _ = doc_selector.get_top_docs(

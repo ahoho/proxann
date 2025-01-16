@@ -70,7 +70,7 @@ class TopicJsonFormatter:
     def __init__(
         self,
         logger: Optional[logging.Logger] = None,
-        config_path: pathlib.Path = pathlib.Path("config/config.conf")
+        config_path: pathlib.Path = pathlib.Path("config/config.yaml")
     ) -> None:
         """
         Initialize the TopicJsonFormatter class.
@@ -131,7 +131,7 @@ class TopicJsonFormatter:
             distractor_docs = [df[text_column].iloc[doc_id]
                                for doc_id in distractor_ids]
 
-        json_out = self.jsonfy(
+        json_out = self.jsonify(
             topic_ids,
             exemplar_docs_ids, exemplar_docs, exemplar_docs_probs,
             keys,
@@ -140,7 +140,7 @@ class TopicJsonFormatter:
         )
         return json_out
 
-    def jsonfy(
+    def jsonify(
         self,
         topic_ids: List[int],
         exemplar_docs_ids: List[List[int]],
@@ -322,7 +322,7 @@ def main():
         "--config_path",
         help="Path to the configuration file.",
         type=str,
-        default="config/config.conf",
+        default="config/config.yaml",
         required=False
     )
     parser.add_argument(

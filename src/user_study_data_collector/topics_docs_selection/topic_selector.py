@@ -19,7 +19,7 @@ class TopicSelector(object):
         self,
         wmd_model: str = 'word2vec-google-news-300',
         logger: Optional[logging.Logger] = None,
-        config_path: pathlib.Path = pathlib.Path("config/config.conf")
+        config_path: pathlib.Path = pathlib.Path("config/config.yaml")
     ) -> None:
         """
         Initialize the TopicSelector class.

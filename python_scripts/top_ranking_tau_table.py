@@ -22,7 +22,7 @@ from plotnine import (
 import sys
 sys.path.append("..")
 
-from src.llm_eval.utils import process_responses, collect_fit_rank_data, compute_correlations_one
+from src.proxann.utils import process_responses, collect_fit_rank_data, compute_correlations_one
 
 def generate(
     data,

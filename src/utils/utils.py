@@ -1,13 +1,13 @@
-import configparser
 import logging
 import pathlib
 import pickle
-from datetime import datetime
 import sys
+from datetime import datetime
 from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+import yaml
 from scipy import sparse
 
 
@@ -37,6 +37,48 @@ def log_or_print(
         print(message)
 
 
+def load_yaml_config_file(config_file: str, section: str, logger:logging.Logger) -> Dict:
+    """
+    Load a YAML configuration file and return the specified section.
+
+    Parameters
+    ----------
+    config_file : str
+        Path to the YAML configuration file.
+    section : str
+        Section of the configuration file to return.
+
+    Returns
+    -------
+    Dict
+        The specified section of the configuration file.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the configuration file is not found.
+    ValueError
+        If the specified section is not found in the configuration file.
+    """
+
+    if not pathlib.Path(config_file).exists():
+        log_or_print(f"Config file not found: {config_file}", level="error", logger=logger)
+        raise FileNotFoundError(f"Config file not found: {config_file}")
+
+    with open(config_file, "r") as file:
+        config = yaml.safe_load(file)
+
+    section_dict = config.get(section, {})
+
+    if section == {}:
+        log_or_print(f"Section {section} not found in config file.", level="error", logger=logger)
+        raise ValueError(f"Section {section} not found in config file.")
+
+    log_or_print(f"Loaded config file {config_file} and section {section}.", logger=logger)
+
+    return section_dict
+
+
 def init_logger(
     config_file: str,
     name: str = None
@@ -57,12 +99,11 @@ def init_logger(
         The initialized logger.
     """
 
-    config = configparser.ConfigParser()
-    config.read(config_file)
-    name = name if name else config["logger"]["logger_name"]
-    log_level = config['logger'].get("log_level", "INFO").upper()
-    dir_logger = pathlib.Path(config['logger'].get("dir_logger", "logs"))
-    N_log_keep = int(config['logger'].get("N_logs_keep", 5))
+    logger_config = load_yaml_config_file(config_file, "logger", logger=None)
+    name = name if name else logger_config.get("logger_name", "default_logger")
+    log_level = logger_config.get("log_level", "INFO").upper()
+    dir_logger = pathlib.Path(logger_config.get("dir_logger", "logs"))
+    N_log_keep = int(logger_config.get("N_log_keep", 5))
 
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
@@ -87,7 +128,7 @@ def init_logger(
             old_file.unlink()
 
     # Create handlers based on config
-    if config["logger"].get("file_log", True):
+    if logger_config.get("file_log", True):
         file_handler = logging.FileHandler(log_file_path)
         file_handler.setLevel(log_level)
         file_format = logging.Formatter(
@@ -95,7 +136,7 @@ def init_logger(
         file_handler.setFormatter(file_format)
         logger.addHandler(file_handler)
 
-    if config["logger"].get("console_log", True):
+    if logger_config.get("console_log", True):
         console_handler = logging.StreamHandler()
         console_handler.setLevel(log_level)
         console_format = logging.Formatter(

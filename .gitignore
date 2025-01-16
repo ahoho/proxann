@@ -172,7 +172,7 @@ data/results
 src/analysis/topic-model-data
 data/human_annotations
 data/document-data
-src/llm_eval/.venv
+src/proxann/.venv
 data/modelFiles
 data/files_pilot/document-data
 cache
@@ -189,3 +189,10 @@ _from_lorena
 .vscode/settings.json
 notebooks/testing
 _under_development
+data/llm_out_tests_new
+data/json_out_
+data/dspy-saved
+data/cohrs
+data/tests
+data/top_docs
+data/llm_out/tests

@@ -1,5 +1,4 @@
 import argparse
-import configparser
 import json
 import logging
 import os
@@ -29,7 +28,8 @@ from tqdm import tqdm
 from umap import UMAP
 
 from src.utils.utils import (file_lines, get_embeddings_from_str, init_logger,
-                             load_vocab_from_txt, pickler, read_dataframe)
+                             load_vocab_from_txt, load_yaml_config_file,
+                             pickler, read_dataframe)
 
 # from cuml.manifold import UMAP
 
@@ -43,7 +43,7 @@ class TMTrainer(ABC):
         self,
         model_path: str = None,
         logger: logging.Logger = None,
-        config_path: pathlib.Path = pathlib.Path("config/config.conf")
+        config_path: pathlib.Path = pathlib.Path("config/config.yaml")
     ) -> None:
         """
         Initialize the TMTrainer class.
@@ -74,9 +74,11 @@ class TMTrainer(ABC):
 
         self.model_path.mkdir(exist_ok=True)
 
-        config = configparser.ConfigParser()
-        config.read(config_path)
-        self.topn = int(config["tm_all"].get("topn", 15))
+        # load config
+        self.config = load_yaml_config_file(config_path, "topic_modeling", logger)
+   
+        self.num_topics = int(self.config.get("general", {}).get("num_topics", 50))
+        self.topn = int(self.config.get("general", {}).get("topn", 15))
 
     def _save_init_params_to_yaml(self) -> None:
         """
@@ -269,7 +271,7 @@ class MalletLDATrainer(TMTrainer):
         self,
         model_path: str = None,
         logger: logging.Logger = None,
-        config_path: pathlib.Path = pathlib.Path("config/config.conf"),
+        config_path: pathlib.Path = pathlib.Path("config/config.yaml"),
         **kwargs
     ) -> None:
         """
@@ -290,12 +292,8 @@ class MalletLDATrainer(TMTrainer):
         super().__init__(model_path, logger, config_path)
 
         # Load parameters from config
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        mallet_config = config["tm_mallet"]
+        mallet_config = self.config.get("mallet", {})
         default_params = {
-            "num_topics": int(mallet_config.get("num_topics", 50)),
             "alpha": float(mallet_config.get("alpha", 5.0)),
             "optimize_interval": int(mallet_config.get("optimize_interval", 10)),
             "num_threads": int(mallet_config.get("num_threads", 4)),
@@ -306,7 +304,8 @@ class MalletLDATrainer(TMTrainer):
             ),
             "mallet_path": pathlib.Path(
                 mallet_config.get(
-                    "mallet_path", "src/train/Mallet-202108/bin/mallet")
+                    "mallet_path", "src/train/Mallet-202108/bin/mallet"
+                )
             ),
         }
 
@@ -566,7 +565,7 @@ class TomotopyLdaModel(TMTrainer):
         self,
         model_path: str = None,
         logger: logging.Logger = None,
-        config_path: pathlib.Path = pathlib.Path("config/config.conf"),
+        config_path: pathlib.Path = pathlib.Path("config/config.yaml"),
         **kwargs
     ) -> None:
         """
@@ -587,11 +586,7 @@ class TomotopyLdaModel(TMTrainer):
         super().__init__(model_path, logger, config_path)
 
         # Load parameters from config
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        tomotopy_config = config["tm_tomotopy"]
-        self.num_topics = int(tomotopy_config.get("num_topics", 50))
+        tomotopy_config = self.config.get("tomotopy", {})
         self.num_iters = int(tomotopy_config.get("num_iters", 1000))
         self.alpha = float(tomotopy_config.get("alpha", 0.1))
         self.eta = float(tomotopy_config.get("eta", 0.01))
@@ -631,16 +626,14 @@ class TomotopyLdaModel(TMTrainer):
             k=self.num_topics, tw=tp.TermWeight.ONE, alpha=self.alpha, eta=self.eta)
         [self.model.add_doc(doc) for doc in self.train_data]
 
-        self._logger.info(f"Training TomotopyLDA model with {
-                          self.num_topics} topics...")
+        self._logger.info(f"Training TomotopyLDA model with {self.num_topics} topics...")
         pbar = tqdm(total=self.num_iters, desc='Training Progress')
         for i in range(0, self.num_iters, self.iter_interval):
             self.model.train(self.iter_interval)
             pbar.update(self.iter_interval)
             if i % 300 == 0 and i > 0:
                 topics = self.print_topics(verbose=False)
-                pbar.write(f'Iteration: {
-                           i}, Log-likelihood: {self.model.ll_per_word}, Perplexity: {self.model.perplexity}')
+                pbar.write(f'Iteration: {i}, Log-likelihood: {self.model.ll_per_word}, Perplexity: {self.model.perplexity}')
         pbar.close()
 
         self._logger.info("Calculating topics and distributions...")
@@ -728,7 +721,7 @@ class BERTopicTrainer(TMTrainer):
         self,
         model_path: str = None,
         logger: logging.Logger = None,
-        config_path: pathlib.Path = pathlib.Path("config/config.conf"),
+        config_path: pathlib.Path = pathlib.Path("config/config.yaml"),
         **kwargs,
     ):
         """
@@ -748,13 +741,9 @@ class BERTopicTrainer(TMTrainer):
 
         super().__init__(model_path, logger, config_path)
 
-        # Load configuration from the config file
-        config = configparser.ConfigParser()
-        config.read(config_path)
-        bertopic_config = config["tm_bertopic"]
-
+        # Load the YAML configuration
+        bertopic_config = self.config.get("bertopic", {})
         default_params = {
-            "num_topics": int(bertopic_config.get("num_topics", 10)),
             "no_below": int(bertopic_config.get("no_below", 1)),
             "no_above": float(bertopic_config.get("no_above", 1.0)),
             "stopwords": bertopic_config.get("stopwords", None),
@@ -766,7 +755,7 @@ class BERTopicTrainer(TMTrainer):
             "hdbscan_min_cluster_size": int(bertopic_config.get("hdbscan_min_cluster_size", 10)),
             "hdbscan_metric": bertopic_config.get("hdbscan_metric", "euclidean"),
             "hdbscan_cluster_selection_method": bertopic_config.get("hdbscan_cluster_selection_method", "eom"),
-            "hbdsan_prediction_data": bertopic_config.getboolean("hbdsan_prediction_data", True),
+            "hbdsan_prediction_data": bool(bertopic_config.get("hbdsan_prediction_data", True)),
             "language": bertopic_config.get("language", "english"),
             "repr_model_diversity": float(bertopic_config.get("repr_model_diversity", 0.3)),
             "repr_model_topnwords": int(bertopic_config.get("repr_model_topnwords", 15)),

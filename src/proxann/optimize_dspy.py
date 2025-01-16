@@ -11,7 +11,7 @@ from dspy.evaluate import Evaluate
 from dspy.teleprompt import BootstrapFewShotWithRandomSearch
 from sklearn.model_selection import train_test_split
 
-from src.llm_eval.utils import extend_to_full_sentence
+from src.proxann.utils import extend_to_full_sentence
 
 class ThetasDataset(Dataset):
 

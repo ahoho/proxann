@@ -12,7 +12,7 @@ from kneed import KneeLocator
 from scipy import sparse
 from scipy.ndimage import uniform_filter1d
 
-from src.utils.utils import init_logger, keep_top_k_values, safe_load_npy
+from src.utils.utils import init_logger, keep_top_k_values, load_vocab_from_txt, safe_load_npy
 
 
 class DocSelector(object):
@@ -23,7 +23,7 @@ class DocSelector(object):
     def __init__(
         self,
         logger: Optional[logging.Logger] = None,
-        config_path: pathlib.Path = pathlib.Path(__file__).parent.parent.parent / "config/config.conf"
+        config_path: pathlib.Path = pathlib.Path(__file__).parent.parent.parent / "config/config.yaml"
     ) -> None:
         """
         Initialize the DocSelector class.
@@ -707,20 +707,12 @@ class DocSelector(object):
 
 def main():
 
-    def load_vocab_from_txt(vocab_file):
-        vocab_w2id = {}
-        with (vocab_file).open('r', encoding='utf8') as fin:
-            for i, line in enumerate(fin):
-                wd = line.strip()
-                vocab_w2id[wd] = i
-        return vocab_w2id
-
     argparser = argparse.ArgumentParser()
     argparser.add_argument(
         "--config_path",
         help="Path to the configuration file.",
         type=str,
-        default="config/config.conf",
+        default="config/config.yaml",
         required=False
     )
     argparser.add_argument(

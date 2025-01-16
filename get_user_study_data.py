@@ -17,22 +17,36 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
-from src.user_study_data_collector.jsonfy.topic_json_formatter import TopicJsonFormatter
+from src.user_study_data_collector.jsonify.topic_json_formatter import TopicJsonFormatter
 from src.user_study_data_collector.topics_docs_selection.topic_selector import TopicSelector
-from src.utils.utils import load_vocab_from_txt
+from src.utils.utils import init_logger, load_vocab_from_txt, log_or_print
 
 
 def main():
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument(
-        "--config", help="Path to the config file", required=False,
+        "--config_path",
+        help="Path to the configuration file.",
+        type=str,
+        required=False,
+        default="config/config.yaml"
+    )
+    argparser.add_argument(
+        "--user_study_config",
+        help="Path to the user study configuration file.",
+        required=False,
         default="config/config_pilot.conf")
 
     args = argparser.parse_args()
 
+    # init logger
+    logger = init_logger(args.config_path, "get_user_study_data")
+
+    logger.info(f"Reading user study configuration from {args.user_study_config}")
     config = configparser.ConfigParser()
-    config.read(args.config)
+    config.read(args.user_study_config)
+    logger.info(f"User study configuration read successfully")
 
     ############################
     # Topic selection          #
@@ -66,8 +80,8 @@ def main():
             elif vocab_path.endswith()(".txt"):
                 vocab_w2id = load_vocab_from_txt(args.vocab_path)
             else:
-                print(
-                    f"-- -- File does not have the required extension for loading the vocabulary. Exiting...")
+                log_or_print(
+                    f"File does not have the required extension for loading the vocabulary. Exiting...", logger)
                 sys.exit()
 
             betas_path = model_config['betas_path']
@@ -89,12 +103,11 @@ def main():
             # append empty list to keep the order
             remove_topic_ids.append([])
 
-
     topic_selector = TopicSelector()
     selected_topics = topic_selector.iterative_matching(
         models=all_topic_keys, N=N, remove_topic_ids=remove_topic_ids)
 
-    print(f"Selected topics: {selected_topics}")
+    log_or_print(f"Selected topics: {selected_topics}", logger)
 
     ############################
     # JSON formatter           #
@@ -115,7 +128,7 @@ def main():
         model_config = config[model]
         if model != 'all':  # Skip all section (configuration for all models)
             model_config = config[model]
-            print(f"-- -- Obtaining output for model {model}")
+            log_or_print(f"Obtaining output for model {model}", logger)
             # if trained with this repo code, we only need the model path
             if model_config.getboolean('trained_with_thetas_eval'):
                 model_path = model_config['model_path']
@@ -133,8 +146,8 @@ def main():
                             vocab_w2id[wd] = i
 
                 except Exception as e:
-                    print(
-                        f"-- -- Error occurred when loading info from model {model_path.as_posix(): e}")
+                    log_or_print(
+                        f"Error occurred when loading info from model {model_path.as_posix(): e}", logger)
             else:
                 model_path = None
                 thetas_path = model_config['thetas_path']
@@ -152,8 +165,8 @@ def main():
                 elif vocab_path.endswith()(".txt"):
                     vocab_w2id = load_vocab_from_txt(args.vocab_path)
                 else:
-                    print(
-                        f"-- -- File does not have the required extension for loading the vocabulary. Exiting...")
+                    log_or_print(
+                        f"File does not have the required extension for loading the vocabulary. Exiting...", logger)
                     sys.exit()
 
             #  Get keys
@@ -164,8 +177,9 @@ def main():
                 for row in betas
             ]
             # print id and top words
+            log_or_print(f"Top words for model {model}", logger)
             for i, key in enumerate(keys):
-                print(f"-- -- Topic {i}: {key[:10]}")
+                log_or_print(f"* Topic {i}: {key[:10]}", logger)
 
             #  Get corpus
             corpus_path = pathlib.Path(model_config['corpus_path'])
@@ -174,8 +188,8 @@ def main():
             elif corpus_path.suffix in [".json", ".jsonl"]:
                 df = pd.read_json(corpus_path, lines=True)
             else:
-                print(
-                    f"-- -- Unrecognized file extension for data path: {corpus_path.suffix}. Exiting...")
+                log_or_print(
+                    f"Unrecognized file extension for data path: {corpus_path.suffix}. Exiting...", logger)
                 sys.exit()
 
             df["text_split"] = df[text_column].apply(lambda x: x.split())
@@ -200,8 +214,8 @@ def main():
                     if el[0] == idx_model:
                         this_model_tpc_to_keep.append(el[1])
 
-            print(
-                f"-- -- Topics to keep for model {model}: {this_model_tpc_to_keep}")
+            log_or_print(
+                f"Topics to keep for model {model}: {this_model_tpc_to_keep}", logger)
 
             # Filter JSON output
             filtered_out = {int(key): out[key]
@@ -209,10 +223,10 @@ def main():
 
             if not model_path:
                 model_path = pathlib.Path(thetas_path).parent.as_posix()
-            print(
-                f"-- -- Output for model {model} has {len(filtered_out)} topics")
-            print(
-                f"-- -- Saving output for model {model} with key {model_path}")
+            log_or_print(
+                f"Output for model {model} has {len(filtered_out)} topics", logger)
+            log_or_print(
+                f"Saving output for model {model} with key {model_path}", logger)
 
             combined_out.update({
                 model_path: filtered_out

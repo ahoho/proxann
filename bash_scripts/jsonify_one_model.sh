@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # FILE PATHS
-SCRIPT="src/user_study_data_collector/jsonfy/topic_json_formatter.py"
+SCRIPT="src/user_study_data_collector/jsonify/topic_json_formatter.py"
 MODEL_PATH="data/models/mallet"
 THETAS="data/models/mallet/thetas.npz"
 BETAS="data/models/mallet/betas.npy"
@@ -56,7 +56,7 @@ check_file "$VOCAB"
 check_file "$CORPUS"
 
 # Run the Python script
-echo "Running the jsonfy script..."
+echo "Running the jsonify script..."
 python3 "$SCRIPT" \
     --model_path "$MODEL_PATH" \
     --thetas_path "$THETAS" \

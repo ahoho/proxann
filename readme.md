@@ -1,8 +1,8 @@
 <!-- markdownlint-disable MD041 -->
 <!-- markdownlint-disable MD033 -->
-<p align="center">
-  <img src="./figures/repo/Proxann8.png" alt="Logo" width="90" height="90" style="vertical-align: middle; margin-right: 10px;">
-  <span style="font-size: 2em;">THETA-EVALUATION</span>
+<p align="center" style="display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 2em;">
+  <img src="./figures/repo/Proxann8.png" alt="Logo" width="90" height="90" style="display: inline-block;">
+  <span>THETA-EVALUATION</span>
 </p>
 <!-- markdownlint-enable MD033 -->
 <!-- markdownlint-disable MD041 -->
@@ -68,12 +68,11 @@ python3 get_user_study_data.py --config <path_user_study_config_file>
 
 ### Human Annotations
 
-User responses were collected through Prolific using the `src.annotations.annotation_server` server. The collected responses are XXX [confirm whether they are uploaded to Git].
-Here’s an improved version of your section with enhanced clarity, grammar corrections, and better flow:
+User responses were collected through Prolific using the `src.annotations.annotation_server` server. The collected responses are XXX [update this depending on where the files are saved].
 
 ### LLM Annotations
 
-To obtain LLM annotations, run the `proxann.sh` script with the following parameters:
+To obtain LLM annotations, run the `proxann.py` (or its bash version `bash_scripts/run_proxann.sh`) script with the following parameters:
 
 - **`--model_type "$MODEL_TYPE"`**  
   Specifies the language model(s) to be used for generating annotations. Both open-source and closed-source models are supported. Refer to `config/config.yaml` for the currently available models. New models can be added as needed.

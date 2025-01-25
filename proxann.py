@@ -496,8 +496,7 @@ def main():
     # Save results
     ############################################################################
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    save_path = f"{
-        args.path_save_results}/{args.prompt_mode}_{args.model_type}_{timestamp}"
+    save_path = f"{args.path_save_results}/{args.prompt_mode}_{args.model_type}_{timestamp}"
     os.makedirs(save_path, exist_ok=True)
 
     save_results(llm_results_q1, save_path, "llm_results_q1.json")

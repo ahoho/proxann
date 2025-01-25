@@ -292,8 +292,7 @@ def normalize_key(key, valid_models, valid_datasets, include_id=True):
     """
 
     # We use a different pattern depending on whether we want to include the topic ID or not (from run_user_study.py we need it without)
-    pattern = rf"(?:data/models(?:/final_models)?/.*?/)?({
-        '|'.join(map(re.escape, valid_models))})"  # MODIFIED
+    pattern = rf"(?:data/models(?:/final_models)?/.*?/)?({'|'.join(map(re.escape, valid_models))})"  # MODIFIED
 
     if include_id:
         pattern += r"/.*?(\d+)$"
@@ -708,8 +707,7 @@ def compute_correlations_one(
             mean_rank_data = np.array([i + 1 for i in best_ranking])
             mean_fit_data = fit_data.mean(0)
         else:
-            raise ValueError(f"Unknown aggregation method: {
-                             aggregation_method}")
+            raise ValueError(f"Unknown aggregation method: {aggregation_method}")
 
         # Compute general correlations
         fit_rho, _ = spearmanr(mean_fit_data, prob_data)
@@ -867,18 +865,12 @@ def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=N
                     rank_ndcg_llm_tm = ndcg_score([rank_llm], [prob_data])
 
                     # add to the dictionary
-                    annotator_results[f"rank_rho_user_{
-                        llm_annotator}"] = rank_rho_user_llm
-                    annotator_results[f"rank_rho_tm_{
-                        llm_annotator}"] = rank_rho_llm_tm
-                    annotator_results[f"rank_tau_user_{
-                        llm_annotator}"] = rank_tau_user_llm
-                    annotator_results[f"rank_tau_tm_{
-                        llm_annotator}"] = rank_tau_llm_tm
-                    annotator_results[f"rank_ndcg_user_{
-                        llm_annotator}"] = rank_ndcg_user_llm
-                    annotator_results[f"rank_ndcg_tm_{
-                        llm_annotator}"] = rank_ndcg_llm_tm
+                    annotator_results[f"rank_rho_user_{llm_annotator}"] = rank_rho_user_llm
+                    annotator_results[f"rank_rho_tm_{llm_annotator}"] = rank_rho_llm_tm
+                    annotator_results[f"rank_tau_user_{llm_annotator}"] = rank_tau_user_llm
+                    annotator_results[f"rank_tau_tm_{llm_annotator}"] = rank_tau_llm_tm
+                    annotator_results[f"rank_ndcg_user_{llm_annotator}"] = rank_ndcg_user_llm
+                    annotator_results[f"rank_ndcg_tm_{llm_annotator}"] = rank_ndcg_llm_tm
 
             if fit_llm_data is not None:
                 fit_llm_group = list(
@@ -895,18 +887,12 @@ def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=N
                     fit_ndcg_llm_tm = ndcg_score([fit_llm], [prob_data])
 
                     # add to the dictionary
-                    annotator_results[f"fit_rho_user_{
-                        llm_annotator}"] = fit_rho_user_llm
-                    annotator_results[f"fit_rho_tm_{
-                        llm_annotator}"] = fit_rho_llm_tm
-                    annotator_results[f"fit_tau_user_{
-                        llm_annotator}"] = fit_tau_user_llm
-                    annotator_results[f"fit_tau_tm_{
-                        llm_annotator}"] = fit_tau_llm_tm
-                    annotator_results[f"fit_ndcg_user_{
-                        llm_annotator}"] = fit_ndcg_user_llm
-                    annotator_results[f"fit_ndcg_tm_{
-                        llm_annotator}"] = fit_ndcg_llm_tm
+                    annotator_results[f"fit_rho_user_{llm_annotator}"] = fit_rho_user_llm
+                    annotator_results[f"fit_rho_tm_{ llm_annotator}"] = fit_rho_llm_tm
+                    annotator_results[f"fit_tau_user_{llm_annotator}"] = fit_tau_user_llm
+                    annotator_results[f"fit_tau_tm_{llm_annotator}"] = fit_tau_llm_tm
+                    annotator_results[f"fit_ndcg_user_{llm_annotator}"] = fit_ndcg_user_llm
+                    annotator_results[f"fit_ndcg_tm_{llm_annotator}"] = fit_ndcg_llm_tm
 
             corr_data.append({
                 "id": id,
@@ -1011,6 +997,5 @@ def load_or_calculate_npmi(config_pilot, npmi_save, logging=None):
     start_time = time.time()
     npmi_data = calculate_coherence(config_pilot)
     npmi_data.to_csv(npmi_save, index=False)
-    logging.info(f"NPMI calculated in {
-                 (time.time() - start_time) / 60:.2f} minutes.")
+    logging.info(f"NPMI calculated in {(time.time() - start_time) / 60:.2f} minutes.")
     return npmi_data

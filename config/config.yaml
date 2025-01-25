@@ -81,7 +81,12 @@ llm:
       }
     path_api_key: .env
   ollama:
-    available_models: { "llama3.2", "llama3.1:8b-instruct-q8_0", "qwen:32b" }
+    available_models: {
+      "llama3.2",
+      "llama3.1:8b-instruct-q8_0",
+      "qwen:32b",
+      llama3.3:70b
+    }
     host: http://kumo01.tsc.uc3m.es:11434
   llama_cpp:
     host: http://kumo01:11435/v1/chat/completions

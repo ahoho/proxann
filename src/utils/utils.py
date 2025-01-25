@@ -293,8 +293,7 @@ def keep_top_k_values(
     """
 
     if top_k > matrix.shape[1]:
-        err_msg = f"top_k ({top_k}) exceeds the number of columns ({
-            matrix.shape[1]}) in the matrix."
+        err_msg = f"top_k ({top_k}) exceeds the number of columns ({matrix.shape[1]}) in the matrix."
         log_or_print(err_msg, level="error", logger=logger)
         raise ValueError(err_msg)
 

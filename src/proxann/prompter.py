@@ -567,6 +567,7 @@ class Prompter:
             "binary_q2": lambda text: handle_binary_q2(text, few_shot_examples, category, nr_few_shot=nr_few_shot, do_q2_with_q1_fixed=do_q2_with_q1_fixed),
             "q2_dspy": lambda text: handle_q2_dspy_generic(text, category),
             "q2_dspy_llama": lambda text: handle_q2_dspy_generic(text, category, template_name="q2_dspy_llama"),
+            "q2_dspy_qwen": lambda text: handle_q2_dspy_generic(text, category, template_name="q2_dspy_qwen"),
             "q2_bills": lambda text: handle_q2_dspy_generic(text, category, template_name="q2_bills"),
             "q3": lambda text: handle_q3(text, few_shot_examples, category, nr_few_shot=nr_few_shot, doing_both_ways=doing_both_ways, do_q3_with_q1_fixed=do_q3_with_q1_fixed),
             "q3_dspy": lambda text: handle_q3_dspy_generic(text, category, doing_both_ways=doing_both_ways, template_name="q3_dspy"),

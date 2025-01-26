@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Define common variables
-MODEL_TYPE="llama3.1:8b-instruct-q8_0,llama3.3:70b,qwen:32b"
+MODEL_TYPE="qwen:32b" #"qwen:32b" #"llama3.3:70b" #"llama3.1:8b-instruct-q8_0" #,llama3.3:70b,qwen:32b
 PROMPT_MODE="q1_then_q3_dspy,q1_then_q2_dspy"
 REMOVAL_CONDITION="loose"
 SAVE_PATH="data/arr_dec_responses"
 
 # Define dataset-specific configurations using arrays
-DATASET_KEYS=("wiki" "bills")
+DATASET_KEYS=("wiki" "bills") #"bills" 
 TM_MODEL_DATA_PATHS=(
   "data/json_out/arr_dec/config_pilot_wiki.json,data/json_out/arr_dec/config_pilot_wiki_part2.json"
   "data/json_out/arr_dec/config_pilot_bills.json"

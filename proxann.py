@@ -159,7 +159,12 @@ def do_q2(
         List of user categories.
     """
     if prompt_mode == "q1_then_q2_dspy":
-        prompt_key = "q2_dspy" if "gpt" in llm_model else "q2_dspy_llama"
+        if "llama" in llm_model:
+            prompt_key = "q2_dspy_llama"
+        elif "qwen" in llm_model:
+            prompt_key = "q2_dspy_qwen"
+        else:
+            prompt_key = "q2_dspy"
         log_or_print(f"Using prompt key: {prompt_key}", logger)
         questions = prompter.get_prompt(cluster_data, prompt_key, category)
     else:
@@ -176,7 +181,12 @@ def do_q2(
         #  we do not to make one prompt per user category (each user has a different category), and we want to use each user's category to determine the fit score for each document in the evaluation set
         for cat in user_cats:
             if prompt_mode == "q1_then_q2_dspy":
-                prompt_key = "q2_dspy" if "gpt" in llm_model else "q2_dspy_llama"
+                if "llama" in llm_model:
+                    prompt_key = "q2_dspy_llama"
+                elif "qwen" in llm_model:
+                    prompt_key = "q2_dspy_qwen"
+                else:
+                    prompt_key = "q2_dspy"
                 log_or_print(f"Using prompt key: {prompt_key}", logger)
                 questions = prompter.get_prompt(cluster_data, prompt_key, cat)
             else:
@@ -195,7 +205,11 @@ def do_q2(
     for question in questions:
         response_q2, _ = prompter.prompt(
             dft_system_prompt, question, use_context=use_context)
+        log_or_print(f"\033[96mFit: {response_q2}\033[0m", logger)
         score = extract_info_binary_q2(response_q2)
+        #if "marginally" in response_q2.lower() or "marginal" in response_q2.lower() or "maybe" in response_q2.lower():
+        #if "no" in response_q2.lower():
+        #    import pdb; pdb.set_trace()
         log_or_print(f"\033[92mFit: {score}\033[0m", logger)
         fit_data.append(score)
 
@@ -249,12 +263,11 @@ def do_q3(
     do_q3_with_q1_fixed = prompt_mode == "q1_then_q3_fix_cat"
 
     if prompt_mode == "q1_then_q3_dspy":
-        prompt_key = "q3_dspy" if "gpt" in llm_model else "q3_dspy_llama"
+        prompt_key = "q3_dspy_llama" if "llama" in llm_model else "q3_dspy"
         log_or_print(f"-- Using prompt key: {prompt_key}", logger)
     else:
         prompt_key = "q3"
-    q3_out = prompter.get_prompt(cluster_data, prompt_key, category=category,
-                                 do_q3_with_q1_fixed=do_q3_with_q1_fixed, doing_both_ways=doing_both_ways)
+    q3_out = prompter.get_prompt(cluster_data, prompt_key, category=category, do_q3_with_q1_fixed=do_q3_with_q1_fixed, doing_both_ways=doing_both_ways)
 
     if isinstance(q3_out, tuple) and len(q3_out) > 2:  # Both ways
         questions_one, pair_ids_one, questions_two, pair_ids_two = q3_out
@@ -315,8 +328,7 @@ def do_q3(
     ranked_documents = bradley_terry_model(
         pair_ids_comb, orders_comb, logprobs_comb)
     true_order = [el["doc_id"] for el in cluster_data["eval_docs"]]
-    ranking_indices = {doc_id: idx for idx,
-                       doc_id in enumerate(ranked_documents['doc_id'])}
+    ranking_indices = {doc_id: idx for idx, doc_id in enumerate(ranked_documents['doc_id'])}
     rank = [ranking_indices[doc_id] + 1 for doc_id in true_order]
     rank = [len(rank) - r + 1 for r in rank]  # Invert rank
 
@@ -410,8 +422,7 @@ def main():
                         # Q1
                         # ==============================================
                         if prompt_mode in Q1_THEN_Q3_PROMPTS:
-                            do_q1(prompter, cluster_data,
-                                  users_cats, categories)
+                            do_q1(prompter, cluster_data, users_cats, categories)
                             category = categories[-1]
                         else:
                             category = None
@@ -420,8 +431,7 @@ def main():
                         # Q3
                         # ==============================================
                         # TODO: Add logic for when category is not category[-1] but each of the users' categories
-                        do_q3(prompter, prompt_mode, llm_model, cluster_data,
-                              rank_data, users_rank, category, args.do_both_ways)
+                        do_q3(prompter, prompt_mode, llm_model, cluster_data,rank_data, users_rank, category, args.do_both_ways)
 
                     elif prompt_mode in Q1_THEN_Q2_PROMPTS:
                         log_or_print("-- Executing Q1 / Q2...", logger)
@@ -430,8 +440,7 @@ def main():
                         # Q1
                         # ==============================================
                         if prompt_mode in Q1_THEN_Q2_PROMPTS:
-                            do_q1(prompter, cluster_data,
-                                  users_cats, categories)
+                            do_q1(prompter, cluster_data, users_cats, categories)
                             category = categories[-1]
                         else:
                             category = None
@@ -441,8 +450,7 @@ def main():
                         # ==============================================
                         # if args.use_user_cats:
                         #    for_q2user_cats = users_cats
-                        labels = do_q2(prompter, prompt_mode, llm_model,
-                                       cluster_data, fit_data, category)
+                        labels = do_q2(prompter, prompt_mode, llm_model, cluster_data, fit_data, category)
 
                 # llm loop ends here
                 #  we save the results as if the LLMs are annotators

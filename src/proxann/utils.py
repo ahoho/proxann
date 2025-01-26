@@ -215,6 +215,7 @@ def extract_info_q1_q2(text, get_label):
     return label, score, rationale
 
 
+"""
 def extract_info_binary_q2(text):
     fit_pattern_general = r'FIT:\s*(YES|NO)'
     # for dspy prompts
@@ -228,6 +229,30 @@ def extract_info_binary_q2(text):
     fit = int("yes" in fit.lower())
 
     return fit
+"""
+def extract_info_binary_q2(text):
+
+    fit_pattern_bracketed = r'\[\[  ## FIT ##  \]\]\s*(YES|NO)'
+    fit_pattern_general = r'FIT:\s*(YES|NO)'
+
+    fit_match = re.findall(fit_pattern_bracketed, text, re.DOTALL)
+    if not fit_match:
+        fit_match = re.findall(fit_pattern_general, text, re.DOTALL)
+
+    fit = fit_match[0].strip() if fit_match else ""
+    
+    if "yes" in fit.lower():
+        fit_binary = 1
+    elif "partial" in fit.lower():
+        fit_binary = 0
+    elif "maybe" in fit.lower():
+        fit_binary = 0
+    elif "marginally" in fit.lower() or "marginal" in fit.lower():
+        fit_binary = 0
+    else:
+        fit_binary = 0
+
+    return fit_binary
 
 
 def extract_logprobs(pairwise_logprobs, backend, logger):

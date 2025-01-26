@@ -198,3 +198,4 @@ data/top_docs
 data/llm_out/tests
 figures/repo/_tests
 notebooks/tests
+data/arr_dec_responses

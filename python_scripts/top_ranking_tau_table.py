@@ -19,8 +19,11 @@ from plotnine import (
     element_line
 )
 
-import sys
-sys.path.append("..")
+import sys,os
+
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, root_dir)
+print(sys.path)
 
 from src.proxann.utils import process_responses, collect_fit_rank_data, compute_correlations_one
 
@@ -29,7 +32,7 @@ def generate(
     human_metrics= ["Human\\\Fit", "Human\\\Rank"],
     llm_metrics=["Step 2", "Step 3"],
     cohr_metrics=["$C_{NPMI}$"],#, "$C_{V}$"
-    llm_models=["gpt-4-o", "llama3.1"],
+    llm_models=["gpt-4-o", "llama3.1", "llama3.3:70b", "qwen:32b"],
     datasets=["Wiki", "Bills"],
 ):  
     """   
@@ -48,18 +51,21 @@ def generate(
     
     column_format = "ll" + "c" * len(datasets) * len(human_metrics)
 
+    cmidrules = [
+        rf"\cmidrule(lr){{{nr_left_columns + i * len(human_metrics) + 1}-{nr_left_columns + i * len(human_metrics) + len(human_metrics)}}}"
+        for i in range(len(datasets))
+    ]
+    
+
     latex_table = rf"""
     \begin{{tabular}}{{@{{}}{column_format}@{{}}}}
     \toprule
     {" & ".join(headers_first_level)} \\
-    {"".join([
-        f'\cmidrule(lr){{{nr_left_columns + i*len(human_metrics) + 1}-{nr_left_columns + i*len(human_metrics) + len(human_metrics)}}}' 
-        for i in range(len(datasets))
-    ])}
+    {"".join(cmidrules)}
     {" & ".join(headers_second_level)} \\
     \midrule
     """
-    
+
     # Pivot to structure data as needed
     aux = data.to_latex(index=False, float_format="{:.3f}".format).split("\\midrule\n")[1].split("\n\\bottomrule")[0].strip().split("\n")
     rows = [el.strip("\\").strip(" ") for el in aux]
@@ -89,10 +95,18 @@ def generate(
             first_row = False
             if llm_model == "gpt-4-o":
                 row_id = 2 if metric_first == "Step 2" else 3
-            else:
+            elif llm_model == "llama3.1":
                 row_id = 4 if metric_first == "Step 2" else 5
+            #elif llm_model == "llama3.1:8b-instruct-q8_0":
+            #    row_id = 6 if metric_first == "Step 2" else 7
+            elif llm_model == "llama3.3:70b":
+                row_id = 6 if metric_first == "Step 2" else 7
+            elif llm_model == "qwen:32b":
+                row_id = 8 if metric_first == "Step 2" else 9
             row_values = rows[row_id]
 
+            #"llama3.1", "llama3.1:8b-instruct-q8_0", "llama3.3:70b", "qwen:32b"
+            
             latex_table += f"{row_label} & {row_values} \\\\\n"
             
         latex_table += r"\midrule" + "\n"
@@ -102,30 +116,36 @@ def generate(
     return latex_table
 
 data_jsons = [
-    "../data/json_out/config_pilot_wiki.json",
-    "../data/json_out/config_pilot_wiki_part2.json",
-    "../data/json_out/config_bills_part1.json"
+    "data/json_out/config_pilot_wiki.json",
+    "data/json_out/config_pilot_wiki_part2.json",
+    "data/json_out/config_pilot_bills.json" #"data/json_out/config_bills_part1.json"
 ]
 response_csvs = [
-    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
-    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv",
+    "data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
+    "data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv",
 ]
 
 llm_data_paths = {
     "wiki": {
-        "gpt4o": "../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-mini-2024-07-18_20241213_135628",
-        #"llama3.1": "../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_135530"
-        "llama3.1": "../data/llm_out/wiki_new/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241215_194908"
+        "gpt4o": "data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-mini-2024-07-18_20241213_135628",
+        "llama3.1": "data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_135530",
+        #"llama3.1": "data/llm_out/wiki/wiki_new/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241215_194908",
+        #"llama3.1:8b-instruct-q8_0": "data/arr_dec_responses/wiki/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20250126_093749",
+        "llama3.3:70b": "data/arr_dec_responses/wiki/q1_then_q3_dspy,q1_then_q2_dspy_llama3.3:70b_20250126_094116",
+        "qwen:32b": "data/arr_dec_responses/wiki/q1_then_q3_dspy,q1_then_q2_dspy_qwen:32b_20250126_223431",
     },
     "bills": {
-        #"gpt4o": "../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-mini-2024-07-18_20241213_141345",
-        "gpt4o": "../data/llm_out/bills_examples_bills/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-2024-08-06_20241215_211522",
-        #"llama3.1": "../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_133218"
-        "llama3.1": "../data/llm_out/bills_examples_bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241215_205138"
+        "gpt4o": "data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-mini-2024-07-18_20241213_141345",
+        #"gpt4o": "data/llm_out/bills/bills_examples_bills/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-2024-08-06_20241215_211522",
+        "llama3.1": "data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_133218",
+        #"llama3.1": "data/llm_out/bills/bills_examples_bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241215_205138"
+        #"llama3.1:8b-instruct-q8_0": "data/arr_dec_responses/bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20250126_095245",
+        "llama3.3:70b": "data/arr_dec_responses/bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.3:70b_20250126_095221",
+        "qwen:32b": "data/arr_dec_responses/bills/q1_then_q3_dspy,q1_then_q2_dspy_qwen:32b_20250126_223440",
     }
 }
 
-cohr_path = ["../data/all_cohrs_bills.csv", "../data/all_cohrs_wiki.csv"]
+cohr_path = ["data/cohrs/all_cohrs_bills.csv", "data/cohrs/all_cohrs_wiki.csv"]
 
 start_date = "2024-12-06 09:00:00"
 
@@ -145,9 +165,8 @@ corr_metric = "tau"
 agg = "mean"
 
 # Obtener las claves internas del primer nivel del diccionario
-row_names = ["npmi", "cv"] + [f"{metric}_{llm}" 
-                              for llm in list(llm_data_paths[list(llm_data_paths.keys())[0]].keys()) 
-                              for metric in ["fit", "rank"]]
+row_names = ["npmi", "cv"] + \
+[f"{metric}_{llm}" for llm in list(llm_data_paths[list(llm_data_paths.keys())[0]].keys()) for metric in ["fit", "rank"]]
 
 column_names = [f"{metric}_{dataset}" for dataset in ["wiki", "bills"] for metric in ["fit", "rank"]]
 
@@ -192,6 +211,7 @@ for dataset in ["wiki", "bills"]:
         npmi_cohrs = [x["npmi"] for x in filtered_cohrs]
         cv_cohrs = [x["cv"] for x in filtered_cohrs]
 
+        #import pdb; pdb.set_trace()
         corrs_mode1_llm = compute_correlations_one(filtered_corr_data, filtered_ranks, filtered_fits, aggregation_method=agg)
 
         for user_metric in ["fit", "rank"]:
@@ -221,9 +241,8 @@ print(latex_output_transposed)
 
 
 ### to generate figure
-column_names = ["human_fit", "human_rank"] + ["npmi"] + [f"{llm}_{metric}" 
-                              for llm in list(llm_data_paths[list(llm_data_paths.keys())[0]].keys()) 
-                              for metric in ["fit", "rank"]]
+column_names = ["human_fit", "human_rank"] + ["npmi"] + \
+[f"{llm}_{metric}" for llm in list(llm_data_paths[list(llm_data_paths.keys())[0]].keys()) for metric in ["fit", "rank"]]
 row_names = ["mallet", "ctm", "bertopic"]
 
 # create a dict of dataframes
@@ -295,9 +314,9 @@ for dataset in ["wiki", "bills"]:
     dataset_statistics[dataset] = results_df
 
 print("Wiki dataset")
-print(dataset_statistics["wiki"])
+print(dataset_statistics["wiki"].to_string())
 print("Bills dataset")
-print(dataset_statistics["bills"])
+print(dataset_statistics["bills"].to_string())
 
 # generate graph for each dataset
 for dtset in dataset_statistics.keys():
@@ -315,7 +334,7 @@ for dtset in dataset_statistics.keys():
         'bertopic': 'BERTopic'
     })
 
-    desired_order = ['human_fit', 'human_rank', 'npmi', 'gpt4o_fit', 'gpt4o_rank', 'llama3.1_fit', 'llama3.1_rank'] # force the order of the metrics
+    desired_order = ['human_fit', 'human_rank', 'npmi', 'gpt4o_fit', 'gpt4o_rank', 'llama3.1_fit', 'llama3.1_rank', 'llama3.3:70b_fit', 'llama3.3:70b_rank', 'qwen:32b_fit', 'qwen:32b_rank'] # force the order of the metrics #'llama3.1:8b-instruct-q8_0_fit', 'llama3.1:8b-instruct-q8_0_rank',
     data['metric'] = pd.Categorical(data['metric'], categories=desired_order, ordered=True)
 
     metric_labels = {
@@ -326,7 +345,13 @@ for dtset in dataset_statistics.keys():
         'gpt4o_fit': 'GPT-4-o\nFit',
         'gpt4o_rank': 'GPT-4-o\nRank',
         'llama3.1_fit': 'LLaMA 3.1\nFit',
-        'llama3.1_rank': 'LLaMA 3.1\nRank'
+        'llama3.1_rank': 'LLaMA 3.1\nRank',
+        #'llama3.1:8b-instruct-q8_0_fit': 'LLaMA 3.1v2\nFit', 
+        #'llama3.1:8b-instruct-q8_0_rank': 'LLaMA 3.1v2\nRank', 
+        'llama3.3:70b_fit': 'LLaMA 3.3\nFit', 
+        'llama3.3:70b_rank': 'LLaMA 3.3\nRank', 
+        'qwen:32b_fit': 'Qwen 32b\nFit', 
+        'qwen:32b_rank': 'Qwen 32b\nRank'
     }
     colors = {
         'mallet': '#66c2a5',
@@ -363,4 +388,4 @@ for dtset in dataset_statistics.keys():
         )
     )
     
-    plot.save(f"../figures/all_metrics_models_comparisson_{dtset}.pdf", dpi=300, bbox_inches='tight')
+    plot.save(f"figures/all_metrics_models_comparisson_{dtset}_revisions.pdf", dpi=300, bbox_inches='tight')

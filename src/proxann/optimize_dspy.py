@@ -57,7 +57,7 @@ class ThetasDataset(Dataset):
             train_data["fit"] = train_data.apply(lambda x: "YES" if x["bin_fit"] == 1 else "NO", axis=1)
             train_data["document"] = train_data["doc"].apply(lambda x: extend_to_full_sentence(x,num_words_truncate))
             inputs = ["category", "document"]
-            
+            train_data = train_data[(inputs + ["fit"])]            
         else:
             raise ValueError("mode must be either 'q2' or 'q3'")
         
@@ -155,7 +155,7 @@ class Q2Signature(dspy.Signature):
     """Determine whether the DOCUMENT fits with the given CATEGORY or not"""
     CATEGORY = dspy.InputField()
     DOCUMENT = dspy.InputField()
-    FIT = dspy.OutputField(desc="Whether the DOCUMENT fits with the given CATEGORY or not (YES or NO)")
+    FIT = dspy.OutputField(desc="Whether the DOCUMENT fits with the given CATEGORY or not (YES if it fits, NO if it does not).")
     
 class Q2Module(dspy.Module):
     def __init__(self):
@@ -170,6 +170,7 @@ class Q2Module(dspy.Module):
         elif "no" in fit.lower():
             fit = "NO"
         else:
+            print(f"fit: {fit}")
             fit = "10000"
         
         return dspy.Prediction(fit = fit)
@@ -180,7 +181,8 @@ def get_accuracy(example, pred, trace=None):
 def get_accuracy_fit(example, pred, trace=None):
     return 1 if example.fit == pred["fit"] else 0
     
-def optimize_module(data_path, mbd=4, mld=16, ncp=16, mr=1, dev_size=0.25):
+def optimize_module(data_path, mbd=16, mld=64, ncp=64, mr=5, dev_size=0.25):
+                    #mbd=4, mld=16, ncp=16, mr=1, dev_size=0.25):
 
     dataset = ThetasDataset(data_fpath=data_path, dev_size=dev_size)
 
@@ -303,8 +305,8 @@ if __name__ == "__main__":
     """
     
     compiled_pred = optimize_q2_module("data/files_pilot/user_fit_tr_data.json")
+    compiled_pred.save("data/dspy-saved/q2_qwen:32b_26jan.json")
     import pdb; pdb.set_trace()
-    compiled_pred.save("data/dspy-saved/qwen:32b_15dec.json")
     
     compiled_classifier = compiled_pred
     #compiled_classifier("<<category>>", "<<document>>", "<<document>>")

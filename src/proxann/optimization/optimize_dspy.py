@@ -283,7 +283,8 @@ if __name__ == "__main__":
     
 
     lm = dspy.LM(
-        "ollama_chat/qwen:32b",
+        #"ollama_chat/qwen:32b",
+        "ollama_chat/llama3.3:70b",
         api_base="http://kumo01:11434"
     )
     dspy.settings.configure(lm=lm)
@@ -305,8 +306,7 @@ if __name__ == "__main__":
     """
     
     compiled_pred = optimize_q2_module("data/files_pilot/user_fit_tr_data.json")
-    compiled_pred.save("data/dspy-saved/q2_qwen:32b_26jan.json")
-    import pdb; pdb.set_trace()
+    compiled_pred.save("data/dspy-saved/q2_llama3.3:70B_26jan.json")
     
     compiled_classifier = compiled_pred
     #compiled_classifier("<<category>>", "<<document>>", "<<document>>")

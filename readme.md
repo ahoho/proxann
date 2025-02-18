@@ -1,8 +1,7 @@
 <!-- markdownlint-disable MD041 -->
 <!-- markdownlint-disable MD033 -->
-<p align="center" style="display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 2em;">
-  <img src="./figures/repo/Proxann8.png" alt="Logo" width="90" height="90" style="display: inline-block;">
-  <span>THETA-EVALUATION</span>
+<p align="center" style="display: flex; align-items: center; justify-content: center;">
+  <img src="./figures/repo/Proxann8.png" alt="Logo" width="150" height="150" style="display: inline-block;">
 </p>
 <!-- markdownlint-enable MD033 -->
 <!-- markdownlint-disable MD041 -->
@@ -63,7 +62,7 @@ Using the [user study configuration files](config/user_study), JSON files (one p
 The generated JSON files are available [here](data/json_out) and can be created using the following command:
 
 ```bash
-python3 get_user_study_data.py --config <path_user_study_config_file>
+python3 get_user_study_data.py --user_study_config <path_user_study_config_file>
 ```
 
 ### Human Annotations

@@ -231,23 +231,21 @@ def extract_info_binary_q2(text):
     return fit
 """
 def extract_info_binary_q2(text):
-
-    fit_pattern_bracketed = r'\[\[  ## FIT ##  \]\]\s*(YES|NO)'
-    fit_pattern_general = r'FIT:\s*(YES|NO)'
+    #fit_pattern_bracketed = r'\[\[  ## FIT ##  \]\]\s*(YES|NO|PARTIAL|PARTIALLY|MAYBE|MARGINALLY|MARGINAL)'
+    # adjust fit_pattern_bracketed to match in case additional spaces are added or \n appear before or after the brackets or the YES/NO
+    fit_pattern_bracketed = r'\[\[\s*##\s*FIT\s*##\s*\]\]\s*(YES|NO|PARTIAL|PARTIALLY|MAYBE|MARGINALLY|MARGINAL)'
+    
+    fit_pattern_general = r'FIT:\s*(YES|NO|PARTIAL|PARTIALLY|MAYBE|MARGINALLY|MARGINAL)'
 
     fit_match = re.findall(fit_pattern_bracketed, text, re.DOTALL)
     if not fit_match:
         fit_match = re.findall(fit_pattern_general, text, re.DOTALL)
 
     fit = fit_match[0].strip() if fit_match else ""
-    
+
     if "yes" in fit.lower():
         fit_binary = 1
-    elif "partial" in fit.lower():
-        fit_binary = 0
-    elif "maybe" in fit.lower():
-        fit_binary = 0
-    elif "marginally" in fit.lower() or "marginal" in fit.lower():
+    elif any(word in fit.lower() for word in ["partial", "maybe", "marginally", "marginal"]):
         fit_binary = 0
     else:
         fit_binary = 0

@@ -24,12 +24,22 @@ class Prompter:
         self,
         model_type: str,
         logger: logging.Logger = None,
-        config_path: pathlib.Path = pathlib.Path("config/config.yaml")
+        config_path: pathlib.Path = pathlib.Path("config/config.yaml"),
+        temperature: float = None,
+        seed: int = None,
     ):
         self._logger = logger if logger else init_logger(config_path, __name__)
         self.config = load_yaml_config_file(config_path, "llm", logger)
 
         self.params = self.config.get("parameters", {})
+        
+        # We can override the temperature and seed from the config file if given as arguments
+        if temperature is not None:
+            self.params["temperature"] = temperature
+            self._logger.info(f"Setting temperature to: {temperature}")
+        if seed is not None:
+            self.params["seed"] = seed
+            self._logger.info(f"Setting seed to: {seed}")
 
         self.GPT_MODELS = self.config.get(
             "gpt", {}).get("available_models", {})
@@ -147,6 +157,7 @@ class Prompter:
             stream=False,
             temperature=params["temperature"],
             max_tokens=params.get("max_tokens", 1000),
+            seed=params.get("seed", 1234),
             logprobs=True,
             top_logprobs=10,
         )

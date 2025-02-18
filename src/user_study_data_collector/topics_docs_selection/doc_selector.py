@@ -31,9 +31,9 @@ class DocSelector(object):
         Parameters
         ----------
         logger : logging.Logger, optional
-            Logger object to log activity.
-        path_logs : pathlib.Path, optional
-            Path for saving logs.
+            Logger object, by default None
+        config_path : pathlib.Path, optional
+            Path to the configuration file, by default pathlib.Path(__file__).parent.parent.parent / "config/config.yaml"
         """
         self._logger = logger if logger else init_logger(config_path,__name__)
 

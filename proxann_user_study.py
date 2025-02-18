@@ -12,8 +12,7 @@ from src.proxann.utils import (
 )
 from src.utils.utils import init_logger, load_yaml_config_file, log_or_print
 
-Q1_THEN_Q2_PROMPTS = {"q1_then_binary_q2",
-                      "q1_then_q2_fix_cat", "q1_then_q2_dspy"}
+Q1_THEN_Q2_PROMPTS = {"q1_then_binary_q2", "q1_then_q2_fix_cat", "q1_then_q2_dspy"}
 Q1_THEN_Q3_PROMPTS = {"q1_then_q3", "q1_then_q3_fix_cat", "q1_then_q3_dspy"}
 
 
@@ -60,6 +59,14 @@ def parse_args():
         "--path_save_results", type=str,
         help="Path to save results.",
         default="data/files_pilot/results")
+    parser.add_argument(
+        "--temperature", type=float, default=None,
+        help="Temperature value for the LLM generation."
+    )
+    parser.add_argument(
+        "--seed", type=int, default=None,
+        help="Seed for random number generator." 
+    )
     return parser.parse_args()
 
 
@@ -75,8 +82,7 @@ def save_results(data, path, filename):
 
     data.to_json(os.path.join(path, filename), orient="records")
 
-    assert os.path.exists(os.path.join(path, filename)
-                          ), f"Error saving {filename}"
+    assert os.path.exists(os.path.join(path, filename)), f"Error saving {filename}"
 
 
 # =============================================================================
@@ -346,7 +352,11 @@ def main():
     logger = init_logger(args.config_path, f"RunProxann-{args.running_mode}")
     logger.info(f"Running Proxann in mode: {args.running_mode}")
     config = load_yaml_config_file(args.config_path, "user_study", logger)
-
+    
+    # Get seed and temperature if given
+    custom_temperature = args.temperature if args.temperature is not None else None
+    custom_seed = args.seed if args.seed is not None else None
+        
     valid_models = config.get(
         "valid_models", {"mallet", "ctm", "bertopic", "category-45"})
     valid_datasets = config.get(
@@ -359,7 +369,6 @@ def main():
     }
 
     # Parse user's responses
-
     responses_by_id = process_responses(
         args.response_csv, args.tm_model_data_path.split(","), removal_condition=args.removal_condition, filter=args.dataset_key)
 
@@ -398,8 +407,7 @@ def main():
                 # user data (categories, ranks)
                 # users_cats = []
                 # users_rank = []
-                users_cats = [user_data["category"]
-                              for user_data in responses_by_id[id_]]
+                users_cats = [user_data["category"] for user_data in responses_by_id[id_]]
                 this_corr_data = next(c for c in corr_data if c["id"] == id_)
                 users_rank = this_corr_data["rank_data"]
 
@@ -413,7 +421,7 @@ def main():
 
                 for llm_model in model_types:
                     log_or_print(f"LLM: {llm_model}", logger)
-                    prompter = Prompter(model_type=llm_model)
+                    prompter = Prompter(model_type=llm_model, temperature=custom_temperature, seed=custom_seed)
 
                     if prompt_mode in Q1_THEN_Q3_PROMPTS:
                         log_or_print("-- Executing Q1 / Q3...", logger)
@@ -504,7 +512,12 @@ def main():
     # Save results
     ############################################################################
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    save_path = f"{args.path_save_results}/{args.prompt_mode}_{args.model_type}_{timestamp}"
+    save_path = f"{args.path_save_results}/{args.prompt_mode}"
+    if args.temperature is not None:
+        save_path += f"_temp{args.temperature}"
+    if args.seed is not None:
+        save_path += f"_seed{args.seed}"
+    save_path += f"_{args.model_type}_{timestamp}"
     os.makedirs(save_path, exist_ok=True)
 
     save_results(llm_results_q1, save_path, "llm_results_q1.json")
@@ -512,7 +525,6 @@ def main():
         save_results(llm_results_q2, save_path, "llm_results_q2.json")
     if llm_results_q3:
         save_results(llm_results_q3, save_path, "llm_results_q3.json")
-
 
 if __name__ == "__main__":
     main()

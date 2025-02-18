@@ -199,3 +199,6 @@ data/llm_out/tests
 figures/repo/_tests
 notebooks/tests
 data/arr_dec_responses
+data/llm_out
+data/json_out/tests
+test.json

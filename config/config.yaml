@@ -56,6 +56,7 @@ llm:
     top_p: 0.1
     frequency_penalty: 0.0
     random_seed: 1234
+    seed: 1234
   gpt:
     available_models:
       {

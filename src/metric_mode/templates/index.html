@@ -6,47 +6,95 @@
     <title>File Upload</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script>
-        function updateProgressBar(progress) {
-            document.getElementById('progress-bar').style.width = progress + '%';
+        function toggleFileRequirements() {
+            const trainedWithThetas = document.getElementById("trained_with_thetas_eval").checked;
+            document.getElementById("thetas").required = !trainedWithThetas;
+            document.getElementById("betas").required = !trainedWithThetas;
+            document.getElementById("vocab").required = !trainedWithThetas;
+        }
+
+        function startEvaluation() {
+            document.getElementById("progress-bar").style.width = "0%";
+            document.getElementById("progress-bar").classList.add("progress-bar-striped", "progress-bar-animated");
+            document.getElementById("results").innerHTML = "";
+            
+            fetch("/evaluate", { method: "POST" })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("results").innerHTML = data.table;
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    document.getElementById("results").innerHTML = "<div class='alert alert-danger'>Evaluation failed.</div>";
+                });
+            updateProgress();
+        }
+
+        function updateProgress() {
+            fetch("/evaluate_status")
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("progress-bar").style.width = data.progress + "%";
+                    if (data.progress < 100) {
+                        setTimeout(updateProgress, 1000);
+                    } else {
+                        document.getElementById("progress-bar").classList.remove("progress-bar-striped", "progress-bar-animated");
+                    }
+                });
         }
     </script>
 </head>
 <body class="bg-light">
     <div class="container mt-5">
         <div class="text-center mb-4">
-            <img src="/static/logo.png" alt="Logo" class="img-fluid" style="max-height: 200px;">
+            <img src="/static/logo.png" alt="Logo" class="img-fluid" style="max-height: 100px;">
         </div>
         <div class="card shadow-sm p-4">
-            <h2 class="text-center text-primary">Upload Your Files</h2>
+            <h2 class="text-center text-primary">Upload Required Files</h2>
             <form action="/upload" method="post" enctype="multipart/form-data" class="mt-4">
                 <div class="mb-3">
-                    <input class="form-control" type="file" name="files" multiple required>
+                    <label class="form-label">Corpus File</label>
+                    <input class="form-control" type="file" name="corpus" required>
                 </div>
-                <div class="progress mb-3">
-                    <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%;"></div>
+                <div class="mb-3">
+                    <input type="checkbox" id="trained_with_thetas_eval" name="trained_with_thetas_eval" onchange="toggleFileRequirements()">
+                    <label for="trained_with_thetas_eval">Trained with Proxann</label>
                 </div>
-                <div class="d-grid gap-2">
+                <div id="proxannFields" class="mb-3">
+                    <label class="form-label">Model File (if trained with Proxann)</label>
+                    <input class="form-control" type="file" name="model">
+                </div>
+                <hr>
+                <p class="text-center">If your model was trained separately, upload these additional files:</p>
+                <div class="mb-3">
+                    <label class="form-label">Thetas File</label>
+                    <input class="form-control" type="file" name="thetas" id="thetas">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Betas File</label>
+                    <input class="form-control" type="file" name="betas" id="betas">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Vocabulary File</label>
+                    <input class="form-control" type="file" name="vocab" id="vocab">
+                </div>
+                <div class="text-center">
                     <button type="submit" class="btn btn-primary">Upload</button>
+                    <a href="/download-example" class="btn btn-info">Download Example Files</a>
                 </div>
             </form>
-            {% if files %}
+            {% if status %}
             <div class="alert alert-success mt-4">Files Uploaded Successfully</div>
-            <table class="table table-bordered mt-3">
-                <thead class="table-light">
-                    <tr>
-                        <th>#</th>
-                        <th>File Name</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for file in files %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td>{{ file }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div class="text-center mt-3">
+                <a href="{{ url_for('download_config') }}" class="btn btn-success">Download Config File</a>
+            </div>
+            <div class="text-center mt-3">
+                <button onclick="startEvaluation()" class="btn btn-warning">Evaluate</button>
+            </div>
+            <div class="progress mt-3">
+                <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%;"></div>
+            </div>
+            <div id="results" class="mt-4"></div>
             {% endif %}
         </div>
     </div>

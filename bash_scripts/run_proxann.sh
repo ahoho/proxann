@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Define common variables
-MODEL_TYPE="gpt-4o-2024-08-06" #"qwen:32b" #"qwen:32b" #"llama3.3:70b" #"llama3.1:8b-instruct-q8_0" #,llama3.3:70b,qwen:32b
+MODEL_TYPE="qwen:32b" #"gpt-4o-2024-08-06" #"qwen:32b" #"qwen:32b" #"llama3.3:70b" #"llama3.1:8b-instruct-q8_0" #,llama3.3:70b,qwen:32b
 PROMPT_MODE="q1_then_q3_dspy,q1_then_q2_dspy"
 REMOVAL_CONDITION="loose"
-SAVE_PATH="data/arr_dec_responses"
+SAVE_PATH="data/tests"
 
 # Define dataset-specific configurations using arrays
 DATASET_KEYS=("wiki" "bills") #"bills" 
@@ -31,7 +31,7 @@ for i in "${!DATASET_KEYS[@]}"; do
 
   mkdir -p "$SAVE_PATH_DTSET"
 
-  python3 proxann.py \
+  python3 proxann_user_study.py \
     --model_type "$MODEL_TYPE" \
     --prompt_mode "$PROMPT_MODE" \
     --removal_condition "$REMOVAL_CONDITION" \

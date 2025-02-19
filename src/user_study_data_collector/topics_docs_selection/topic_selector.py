@@ -32,9 +32,7 @@ class TopicSelector(object):
             Path for saving logs.
         """
         self._logger = logger if logger else init_logger(config_path, __name__)
-        self._logger.info("Loading Word2Vec model...")
-        self._wmd_model = api.load(wmd_model)
-        self._logger.info("Word2Vec model loaded.")
+        self._wmd_model = wmd_model
 
         return
 
@@ -118,7 +116,7 @@ class TopicSelector(object):
                 new_model = []
                 new_topic_id = 0
                 for i, topic in enumerate(model):
-                    if len(remove_topic_ids) > 1 and i not in remove_topic_ids[i_model]:
+                    if i not in remove_topic_ids[i_model]:
                         new_model.append(topic)
                         # Map new topic ID to the original
                         mapping[new_topic_id] = i
@@ -126,57 +124,83 @@ class TopicSelector(object):
                 modified_models.append(new_model)
                 id_mappings.append(mapping)  # Store the mapping for this model
             models = modified_models
+        
         random.seed(seed)
-        dists = {}
-        for modelA, modelB in product(range(len(models)), range(len(models))):
-            dists[(modelA, modelB)] = self._get_wmd_mat(
-                [models[modelA], models[modelB]])
+        
+        # Case 1: Single Model - Return single-topic matches
+        if len(models) == 1:
 
-        matches = []  # Matches with filtered topic IDs
+            self._logger.info("Single model detected. Sampling topics from the model.")
+            model = models[0]
+            num_topics = len(model)
 
-        assert (all(N <= len(m) for m in models))
-        while len(matches) < min(len(m) for m in models):
-            for seed_model in range(len(models)):
-                # Calculate the mean distance to all other models
-                min_dists, min_dists_indices = [], []
-                for other_model in range(len(models)):
-                    if seed_model == other_model:
-                        min_dists_indices.append((seed_model, None))
-                        continue
-                    distsAB = dists[(seed_model, other_model)]
-                    # Get the minimum distance for each topic in the seed model to the other model
-                    min_dists.append(distsAB.min(1))
-                    min_dists_indices.append((other_model, distsAB.argmin(1)))
-                mean_min_dists = np.mean(min_dists, axis=0)
-                seed_model_topic = np.argmin(mean_min_dists)
-                seed_model_matches = [
-                    (model_idx, indices[seed_model_topic]) if model_idx != seed_model else (
-                        model_idx, seed_model_topic)
-                    for model_idx, indices in min_dists_indices
+            if N > num_topics:
+                raise ValueError("N must be less than or equal to the number of topics in the model.")
+
+            selected_topics = random.sample(range(num_topics), N)  # Randomly select N topics
+
+            matches = [[(0, topic_id)] for topic_id in selected_topics]  # Wrap each topic in a list
+
+            sampled_matches_original = [[(0, id_mappings[0][topic_id])] for topic_id in selected_topics]
+
+        # Case 2: Multiple Models - Perform cross-model matching
+        else:
+            self._logger.info("Multiple models detected. Performing cross-model matching.")
+            
+            self._logger.info("Loading Word2Vec model...")
+            self._wmd_model = api.load(self._wmd_model)
+            self._logger.info("Word2Vec model loaded.")
+            
+            dists = {}
+            for modelA, modelB in product(range(len(models)), range(len(models))):
+                dists[(modelA, modelB)] = self._get_wmd_mat(
+                    [models[modelA], models[modelB]])
+
+            matches = []  # Matches with filtered topic IDs
+
+            assert (all(N <= len(m) for m in models))
+            while len(matches) < min(len(m) for m in models):
+                for seed_model in range(len(models)):
+                    # Calculate the mean distance to all other models
+                    min_dists, min_dists_indices = [], []
+                    for other_model in range(len(models)):
+                        if seed_model == other_model:
+                            min_dists_indices.append((seed_model, None))
+                            continue
+                        distsAB = dists[(seed_model, other_model)]
+                        # Get the minimum distance for each topic in the seed model to the other model
+                        min_dists.append(distsAB.min(1))
+                        min_dists_indices.append((other_model, distsAB.argmin(1)))
+                    mean_min_dists = np.mean(min_dists, axis=0)
+                    seed_model_topic = np.argmin(mean_min_dists)
+                    seed_model_matches = [
+                        (model_idx, indices[seed_model_topic]) if model_idx != seed_model else (
+                            model_idx, seed_model_topic)
+                        for model_idx, indices in min_dists_indices
+                    ]
+                    matches.append(seed_model_matches)
+
+                    # Remove the matched topics from the distance matrix
+                    for modelA, modelA_topic in seed_model_matches:
+                        for modelB in range(len(models)):
+                            if modelA != modelB:
+                                dists[(modelA, modelB)][modelA_topic, :] = np.inf
+                                dists[(modelB, modelA)][:, modelA_topic] = np.inf
+
+            sampled_matches = random.sample(matches, N)
+
+            # Map the sampled matches to their original topic IDs (sampled_matches are just positions in the betas matrix)
+            sampled_matches_original = [
+                [
+                    (model_idx, id_mappings[model_idx][topic_id]
+                    if topic_id is not None else None)
+                    for model_idx, topic_id in match
                 ]
-                matches.append(seed_model_matches)
-
-                # Remove the matched topics from the distance matrix
-                for modelA, modelA_topic in seed_model_matches:
-                    for modelB in range(len(models)):
-                        if modelA != modelB:
-                            dists[(modelA, modelB)][modelA_topic, :] = np.inf
-                            dists[(modelB, modelA)][:, modelA_topic] = np.inf
-
-        sampled_matches = random.sample(matches, N)
-
-        # Map the sampled matches to their original topic IDs (sampled_matches are just positions in the betas matrix)
-        sampled_matches_original = [
-            [
-                (model_idx, id_mappings[model_idx][topic_id]
-                 if topic_id is not None else None)
-                for model_idx, topic_id in match
+                for match in sampled_matches
             ]
-            for match in sampled_matches
-        ]
 
-        # Output the sampled matches in both forms
-        print("Sampled Matches (Position IDs):", sampled_matches)
-        print("Sampled Matches (Original Topic IDs):", sampled_matches_original)
+            # Output the sampled matches in both forms
+            print("Sampled Matches (Position IDs):", sampled_matches)
+            print("Sampled Matches (Original Topic IDs):", sampled_matches_original)
 
         return sampled_matches_original

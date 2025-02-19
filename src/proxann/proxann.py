@@ -6,13 +6,15 @@ import numpy as np
 import pandas as pd # type: ignore
 import pathlib
 from typing import Optional
+from scipy.stats import kendalltau, spearmanr
+from sklearn.metrics import ndcg_score
 
 from scipy import sparse
 from src.proxann.prompter import Prompter
-from src.proxann.utils import bradley_terry_model, extract_info_binary_q2, extract_info_q1_q3, extract_logprobs
+from src.proxann.utils import bradley_terry_model, extract_info_binary_q2, extract_info_q1_q3, extract_logprobs, load_config_pilot
 from src.user_study_data_collector.jsonify.topic_json_formatter import TopicJsonFormatter
 from src.user_study_data_collector.topics_docs_selection.topic_selector import TopicSelector
-from src.utils.utils import init_logger, load_vocab_from_txt, log_or_print
+from src.utils.utils import init_logger, load_vocab_from_txt, load_yaml_config_file, log_or_print
 
 class ProxAnn(object):
     def __init__(
@@ -33,7 +35,11 @@ class ProxAnn(object):
         
         self._logger.info("ProxAnn logger object initialized.")
         
+        # load config from user_study
+        self._config = load_yaml_config_file(config_path, "user_study", logger)
+        
         self._logger.info("ProxAnn object initialized.")
+        
         
         return
     
@@ -252,13 +258,18 @@ class ProxAnn(object):
         # Write JSON output to file
         with open(output_path, 'w') as file:
             json.dump(combined_out, file, indent=4)    
+
         
-        return ""
+        if output_path.exists():
+            return 0, output_path
+        else:
+            return 1, None
     
     # =========================================================================
     # Logic for Q1 / Q2 / Q3
     # =========================================================================
     def do_q1(
+        self,
         prompter: Prompter,
         cluster_data: dict,
         users_cats: list,
@@ -287,13 +298,15 @@ class ProxAnn(object):
             dft_system_prompt, question, use_context=False)  # max_tokens=10
 
         categories.append(category)
-        log_or_print(f"\033[92mUser categories: {users_cats}\033[0m", logger)
+        if users_cats != []:
+            log_or_print(f"\033[94mUser categories: {users_cats}\033[0m", logger)
         log_or_print(f"\033[94mModel category: {category}\033[0m", logger)
 
         return
 
 
     def do_q2(
+        self,
         prompter: Prompter,
         prompt_mode: str,
         llm_model: str,
@@ -393,6 +406,7 @@ class ProxAnn(object):
 
 
     def do_q3(
+        self,
         prompter: Prompter,
         prompt_mode: str,
         llm_model: str,
@@ -509,7 +523,202 @@ class ProxAnn(object):
         rank = [len(rank) - r + 1 for r in rank]  # Invert rank
 
         log_or_print(f"\033[95mLLM Rank:\n {rank}\033[0m", logger)
-        log_or_print(f"\033[95mUsers rank: {users_rank}\033[0m", logger)
+        if users_rank != []:
+            log_or_print(f"\033[95mUsers rank: {users_rank}\033[0m", logger)
         rank_data.append(rank)
 
         return
+    
+    # this will be executed for each model the user wants to evaluate
+    def run_metric(
+        self,
+        tm_model_data_path,
+        llm_models,
+        custom_temperature=None,
+        custom_seed=None,
+        do_both_ways=False,
+        q1_q3_prompt_mode="q1_then_q3_dspy",
+        q1_q2_prompt_mode="q1_then_q2_dspy"
+    ):  
+        """
+        Run "Proxann" metrics for a given topic model (full or set of topics) based on one or more LLMs.
+        
+        Parameters
+        ----------
+        tm_model_data_path : str
+            Path to the topic modeling data.
+        llm_models : list
+            List of LLM models to use.
+        custom_temperature : float, optional
+            Custom temperature for the LLM, by default None.
+        custom_seed : int, optional
+            Custom seed for the LLM, by default None.
+        do_both_ways : bool, optional
+            Whether to run Q3 twice: once with A as the first document, then reversed, by default False.
+        q1_q3_prompt_mode : str, optional
+            Prompting mode for Q3, by default "q1_then_q3_dspy".
+        q1_q2_prompt_mode : str, optional
+            Prompting mode for Q2, by default "q1_then_q2_dspy".
+            
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe with correlation results.
+        """
+        
+        # Load topic modeling data with information for each topic being evaluated and normalize the keys
+        tm_model_data = load_config_pilot(tm_model_data_path)
+        
+        # tm_model_data is a dictionary with keys representing the model path
+        # we retain the inner dictionary, where each key represents a topic
+        tm_model_data = tm_model_data[list(tm_model_data.keys())[0]]
+        
+        llm_results_q1, llm_results_q2, llm_results_q3 = [], [], []
+        # ---------------------------------------------------------
+        # For each topic ...
+        # ---------------------------------------------------------
+
+        # each cluster_data is the information for a topic
+        for cluster_id, cluster_data in tm_model_data.items():
+            self._logger.info(f"Cluster: {cluster_id}")
+            
+            rank_data = []
+            fit_data = [] 
+            categories = []
+            
+            for llm_model in llm_models:
+                # Create prompter for the LLM
+                prompter = Prompter(model_type=llm_model, temperature=custom_temperature, seed=custom_seed)
+                # ----------------------------------------------
+                # Q1_THEN_Q3
+                # ----------------------------------------------
+                self._logger.info("-- Executing Q1 / Q3...")
+                # ==============================================
+                # Q1
+                # ==============================================
+                self.do_q1(prompter, cluster_data, [], categories)
+                
+                # ==============================================
+                # Q3
+                # ==============================================
+                # TODO: Add logic for when category is not category[-1] but each of the users' categories
+                category = categories[-1]
+                self.do_q3(prompter, q1_q3_prompt_mode, llm_model, cluster_data,rank_data, [], category, do_both_ways)
+
+                # ----------------------------------------------
+                # Q1_THEN_Q2
+                # ----------------------------------------------
+                self._logger.info("-- Executing Q1 / Q2...")
+                labels = self.do_q2(prompter, q1_q2_prompt_mode, llm_model, cluster_data, fit_data, category)
+            
+            llm_results_q1.append({
+                "id": cluster_id,
+                "n_annotators": len(llm_models),
+                "annotators": llm_models,
+                "categories": categories,
+            })
+
+            if fit_data != []:
+                llm_results_q2.append({
+                    "id": cluster_id,
+                    "n_annotators": len(llm_models),
+                    "annotators": llm_models,
+                    "labels": labels,
+                    "fit_data": [fit_data],
+                })
+
+            if rank_data != []:
+                llm_results_q3.append({
+                    "id": cluster_id,
+                    "n_annotators": len(llm_models),
+                    "annotators": llm_models,
+                    "rank_data": rank_data
+                })
+                
+        llm_results_q2 = sorted(llm_results_q2, key=lambda x: x["id"])
+        llm_results_q3 = sorted(llm_results_q3, key=lambda x: x["id"])
+        
+        corr_data = self.compute_llm_tm_corrs(tm_model_data, llm_results_q3, llm_results_q2)
+        
+        return corr_data
+    
+    def compute_llm_tm_corrs(
+        self,
+        tm_model_data: dict,
+        rank_llm_data: list,
+        fit_llm_data: list,
+    )-> pd.DataFrame:
+        """
+        Compute correlation between LLM and TM data.
+        
+        Parameters
+        ----------
+        tm_model_data : dict
+            Topic modeling data.
+        rank_llm_data : list
+            List of rank data for the LLM.
+        fit_llm_data : list
+            List of fit data for the LLM.
+            
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe with correlation results.
+        """
+        
+        model_data = []
+        
+        for topic_id, topic_data in tm_model_data.items():
+            
+            prob_data = np.array([doc["prob"] for doc in topic_data["eval_docs"]])
+
+            assign_data = np.array([doc["assigned_to_k"] for doc in topic_data["eval_docs"]])
+            
+            model_data.append({
+                "id": topic_id,
+                "prob_data": prob_data,
+                "assign_data": assign_data
+            })   
+            
+        model_data = sorted(model_data, key=lambda x: x["id"])
+        
+        assert [k["id"] for k in model_data] == [k["id"] for k in rank_llm_data] == [k["id"] for k in fit_llm_data], "IDs do not match"
+    
+        corr_results = []
+        for d_model, d_r_llm, d_f_llm in zip(model_data, rank_llm_data, fit_llm_data):
+            # from the tm model
+            prob_data = d_model["prob_data"]
+            assign_data = d_model["assign_data"]
+            
+            # from the LLMs        
+            annotator_results = {}
+            r_llm = d_r_llm["rank_data"]
+            r_annotators = d_r_llm["annotators"]
+            f_llm = d_f_llm["fit_data"]
+            f_annotators = d_f_llm["annotators"]
+            
+            # f_annotators should be the same as r_annotators
+            assert r_annotators == f_annotators, "Annotators do not match"
+            
+            for a, r_llm_a, f_llm_a in zip(r_annotators, r_llm, f_llm):
+                
+                rank_rho_gt, _ = spearmanr(prob_data, r_llm_a)
+                rank_tau_gt, _ = kendalltau(prob_data, r_llm_a)
+                rank_ndcg_gt = ndcg_score([r_llm_a], [prob_data])
+                
+                fit_tau_tm, _ = kendalltau(prob_data, f_llm_a)
+                fit_agree_tm = np.mean(assign_data == f_llm_a)
+                
+                annotator_results[f"rank_rho_tm_{a}"] = rank_rho_gt
+                annotator_results[f"rank_tau_tm_{a}"] = rank_tau_gt
+                annotator_results[f"rank_ndcg_tm_{a}"] = rank_ndcg_gt
+            
+                annotator_results[f"fit_tau_tm_{a}"] = fit_tau_tm
+                annotator_results[f"fit_agree_tm_{a}"] = fit_agree_tm
+                
+            corr_results.append({
+                "id": d_model["id"],
+                **annotator_results
+            })
+            
+        return pd.DataFrame(corr_results)

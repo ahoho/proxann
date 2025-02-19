@@ -34,3 +34,51 @@ Ensure that all required files are correctly formatted and accessible.
 
 # @TODO: Make json with user-provided model data
 # @TODO: Run Q1, Q2, Q3 and get a score based on correlations with the topic model
+
+import argparse
+
+from src.proxann.proxann import ProxAnn
+from src.utils.utils import init_logger, load_yaml_config_file
+
+
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config_path", type=str,  required=False, default="config/config.yaml",
+        help="Path to the configuration file.")
+    parser.add_argument(
+        "--user_study_config",
+        help="Path to the user study configuration file.",
+        required=False,
+        default="config/config_pilot.conf")
+    
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+
+    logger = init_logger(args.config_path, f"RunProxann-eval")
+    logger.info(f"Running Proxann in metric mode")
+    
+    # Init proxann object
+    proxann = ProxAnn(logger, args.config_path)
+
+    # Generate user provided JSON file
+    status, tm_model_data_path = proxann.generate_user_provided_json(path_user_study_config_file=args.user_study_config)
+    
+    if status == 0:
+        logger.info("User provided JSON file generated successfully.")
+    else:
+        logger.error("Error generating user provided JSON file.")
+        return 1
+    
+    proxann.run_metric(
+        tm_model_data_path.as_posix(),
+        llm_models=["qwen:32b"]
+    )
+    
+
+if __name__ == "__main__":
+    main()

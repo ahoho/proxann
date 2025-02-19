@@ -39,7 +39,7 @@ for s in "${seeds[@]}"; do
 
     mkdir -p "$SAVE_PATH_DTSET"
 
-    python3 proxann.py \
+    python3 proxann_user_study.py \
       --model_type "$MODEL_TYPE" \
       --prompt_mode "$PROMPT_MODE" \
       --removal_condition "$REMOVAL_CONDITION" \

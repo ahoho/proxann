@@ -13,11 +13,14 @@ import requests
 # import ollama  # type: ignore
 from ollama import Client
 from openai import OpenAI
+import hashlib
 
 from src.utils.utils import load_yaml_config_file, init_logger
 
 memory = Memory(location='cache', verbose=0)
 
+def hash_input(*args):
+    return hashlib.md5(str(args).encode()).hexdigest()
 
 class Prompter:
     def __init__(
@@ -96,6 +99,7 @@ class Prompter:
         """Caching setup."""
 
         print("Cache miss: computing results...")
+        
         if backend == "openai":
             result, logprobs = Prompter._call_openai_api(
                 template=template,
@@ -234,6 +238,8 @@ class Prompter:
 
         # Ensure hashable params for caching and get cached data / execute prompt
         params_tuple = tuple(sorted(self.params.items()))
+        
+        print("Cache key:", hash_input(system_prompt_template, question, self.model_type, self.backend, params_tuple, self.context, use_context))
         cached_data = self._cached_prompt_impl(
             template=system_prompt_template,
             question=question,

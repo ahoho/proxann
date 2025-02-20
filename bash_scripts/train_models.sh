@@ -1,5 +1,6 @@
 #!/bin/bash
 
+CONFIG_FILE="/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/config/config.yaml"
 TRAINER_TYPE="BERTopic"
 NUM_TOPICS=50
 SCRIPT="python3 src/train/tm_trainer.py"
@@ -24,7 +25,7 @@ for DATASET_ENTRY in "${DATASETS[@]}"; do
     
     # Construct paths
     CORPUS_FILE="${DATASET_PATH}/${EMBEDDINGS_SUFFIX}"
-    MODEL_PATH="${MODEL_BASE_PATH}/${DATASET}-labeled/vocab_15k/k-${NUM_TOPICS}/bertopic"
+    MODEL_PATH="${MODEL_BASE_PATH}/${DATASET}-labeled/vocab_15k/k-${NUM_TOPICS}/new_tests_bertopic"
     VOCAB_PATH="${DATASET_PATH}/${VOCAB_FILE}"
 
     # Output current processing dataset
@@ -32,6 +33,7 @@ for DATASET_ENTRY in "${DATASETS[@]}"; do
 
     # Run the training script
     $SCRIPT \
+        --config_path "$CONFIG_FILE" \
         --corpus_file "$CORPUS_FILE" \
         --model_path "$MODEL_PATH" \
         --vocab_path "$VOCAB_PATH" \

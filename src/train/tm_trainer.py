@@ -63,8 +63,7 @@ class TMTrainer(ABC):
         self.model_path = pathlib.Path(model_path)
         if self.model_path.exists():
             self._logger.info(
-                f"Model path {
-                    self.model_path} already exists. Saving a copy..."
+                f"Model path {self.model_path} already exists. Saving a copy..."
             )
             old_model_dir = self.model_path.parent / \
                 (self.model_path.name + "_old")
@@ -381,16 +380,14 @@ class MalletLDATrainer(TMTrainer):
                 f'output-state = {self.mallet_folder.joinpath("topic-state.gz").resolve().as_posix()}\n')
             fout.write(
                 f'output-doc-topics = {self.mallet_folder.joinpath("doc-topics.txt").resolve().as_posix()}\n')
-            fout.write(f'word-topic-counts-file = {self.mallet_folder.joinpath(
-                "word-topic-counts.txt").resolve().as_posix()}\n')
+            fout.write(f'word-topic-counts-file = {self.mallet_folder.joinpath("word-topic-counts.txt").resolve().as_posix()}\n')
             fout.write(
                 f'diagnostics-file = {self.mallet_folder.joinpath("diagnostics.xml").resolve().as_posix()}\n')
             fout.write(
                 f'xml-topic-report = {self.mallet_folder.joinpath("topic-report.xml").resolve().as_posix()}\n')
             fout.write(
                 f'output-topic-keys = {self.mallet_folder.joinpath("topickeys.txt").resolve().as_posix()}\n')
-            fout.write(f'inferencer-filename = {self.mallet_folder.joinpath(
-                "inferencer.mallet").resolve().as_posix()}\n')
+            fout.write(f'inferencer-filename = {self.mallet_folder.joinpath("inferencer.mallet").resolve().as_posix()}\n')
 
         cmd = f'{self.mallet_path} train-topics --config {config_mallet}'
 
@@ -534,8 +531,7 @@ class MalletLDATrainer(TMTrainer):
         cmd = (
             f'{self.mallet_path.as_posix()} infer-topics --inferencer {inferencer} '
             f'--input {corpus_mallet_inf} --output-doc-topics {doc_topics_file} '
-            f'--doc-topics-threshold {
-                doc_topic_thr} --num-iterations {num_iterations}'
+            f'--doc-topics-threshold {doc_topic_thr} --num-iterations {num_iterations}'
         )
 
         try:
@@ -801,8 +797,7 @@ class BERTopicTrainer(TMTrainer):
         return (
             rf"(?<![a-zA-Z\u00C0-\u024F\d\-_])"
             rf"[a-zA-Z\u00C0-\u024F]"
-            rf"(?:[a-zA-Z\u00C0-\u024F]|(?!\d{{4}})[\d]|[\-_·\.'](?![\-_·\.'])){{{
-                word_min_len - 1},}}"
+            rf"(?:[a-zA-Z\u00C0-\u024F]|(?!\d{{4}})[\d]|[\-_·\.'](?![\-_·\.'])){{{word_min_len - 1},}}"
             rf"(?<![\-_·\.'])[a-zA-Z\u00C0-\u024F\d]?"
             rf"(?![a-zA-Z\u00C0-\u024F\d])"
         )
@@ -836,8 +831,7 @@ class BERTopicTrainer(TMTrainer):
             self._logger.info(
                 "Using pre-trained embeddings from the dataset...")
         else:
-            self._logger.info(f"Creating SentenceTransformer model with {
-                              self.sbert_model}...")
+            self._logger.info(f"Creating SentenceTransformer model with {self.sbert_model}...")
         self._embedding_model = SentenceTransformer(self.sbert_model)
 
         self._umap_model = UMAP(
@@ -892,8 +886,7 @@ class BERTopicTrainer(TMTrainer):
             verbose=True
         )
 
-        self._logger.info(f"Training BERTopic model with {
-                          self.num_topics} topics... ")
+        self._logger.info(f"Training BERTopic model with {self.num_topics} topics... ")
 
         if self.embeddings is not None:
             self._logger.info(

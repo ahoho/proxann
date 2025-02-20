@@ -364,7 +364,8 @@ class DocSelector(object):
     def _select_ids_nparts(
         self,
         mat: np.ndarray,
-        n_parts: int = 5
+        n_parts: int = 5,
+        seed: int = 2357_11
     ) -> List[List[int]]:
         """
         Selects one random value from each of the n_parts segments of each column in the given matrix.
@@ -382,6 +383,8 @@ class DocSelector(object):
         List[List[int]]:
             A list of lists containing the indices of the selected documents for each topic. Each inner list corresponds to a topic and contains one selected document from each of the n_parts segments.
         """
+        np.random.seed(seed)
+        
         selected_ids = []
         mat = mat.copy()
 
@@ -519,7 +522,8 @@ class DocSelector(object):
         thr: tuple = None,
         ntop: int = 5,
         poly_degree=3,
-        smoothing_window=5
+        smoothing_window=5,
+        seed: int = 2357_11
     ) -> List[List[int]]:
         """
         Get the top documents based on the specified method.
@@ -570,6 +574,8 @@ class DocSelector(object):
             A list of lists containing the indices of the ntop selected documents for each topic.
         """
 
+        np.random.seed(seed)
+        
         if method == "thetas_sample":
             mat = thetas.copy()
             mat = mat / mat.sum(axis=0)

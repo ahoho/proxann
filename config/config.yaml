@@ -45,7 +45,7 @@ topic_modeling:
     language: english
     repr_model_diversity: 0.3
     repr_model_topnwords: 15
-    word_min_len: 0llm
+    word_min_len: 0
 
 ################################
 #   PROXANN CONFIGURATION      #

@@ -106,7 +106,8 @@ class TopicSelector(object):
         list of list of tuple
             List of lists with the N matches found. Each match is a list of tuples, where each tuple contains the model index and the topic index.
         """
-
+        random.seed(seed)
+        
         if remove_topic_ids is not None:
             modified_models = []
             id_mappings = []  # To store mappings for each model
@@ -124,8 +125,6 @@ class TopicSelector(object):
                 modified_models.append(new_model)
                 id_mappings.append(mapping)  # Store the mapping for this model
             models = modified_models
-        
-        random.seed(seed)
         
         # Case 1: Single Model - Return single-topic matches
         if len(models) == 1:

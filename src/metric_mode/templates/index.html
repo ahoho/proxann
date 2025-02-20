@@ -3,8 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>File Upload</title>
+    <title>ProxAnn</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        #results table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        #results th, #results td {
+            text-align: center;  /* Ensures text aligns under headers */
+            padding: 10px;
+            border: 1px solid #dee2e6; /* Matches Bootstrap table borders */
+        }
+        
+        #results th {
+            background-color: #f8f9fa; /* Light gray background for headers */
+            font-weight: bold;
+        }
+        
+        .table-striped tbody tr:nth-of-type(odd) {
+            background-color: #f2f2f2; /* Alternating row colors for readability */
+        }
+    </style>
+    
+
     <script>
         function toggleFileRequirements() {
             const trainedWithThetas = document.getElementById("trained_with_thetas_eval").checked;
@@ -46,26 +71,28 @@
 </head>
 <body class="bg-light">
     <div class="container mt-5">
-        <div class="text-center mb-4">
+        <div class="d-flex justify-content-center mb-4">
             <img src="/static/logo.png" alt="Logo" class="img-fluid" style="max-height: 100px;">
         </div>
-        <div class="card shadow-sm p-4">
-            <h2 class="text-center text-primary">Upload Required Files</h2>
-            <form action="/upload" method="post" enctype="multipart/form-data" class="mt-4">
+        
+        <!-- File Upload Section -->
+        <div class="card shadow-sm p-4 mb-4">
+            <h4 class="text-primary">Upload Required Files</h4>
+            <form action="/upload" method="post" enctype="multipart/form-data" class="mt-3" onsubmit="showUploadProgress(event)">
                 <div class="mb-3">
                     <label class="form-label">Corpus File</label>
                     <input class="form-control" type="file" name="corpus" required>
                 </div>
-                <div class="mb-3">
-                    <input type="checkbox" id="trained_with_thetas_eval" name="trained_with_thetas_eval" onchange="toggleFileRequirements()">
-                    <label for="trained_with_thetas_eval">Trained with Proxann</label>
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" id="trained_with_thetas_eval" name="trained_with_thetas_eval" onchange="toggleFileRequirements()">
+                    <label class="form-check-label" for="trained_with_thetas_eval">Trained with Proxann</label>
                 </div>
                 <div id="proxannFields" class="mb-3">
                     <label class="form-label">Model File (if trained with Proxann)</label>
                     <input class="form-control" type="file" name="model">
                 </div>
                 <hr>
-                <p class="text-center">If your model was trained separately, upload these additional files:</p>
+                <p>If your model was trained separately, upload these additional files:</p>
                 <div class="mb-3">
                     <label class="form-label">Thetas File</label>
                     <input class="form-control" type="file" name="thetas" id="thetas">
@@ -78,26 +105,80 @@
                     <label class="form-label">Vocabulary File</label>
                     <input class="form-control" type="file" name="vocab" id="vocab">
                 </div>
-                <div class="text-center">
+                <div id="upload-progress" class="progress mt-3" style="display: none;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Uploading...</div>
+            </div>
+            <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">Upload</button>
-                    <a href="/download-example" class="btn btn-info">Download Example Files</a>
+                    <a href="{{ url_for('download_config') }}" class="btn btn-success" id="download-config" style="display: none;">Download Config File</a>
                 </div>
+                <a href="{{ url_for('download_config') }}" class="btn btn-success mt-2" id="download-config" style="display: none;">Download Config File</a>
             </form>
-            {% if status %}
-            <div class="alert alert-success mt-4">Files Uploaded Successfully</div>
-            <div class="text-center mt-3">
-                <a href="{{ url_for('download_config') }}" class="btn btn-success">Download Config File</a>
+            <p class="text-success mt-3" id="upload-success" style="display: none;">Files uploaded successfully! You can now proceed with evaluation.</p>
+            <div class="mt-3 position-absolute top-0 end-0 me-3 mt-3">
+                <button class="btn btn-info" id="help-btn">?</button>
+                <div id="help-tooltip" class="position-absolute bg-white p-2 border shadow-sm" style="display: none; width: 250px;">
+                    <p>Download example files to see the required format.</p>
+                    <a href="https://drive.google.com/drive/folders/14HeJKQH4eQktNP6Psf8g7qElkP7nX6xS?usp=sharing" class="btn btn-link" target="_blank" rel="noopener noreferrer">Download</a>                    
+                </div>
             </div>
-            <div class="text-center mt-3">
-                <button onclick="startEvaluation()" class="btn btn-warning">Evaluate</button>
-            </div>
+            <script>
+                document.getElementById("help-btn").addEventListener("mouseenter", function() {
+                    document.getElementById("help-tooltip").style.display = "block";
+                });
+                document.getElementById("help-tooltip").addEventListener("mouseleave", function() {
+                    document.getElementById("help-tooltip").style.display = "none";
+                });
+                document.getElementById("help-btn").addEventListener("mouseleave", function(event) {
+                    setTimeout(function() {
+                        if (!document.getElementById("help-tooltip").matches(':hover')) {
+                            document.getElementById("help-tooltip").style.display = "none";
+                        }
+                    }, 300);
+                });
+            </script>
+        </div>
+
+        <div id="evaluation-section" style="display: none;">
+        <!-- Evaluation Section -->
+        <div class="card shadow-sm p-4">
+            <h4 class="text-warning">Evaluation</h4>
+            
+            <button onclick="startEvaluation()" class="btn btn-warning">Start Evaluation</button>
             <div class="progress mt-3">
                 <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%;"></div>
             </div>
             <div id="results" class="mt-4"></div>
-            {% endif %}
+        </div>
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+        function showUploadProgress(event) {
+            event.preventDefault(); // Prevent default form submission
+            document.getElementById("upload-progress").style.display = "block";
+            let formData = new FormData(event.target);
+            fetch("/upload", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("upload-progress").style.display = "none";
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    document.getElementById("upload-success").style.display = "block";
+                    document.getElementById("download-config").style.display = "inline-block";
+                    document.getElementById("download-config").href = data.config_url;
+                    setTimeout(() => { document.getElementById("evaluation-section").style.display = "block"; }, 500);
+                }
+            })
+            .catch(error => {
+                document.getElementById("upload-progress").style.display = "none";
+                console.error("Error:", error);
+            });
+        }
+    </script>
 </body>
 </html>

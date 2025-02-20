@@ -84,13 +84,18 @@ def upload():
             if file.filename:
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
                 file.save(file_path)
+                print (file_path)
                 uploaded_files[file_key] = file_path
 
     if set(required_files) != set(uploaded_files.keys()):
-        return "Error: Missing required files. Please upload all required files.", 400
+        return jsonify({"error": "Error: Missing required files. Please upload all required files."}), 400
 
     config_path = generate_config(uploaded_files, trained_with_thetas_eval)
-    return render_template('index.html', files=list(uploaded_files.keys()), status="Uploaded Successfully", config_path=config_path)
+    
+    return jsonify({
+        "status": "Uploaded Successfully",
+        "config_url": url_for('download_config')
+    })
 
 @app.route('/download-config')
 def download_config():
@@ -120,7 +125,8 @@ def evaluate():
     )    
     
     evaluation_progress = 100  # Mark evaluation as complete
-    table_html = df.to_html(classes='table table-striped')
+    table_html = df.to_html(classes='table table-striped table-bordered text-center', index=False)
+
     return jsonify({"table": table_html})
 
 @app.route('/evaluate_status', methods=['GET'])
@@ -130,4 +136,4 @@ def evaluate_status():
     return jsonify({"progress": evaluation_progress})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5786)
+    app.run(host='0.0.0.0', debug=True, port=2091)

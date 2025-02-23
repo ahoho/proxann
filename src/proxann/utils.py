@@ -13,12 +13,15 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import networkx as nx
-from scipy.stats import kendalltau, spearmanr, pearsonr
+from scipy.stats import kendalltau, spearmanr
 from sklearn.metrics import ndcg_score
 from irrCAC.raw import CAC
 
 from src.utils.utils import log_or_print
 
+def load_template(template_path: str) -> str:
+    with open(template_path, 'r') as file:
+        return file.read()
 
 def extend_to_full_sentence(
     text: str,
@@ -186,53 +189,20 @@ def extract_info_q1_q3(text, get_label):
 
     return label, order, rationale
 
-
-def extract_info_q1_q2(text, get_label):
-    """
-    Extracts the label, score, and rationale from the prompt text based on the 'get_label' parameter. 
-    If 'get_label' is set to True, the method extracts from the 'q1_q2' prompt; otherwise, it extracts from 'q2'.
-    """
-    label_pattern = r'LABEL:\s*(.*?)\s*(?=SCORE:)'
-    score_pattern = r'SCORE:\s*(\d+)'
-    rationale_pattern = r'RATIONALE:\s*(.*)'
-
-    if get_label:
-        label_match = re.findall(label_pattern, text, re.DOTALL)
-        label = label_match[0].strip() if label_match else ""
-    else:
-        label = ""
-
-    score_match = re.findall(score_pattern, text)
-    score = score_match[0].strip() if score_match else ""
-    try:
-        score = int(score)
-    except ValueError:
-        score = None
-
-    rationale_match = re.findall(rationale_pattern, text, re.DOTALL)
-    rationale = rationale_match[0].strip() if rationale_match else ""
-
-    return label, score, rationale
-
-
-"""
 def extract_info_binary_q2(text):
-    fit_pattern_general = r'FIT:\s*(YES|NO)'
-    # for dspy prompts
-    fit_pattern_bracketed = r'\[\[ ## FIT ## \]\]\s*(YES|NO)'
-
-    fit_match = re.findall(fit_pattern_bracketed, text, re.DOTALL)
-    if not fit_match:
-        fit_match = re.findall(fit_pattern_general, text, re.DOTALL)
-
-    fit = fit_match[0].strip() if fit_match else ""
-    fit = int("yes" in fit.lower())
-
-    return fit
-"""
-def extract_info_binary_q2(text):
-    #fit_pattern_bracketed = r'\[\[  ## FIT ##  \]\]\s*(YES|NO|PARTIAL|PARTIALLY|MAYBE|MARGINALLY|MARGINAL)'
-    # adjust fit_pattern_bracketed to match in case additional spaces are added or \n appear before or after the brackets or the YES/NO
+    """
+    Extracts the fit binary label from the prompt text.
+    
+    Parameters:
+    ----------
+    text: str
+        Text containing the prompt.
+    
+    Returns:
+    -------
+    int
+        Binary label for the fit (1: yes, 0: no).
+    """
     fit_pattern_bracketed = r'\[\[\s*##\s*FIT\s*##\s*\]\]\s*(YES|NO|PARTIAL|PARTIALLY|MAYBE|MARGINALLY|MARGINAL)'
     
     fit_pattern_general = r'FIT:\s*(YES|NO|PARTIAL|PARTIALLY|MAYBE|MARGINALLY|MARGINAL)'
@@ -282,7 +252,6 @@ def extract_logprobs(pairwise_logprobs, backend, logger):
 # ============================================================================ #
 # Pilot study parsing functions
 # ============================================================================ #
-
 
 def merge_dicts(dict1, dict2):
     """Recursively merge two dictionaries at the second level."""

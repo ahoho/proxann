@@ -1,17 +1,30 @@
 import configparser
+import itertools
 import json
 import logging
-import sys
-import numpy as np
-import pandas as pd # type: ignore
 import pathlib
-from typing import Optional
-from scipy.stats import kendalltau, spearmanr
-from sklearn.metrics import ndcg_score
+import random
+import re
+import sys
 
+from typing import List, Optional, Union
+
+import numpy as np
+import pandas as pd  # type: ignore
 from scipy import sparse
+from scipy.stats import kendalltau, spearmanr
+from sklearn.metrics import ndcg_score  # type: ignore
+
 from src.proxann.prompter import Prompter
-from src.proxann.utils import bradley_terry_model, extract_info_binary_q2, extract_info_q1_q3, extract_logprobs, load_config_pilot
+from src.proxann.utils import (
+    bradley_terry_model,
+    extend_to_full_sentence,
+    extract_info_binary_q2,
+    extract_info_q1_q3,
+    extract_logprobs,
+    load_config_pilot,
+    load_template
+)
 from src.user_study_data_collector.jsonify.topic_json_formatter import TopicJsonFormatter
 from src.user_study_data_collector.topics_docs_selection.topic_selector import TopicSelector
 from src.utils.utils import init_logger, load_vocab_from_txt, load_yaml_config_file, log_or_print
@@ -264,6 +277,172 @@ class ProxAnn(object):
             return 0, output_path
         else:
             return 1, None
+        
+    def get_prompt_template(
+        self,
+        llm_model_type: str,
+        text_for_prompt: dict,
+        question_type: str,
+        category: str = None,
+        nr_few_shot: int = 2,
+        doing_both_ways: bool = False,
+        generate_description: bool = False,
+        path_examples: str = "src/proxann/prompts/few_shot_examples.json",
+        base_prompt_path: str = "src/proxann/prompts/"
+    ) -> Union[str, List[str]]:
+
+        # Read JSON with few-shot examples
+        with open(path_examples, 'r') as file:
+            few_shot_examples = json.load(file)
+
+        def load_template_path(q_type: str) -> str:
+            """Helper function to construct the template path based on question type."""
+            return f"{base_prompt_path}{q_type}/instructions_question_prompt.txt"
+        
+        def add_model_key_to_template(template_name: str) -> str:
+            """Helper function to add the model key to the template."""
+            
+            if "q3" in template_name:
+                # TODO: Update this when q3 is optimized for Q3
+                return f"{template_name}_llama" if "llama" in llm_model_type else template_name
+            else:
+                if "llama" in llm_model_type:
+                    return f"{template_name}_llama"
+                elif "qwen" in llm_model_type:
+                    return f"{template_name}_qwen"
+                elif "gpt" in llm_model_type:
+                    return template_name
+            
+                self._logger.info("No specific template for the model type. Using the default template.")
+            return template_name
+
+        def handle_q1(
+            text: dict, 
+            few_shot: dict, 
+            topk: int = 10,
+            num_words: int = 100,
+            nr_few_shot=1,
+            generate_description: bool = False
+        ) -> str:
+            """Function to handle Q1."""
+            
+            # Few-shot examples
+            examples_q1 = few_shot["q1"][:nr_few_shot]
+
+            if generate_description:
+                examples = [
+                    "KEYWORDS: {}\nDOCUMENTS: {}\nCATEGORY: {}\nDESCRIPTION:{}".format(
+                        ex['example']['keywords'],
+                        ''.join(
+                            f"\n- {doc}" for doc in ex['example']['documents']),
+                        ex['example']['response']['label'],
+                        ex['example']['response']['description']
+                    )
+                    for ex in examples_q1
+                ]
+            else:
+                examples = [
+                    "KEYWORDS: {}\nDOCUMENTS: {}\nCATEGORY: {}".format(
+                        ex['example']['keywords'],
+                        ''.join(
+                            f"\n- {doc}" for doc in ex['example']['documents']),
+                        ex['example']['response']['label']
+                    )
+                    for ex in examples_q1
+                ]
+
+            # Actual question to the LLM (keys and docs)
+            docs = "".join(
+                f"\n- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"])
+
+            keys = " ".join(text["topic_words"][:topk])
+
+            template_path = load_template_path(
+                "q1_with_desc") if generate_description else load_template_path("q1")
+            return load_template(template_path).format("\n".join(examples), keys, docs)
+
+        def handle_q2(
+            text: dict,
+            cat: str,
+            num_words: int = 100,
+            template_name: str = "q2_dspy"
+        ) -> List[str]:
+            """Function to handle Q2."""
+
+            template_name = add_model_key_to_template(template_name)
+            template_path = load_template_path(template_name)
+            return [load_template(template_path).format(category=cat, document=extend_to_full_sentence(doc['text'], num_words)) for doc in text["eval_docs"]]
+
+        def handle_q3(
+            text: dict,
+            cat: str,
+            num_words: int = 100,
+            doing_both_ways: bool = True,
+            template_name: str = "q3_dspy",
+            return_raw: bool = False
+        ) -> List[str]:
+            """Function to handle Q3."""
+
+            # Set seed for consistent randomness
+            random.seed(1234)
+
+            # Document pairs generation
+            doc_pairs_one, doc_pairs_two = [], []
+            pair_ids_one, pair_ids_two = [], []
+
+            eval_docs = sorted(text["eval_docs"], key=lambda x: x["doc_id"])
+            # shuffle the eval docs so the "most related" ones are not shown first
+            eval_docs = random.sample(eval_docs, len(eval_docs))
+            for d1, d2 in itertools.combinations(eval_docs, 2):
+                docs_list = [[d1, d2], [d2, d1]] if doing_both_ways else [
+                    random.sample([d1, d2], 2)]
+
+                for i, docs in enumerate(docs_list):
+                    doc_a = extend_to_full_sentence(docs[0]['text'], num_words)
+                    doc_b = extend_to_full_sentence(docs[1]['text'], num_words)
+
+                    if doing_both_ways:
+                        if i % 2 == 0:
+                            doc_pairs_one.append([doc_a, doc_b])
+                            pair_ids_one.append(
+                                {"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+                        else:
+                            doc_pairs_two.append([doc_a, doc_b])
+                            pair_ids_two.append(
+                                {"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+                    else:
+                        doc_pairs_one.append([doc_a, doc_b])
+                        pair_ids_one.append(
+                            {"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+
+            # Template loading and formatting
+            template_name = add_model_key_to_template(template_name)
+            template_path = load_template_path(template_name)
+            template = load_template(template_path)
+
+            if doing_both_ways:
+                return (
+                    [template.format(category=cat, doc_a=pair[0], doc_b=pair[1]) for pair in doc_pairs_one],
+                    pair_ids_one,
+                    [template.format(category=cat, doc_a=pair[0], doc_b=pair[1]) for pair in doc_pairs_two],
+                    pair_ids_two
+                )
+            else:
+                if not return_raw:
+                    return ([template.format(category=cat, doc_a=pair[0], doc_b=pair[1]) for pair in doc_pairs_one], pair_ids_one)
+                else:
+                    return (cat, [(pair[0], pair[1]) for pair in doc_pairs_one], pair_ids_one)
+
+        question_handlers = {
+            "q1": lambda text: handle_q1(text, few_shot_examples, nr_few_shot=nr_few_shot, generate_description=generate_description),
+            "q2_dspy": lambda text: handle_q2(text, category),
+            "q3_dspy": lambda text: handle_q3(text, category, doing_both_ways=doing_both_ways)
+        }
+
+        if question_type not in question_handlers:
+            raise ValueError("Invalid question type")
+
+        return question_handlers[question_type](text_for_prompt)
     
     # =========================================================================
     # Logic for Q1 / Q2 / Q3
@@ -293,9 +472,9 @@ class ProxAnn(object):
         """
         log_or_print("Executing Q1...", logger)
 
-        question = prompter.get_prompt(cluster_data, "q1")
+        question = self.get_prompt_template(prompter.model_type,cluster_data, "q1")
         category, _ = prompter.prompt(
-            dft_system_prompt, question, use_context=False)  # max_tokens=10
+            dft_system_prompt, question, use_context=False)
 
         categories.append(category)
         if users_cats != []:
@@ -304,17 +483,15 @@ class ProxAnn(object):
 
         return
 
-
     def do_q2(
         self,
         prompter: Prompter,
         prompt_mode: str,
-        llm_model: str,
         cluster_data: dict,
         fit_data: list,
         category: str,
         user_cats: list = None,
-        dft_system_prompt: str = "src/proxann/prompts/XXX/simplified_system_prompt.txt",
+        dft_system_prompt: str = None,
         use_context: bool = False,
         logger: logging.Logger = None
     ) -> list:
@@ -327,8 +504,6 @@ class ProxAnn(object):
             Prompter object.
         prompt_mode : str
             Prompting mode for Q2.
-        llm_model : str
-            LLM model to use.
         cluster_data : dict
             Information for a topic as given by the data loaded from args.tm_model_data_path.
         fit_data : list
@@ -338,84 +513,58 @@ class ProxAnn(object):
         user_cats : list, optional
             List of user-generated categories during the user study, by default None.
         dft_system_prompt : str, optional
-            Default system prompt for Q2, by default "src/proxann/prompts/XXX/simplified_system_prompt.txt".
+            Default system prompt for Q2.
         use_context : bool, optional
             Whether to use the context for the prompt, by default False.
+        logger : logging.Logger, optional
+            Logger for logging information.
 
         Returns
         -------
         list
             List of user categories.
         """
-        if prompt_mode == "q1_then_q2_dspy":
-            if "llama" in llm_model:
-                prompt_key = "q2_dspy_llama"
-            elif "qwen" in llm_model:
-                prompt_key = "q2_dspy_qwen"
-            else:
-                prompt_key = "q2_dspy"
-            log_or_print(f"Using prompt key: {prompt_key}", logger)
-            questions = prompter.get_prompt(cluster_data, prompt_key, category)
-        else:
-            do_q2_with_q1_fixed = prompt_mode == "q1_then_q2_fix_cat"
-            questions = prompter.get_prompt(
-                cluster_data, "binary_q2", category, do_q2_with_q1_fixed=do_q2_with_q1_fixed)
 
-        if "dspy" in prompt_mode:
-            dft_system_prompt = None
+        if prompt_mode != "q1_then_q2_dspy":
+            log_or_print(f"Not a valid prompt mode: {prompt_mode}", logger)
+            return
+
+        prompt_key = "q2_dspy"
+        log_or_print(f"Using prompt key: {prompt_key}", logger)
 
         if user_cats:
-            labels = user_cats * len(questions)
+            labels = user_cats * len(self.get_prompt_template(prompter.model_type, cluster_data, prompt_key, category))
 
-            #  we do not to make one prompt per user category (each user has a different category), and we want to use each user's category to determine the fit score for each document in the evaluation set
             for cat in user_cats:
-                if prompt_mode == "q1_then_q2_dspy":
-                    if "llama" in llm_model:
-                        prompt_key = "q2_dspy_llama"
-                    elif "qwen" in llm_model:
-                        prompt_key = "q2_dspy_qwen"
-                    else:
-                        prompt_key = "q2_dspy"
-                    log_or_print(f"Using prompt key: {prompt_key}", logger)
-                    questions = prompter.get_prompt(cluster_data, prompt_key, cat)
-                else:
-                    do_q2_with_q1_fixed = prompt_mode == "q1_then_q2_fix_cat"
-                    questions = prompter.get_prompt(
-                        cluster_data, "binary_q2", cat, do_q2_with_q1_fixed=do_q2_with_q1_fixed)
+                questions = self.get_prompt_template(prompter.model_type,cluster_data, prompt_key, cat)
 
                 for question in questions:
-                    response_q2, _ = prompter.prompt(
-                        dft_system_prompt, question, use_context=use_context)
+                    response_q2, _ = prompter.prompt(dft_system_prompt, question, use_context=use_context)
                     score = extract_info_binary_q2(response_q2)
                     log_or_print(f"\033[92mFit: {score}\033[0m", logger)
                     fit_data.append(score)
         else:
+            questions = self.get_prompt_template(prompter.model_type,cluster_data, prompt_key, category)
             labels = [category] * len(questions)
-        for question in questions:
-            response_q2, _ = prompter.prompt(
-                dft_system_prompt, question, use_context=use_context)
-            log_or_print(f"\033[96mFit: {response_q2}\033[0m", logger)
-            score = extract_info_binary_q2(response_q2)
-            #if "marginally" in response_q2.lower() or "marginal" in response_q2.lower() or "maybe" in response_q2.lower():
-            #if "no" in response_q2.lower():
-            #    import pdb; pdb.set_trace()
-            log_or_print(f"\033[92mFit: {score}\033[0m", logger)
-            fit_data.append(score)
+
+            for question in questions:
+                response_q2, _ = prompter.prompt(dft_system_prompt, question, use_context=use_context)
+                score = extract_info_binary_q2(response_q2)
+                log_or_print(f"\033[92mFit: {score}\033[0m", logger)
+                fit_data.append(score)
 
         return labels
-
 
     def do_q3(
         self,
         prompter: Prompter,
         prompt_mode: str,
-        llm_model: str,
         cluster_data: dict,
         rank_data: list,
         users_rank: list,
         category: str,
         doing_both_ways: bool = False,
-        dft_system_prompt: str = "src/proxann/prompts/q3/simplified_system_prompt.txt",
+        dft_system_prompt: str = "src/proxann/prompts/q3_dspy/simplified_system_prompt.txt",
         use_context: bool = False,
         logger: logging.Logger = None
     ) -> None:
@@ -428,8 +577,6 @@ class ProxAnn(object):
             Prompter object.
         prompt_mode : str
             Prompting mode for Q3.
-        llm_model : str
-            LLM model to use.
         cluster_data : dict
             Information for a topic as given by the data loaded from args.tm_model_data_path.
         rank_data : list
@@ -447,17 +594,10 @@ class ProxAnn(object):
         logger : logging.Logger, optional
             Logger object, by default None.
         """
-        # if "dspy" in prompt_mode:
-        #   dft_system_prompt = None
 
-        do_q3_with_q1_fixed = prompt_mode == "q1_then_q3_fix_cat"
-
-        if prompt_mode == "q1_then_q3_dspy":
-            prompt_key = "q3_dspy_llama" if "llama" in llm_model else "q3_dspy"
-            log_or_print(f"-- Using prompt key: {prompt_key}", logger)
-        else:
-            prompt_key = "q3"
-        q3_out = prompter.get_prompt(cluster_data, prompt_key, category=category, do_q3_with_q1_fixed=do_q3_with_q1_fixed, doing_both_ways=doing_both_ways)
+        prompt_key = "q3_dspy"
+        log_or_print(f"-- Using prompt key: {prompt_key}", logger)
+        q3_out = self.get_prompt_template(prompter.model_type, cluster_data, prompt_key, category=category, doing_both_ways=doing_both_ways)
 
         if isinstance(q3_out, tuple) and len(q3_out) > 2:  # Both ways
             questions_one, pair_ids_one, questions_two, pair_ids_two = q3_out
@@ -603,13 +743,13 @@ class ProxAnn(object):
                 # ==============================================
                 # TODO: Add logic for when category is not category[-1] but each of the users' categories
                 category = categories[-1]
-                self.do_q3(prompter, q1_q3_prompt_mode, llm_model, cluster_data,rank_data, [], category, do_both_ways)
+                self.do_q3(prompter, q1_q3_prompt_mode, cluster_data,rank_data, [], category, do_both_ways)
 
                 # ----------------------------------------------
                 # Q1_THEN_Q2
                 # ----------------------------------------------
                 self._logger.info("-- Executing Q1 / Q2...")
-                labels = self.do_q2(prompter, q1_q2_prompt_mode, llm_model, cluster_data, fit_data, category)
+                labels = self.do_q2(prompter, q1_q2_prompt_mode, cluster_data, fit_data, category)
             
             llm_results_q1.append({
                 "id": cluster_id,
@@ -705,7 +845,6 @@ class ProxAnn(object):
                 rank_rho_gt, _ = spearmanr(prob_data, r_llm_a)
                 rank_tau_gt, _ = kendalltau(prob_data, r_llm_a)
                 rank_ndcg_gt = ndcg_score([r_llm_a], [prob_data])
-                
                 fit_tau_tm, _ = kendalltau(prob_data, f_llm_a)
                 fit_agree_tm = np.mean(assign_data == f_llm_a)
                 

@@ -1,6 +1,5 @@
 import argparse
 from collections import Counter
-import logging
 import os
 import datetime
 
@@ -9,7 +8,7 @@ import pandas as pd
 from src.proxann.prompter import Prompter
 from src.proxann.proxann import ProxAnn
 from src.proxann.utils import (
-    bradley_terry_model, collect_fit_rank_data, extract_info_binary_q2, extract_info_q1_q3, extract_logprobs, load_config_pilot, normalize_key, process_responses
+    collect_fit_rank_data, load_config_pilot, normalize_key, process_responses
 )
 from src.utils.utils import init_logger, load_yaml_config_file, log_or_print
 
@@ -68,6 +67,10 @@ def parse_args():
         "--seed", type=int, default=None,
         help="Seed for random number generator." 
     )
+    parser.add_argument(
+        "---max_tokens", type=int, default=None,
+        help="Max tokens for the LLM generation."
+    )
     return parser.parse_args()
 
 
@@ -99,6 +102,7 @@ def main():
     # Get seed and temperature if given
     custom_temperature = args.temperature if args.temperature is not None else None
     custom_seed = args.seed if args.seed is not None else None
+    custom_max_tokens = args.max_tokens if args.max_tokens is not None else None
         
     valid_models = config.get(
         "valid_models", {"mallet", "ctm", "bertopic", "category-45"})
@@ -164,7 +168,7 @@ def main():
 
                 for llm_model in model_types:
                     log_or_print(f"LLM: {llm_model}", logger)
-                    prompter = Prompter(model_type=llm_model, temperature=custom_temperature, seed=custom_seed)
+                    prompter = Prompter(model_type=llm_model, temperature=custom_temperature, seed=custom_seed, max_tokens=custom_max_tokens)
 
                     if prompt_mode in Q1_THEN_Q3_PROMPTS:
                         log_or_print("-- Executing Q1 / Q3...", logger)
@@ -182,7 +186,7 @@ def main():
                         # Q3
                         # ==============================================
                         # TODO: Add logic for when category is not category[-1] but each of the users' categories
-                        proxann.do_q3(prompter, prompt_mode, llm_model, cluster_data,rank_data, users_rank, category, args.do_both_ways)
+                        proxann.do_q3(prompter, prompt_mode, cluster_data,rank_data, users_rank, category, args.do_both_ways)
 
                     elif prompt_mode in Q1_THEN_Q2_PROMPTS:
                         log_or_print("-- Executing Q1 / Q2...", logger)
@@ -201,7 +205,7 @@ def main():
                         # ==============================================
                         # if args.use_user_cats:
                         #    for_q2user_cats = users_cats
-                        labels = proxann.do_q2(prompter, prompt_mode, llm_model, cluster_data, fit_data, category)
+                        labels = proxann.do_q2(prompter, prompt_mode, cluster_data, fit_data, category)
 
                 # llm loop ends here
                 #  we save the results as if the LLMs are annotators

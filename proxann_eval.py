@@ -1,44 +1,45 @@
 """
-Main script for evaluating a topic using the Proxann model.
+Main script for evaluating a topic using the Proxann model. 
 
 Usage:
 ------
+$ python proxann_eval.py --config_path config/config.yaml --user_study_config config/config_pilot.conf
 
-1. If the model has been trained using Proxann, only the paths to the trained model and the dataset are required. Set `trained_with_thetas_eval=True`.
+Arguments:
+----------
+- `config_path` (str): Path to the configuration file.
+- `user_study_config` (str): Path to the user study configuration file, with the following format:
+
+    1. If the model has been trained using Proxann, only the paths to the trained model and the dataset are required. Set "trained_with_thetas_eval=True".
     
-Example:
---------
-model_path = "data/models/mallet"
-corpus_path = "data/training_data/bills/train.metadata.embeddings.jsonl.all-MiniLM-L6-v2.parquet"
-trained_with_thetas_eval = True
+    Example:
+    --------
+    model_path = "data/models/mallet"
+    corpus_path = "data/training_data/bills/train.metadata.embeddings.jsonl.all-MiniLM-L6-v2.parquet"
+    trained_with_thetas_eval = True
 
-2. If the model was trained separately, you must specify additional paths:
-- Thetas file (as a sparse matrix)
-- Betas file
-- Vocabulary file (JSON)``
-- Corpus file
-- Set `trained_with_thetas_eval=False`
+    2. If the model was trained separately, you must specify additional paths:
+    - Thetas file (as a sparse matrix)
+    - Betas file
+    - Vocabulary file (JSON)``
+    - Corpus file
+    - Set `trained_with_thetas_eval=False`
 
-Example:
---------
-mallet_config = {
-"thetas_path": "data/models/mallet/doctopics.npz.npy",
-"betas_path": "data/models/mallet/beta.npy",
-"vocab_path": "data/models/mallet/vocab.json",
-"corpus_path": "data/train.metadata.jsonl",
-"trained_with_thetas_eval": False
-}
-
-Ensure that all required files are correctly formatted and accessible.
+    Example:
+    --------
+    mallet_config = {
+    "thetas_path": "data/models/mallet/doctopics.npz.npy",
+    "betas_path": "data/models/mallet/beta.npy",
+    "vocab_path": "data/models/mallet/vocab.json",
+    "corpus_path": "data/train.metadata.jsonl",
+    "trained_with_thetas_eval": False
+    }
 """
-
-# @TODO: Make json with user-provided model data
-# @TODO: Run Q1, Q2, Q3 and get a score based on correlations with the topic model
 
 import argparse
 
 from src.proxann.proxann import ProxAnn
-from src.utils.utils import init_logger, load_yaml_config_file
+from src.utils.utils import init_logger
 
 
 def parse_args():

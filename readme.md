@@ -11,25 +11,77 @@ This repository contains the code and data for reproducing experiments from our 
 ## ✨ Features
 
 1. **User Study Data Generation**:
-   - Use the `src.user_study_data_collector` module to generate JSON files containing topic model information for conducting user studies.
-
+   - Use the `src.user_study_data_collector` module to generate the JSON files containing the required topic model information to carry out the evaluation (or user study).
 2. **Proxy-Based Evaluation**:
-   - Perform LLM proxy annotations using the `src.proxann` module.
+   - Perform LLM proxy evaluations using the `src.proxann` module.
 
 3. **Topic Model Training**:
    - Train topic and clustering models (currently, LDA-Mallet, LDA-Tomotopy, and BERTopic) under a unified structure using the `src.train` module.
 
 ## 🛠️ Installation
 
-[Add some details on installation using poetry]
+We recommend **Poetry** for installing the necessary dependencies, but an environment followed by the installation of the [requirements file](requirements.txt) can also be used.
 
-> **IMPORTANT TO RUN LDA-Mallet**
->
-> Download the [latest release of Mallet](https://github.com/mimno/Mallet/releases) and place it in the `src/train` directory. This can be done using the script `bash_scripts/wget_mallet.sh`.
+### Steps for deployment with Poetry
+
+1. Install Poetry by following the official guide: [Poetry Installation Guide](https://python-poetry.org/docs/#installing-with-the-official-installer)
+
+2. Verify that Poetry is using Python 3.11 (preferably version 3.11.11):
+   ```bash
+   poetry run python --version
+   ```
+
+3. Install project dependencies:
+   ```bash
+   poetry install
+   ```
+
+### LLM configuration
+#### GPT models
+You must configure an ``.env`` file located in the root directory with the following format:
+```bash
+OPENAI_API_KEY=[your_open_ai_api_key]
+```
+You can also modify the path to the ``.env`` file in the [configuration file](config/config.yaml).
+
+#### Open-source models
+We rely on [Ollama models](https://ollama.com/) for evaluating with open-source large language models. You must have the model running and specify the endpoint where it is deployed in the [configuration file](config/config.yaml).
+
+### Important: Training with LDA-Mallet
+Download the [latest release of Mallet](https://github.com/mimno/Mallet/releases) and place it in the `src/train` directory. You can use the script `bash_scripts/wget_mallet.sh` to automate this process.
 
 ## 🚀 Usage
 
-[complete when "metric" module is ready]
+You can use **ProxAnn** as a proxy for human annotators to evaluate the quality of topic models. To use it:
+
+1. Initialize a [ProxAnn](src/proxann/proxann.py) object.
+    ```python
+    from src.proxann.proxann import ProxAnn
+    proxann = ProxAnn()
+    ```
+2. Generate a user-provided JSON file using the user study configuration (``path_user_study_config_file``). You can find example configurations [here](config/user_study).
+    ```python
+    status, tm_model_data_path = proxann.generate_user_provided_json(path_user_study_config_file)
+    ```
+    - If ``status == 0``, the JSON file was generated successfully.
+    - Otherwise, an error occurred, and execution should be stopped.
+
+3. Run the evaluation metrics using the ``run_metric()`` method, specifying the generated JSON file and the LLM model(s) to use:
+    ```python
+    proxann.run_metric(
+        tm_model_data_path.as_posix(),
+        llm_models=["qwen:32b"]
+    )
+    ```
+The script [``proxann_eval.py``](proxann_eval.py) contains a simple demonstration of this.
+
+### Deploying ProxAnn as a Web Service
+
+You can also deploy ProxAnn as a web service:
+```python
+python3 -m src.metric_mode.back
+```
+Alternatively, you can use the web service deployed by us: [...]
 
 ## 🔄 Reproducibility
 
@@ -71,7 +123,7 @@ User responses were collected through Prolific using the `src.annotations.annota
 
 ### LLM Annotations
 
-To obtain LLM annotations, run the `proxann.py` (or its bash version `bash_scripts/run_proxann.sh`) script with the following parameters:
+To obtain LLM annotations, run the `proxann_user_study.py` (or its bash version `bash_scripts/run_proxann.sh`) script with the following parameters:
 
 - **`--model_type "$MODEL_TYPE"`**  
   Specifies the language model(s) to be used for generating annotations. Both open-source and closed-source models are supported. Refer to `config/config.yaml` for the currently available models. New models can be added as needed.
@@ -98,9 +150,3 @@ To obtain LLM annotations, run the `proxann.py` (or its bash version `bash_scrip
 
 - **`--dataset_key "$DATASET_KEY"`**  
   Identifies the dataset to be annotated (e.g., `Wiki`, `Bills`).
-
-
-
-```python
-python3 -m src.metric_mode.back
-```

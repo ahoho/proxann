@@ -1,7 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify
+from flask import Flask, render_template, request, url_for, send_file, jsonify
 import os
-import time
-import pandas as pd
+import tarfile
+import zipfile
+import tempfile
+import shutil
+from werkzeug.utils import secure_filename
 
 from src.proxann.proxann import ProxAnn
 from src.utils.utils import init_logger
@@ -77,21 +80,77 @@ def upload():
     required_files_proxann = ["model", "corpus"]
     required_files_separate = ["thetas", "betas", "vocab", "corpus"]
     required_files = required_files_proxann if trained_with_thetas_eval else required_files_separate
+
+    valid_file_suffixes = {"npz", "npy", "json", "parquet", "tar.gz", "tar", "zip"}
     
     for file_key in required_files:
         if file_key in request.files:
             file = request.files[file_key]
-            if file.filename:
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+            filename = secure_filename(file.filename)
+            
+            if not filename:
+                return jsonify({"error": f"Error: No valid filename provided for {file_key}."}), 400
+
+            file_suffix = os.path.splitext(filename)[1].lower().lstrip(".")
+
+            # Enforce file type restrictions
+            file_type_map = {
+                "thetas": {"npz", "npy"},
+                "betas": "npy",
+                "vocab": "json",
+                "corpus": {"parquet", "json"},
+                "model": {"tar.gz", "tar", "zip"}
+            }
+
+            expected_type = file_type_map.get(file_key)
+            if isinstance(expected_type, set) and file_suffix not in expected_type:
+                return jsonify({"error": f"Error: Invalid file type for {file_key}. Expected one of {expected_type}."}), 400
+            elif isinstance(expected_type, str) and file_suffix != expected_type:
+                return jsonify({"error": f"Error: Invalid file type for {file_key}. Expected '{expected_type}'."}), 400
+
+            # Handle compressed archives
+            if file_key == "model":
+                temp_dir = tempfile.mkdtemp()
+                file_path = os.path.join(temp_dir, filename)
                 file.save(file_path)
-                print (file_path)
-                uploaded_files[file_key] = file_path
+
+                try:
+                    if file_suffix in {"tar.gz", "tar"}:
+                        with tarfile.open(file_path, "r:*") as tar:
+                            for member in tar.getmembers():
+                                if member.isfile():
+                                    member_suffix = os.path.splitext(member.name)[1].lower().lstrip(".")
+                                    if member_suffix not in valid_file_suffixes:
+                                        raise ValueError(f"Invalid file in archive: {member.name}")
+                    elif file_suffix == "zip":
+                        with zipfile.ZipFile(file_path, "r") as zip_ref:
+                            for member in zip_ref.namelist():
+                                member_suffix = os.path.splitext(member)[1].lower().lstrip(".")
+                                if member_suffix not in valid_file_suffixes:
+                                    raise ValueError(f"Invalid file in archive: {member}")
+
+                    # Move to final upload directory
+                    final_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    shutil.move(file_path, final_path)
+                    uploaded_files[file_key] = final_path
+
+                except Exception as e:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    return jsonify({"error": f"Error: {str(e)}"}), 400
+
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                continue
+
+            # Save non-archive files
+            final_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(final_path)
+            uploaded_files[file_key] = final_path
 
     if set(required_files) != set(uploaded_files.keys()):
         return jsonify({"error": "Error: Missing required files. Please upload all required files."}), 400
 
-    config_path = generate_config(uploaded_files, trained_with_thetas_eval)
-    
+    _ = generate_config(uploaded_files, trained_with_thetas_eval)
+
     return jsonify({
         "status": "Uploaded Successfully",
         "config_url": url_for('download_config')

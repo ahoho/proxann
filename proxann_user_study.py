@@ -1,5 +1,5 @@
 import argparse
-from collections import Counter
+from collections import Counter, defaultdict
 import os
 import datetime
 
@@ -126,7 +126,7 @@ def main():
     model_types = args.model_type.split(",") if args.model_type else []
     prompt_modes = args.prompt_mode.split(",") if args.prompt_mode else []
 
-    llm_results_q1, llm_results_q2, llm_results_q3 = [], [], []
+    llm_results_q1, llm_results_q2, llm_results_q3, all_info_bradley_terry = [], [], [], []
     topics_per_model = Counter()
 
     for prompt_mode in prompt_modes:
@@ -163,6 +163,7 @@ def main():
                 # ---------------------------------------------------------
                 # to store the rank data for each lmm
                 rank_data = []  # it will store the rank data for each lmm
+                info_to_bradley_terry = defaultdict(list)  # it will store the raw rankings pairs that are passed to the Bradley-Terry model
                 fit_data = []  # it will store the fit data for each lmm
                 categories = []  # it will store the categories for each lmm
 
@@ -186,7 +187,7 @@ def main():
                         # Q3
                         # ==============================================
                         # TODO: Add logic for when category is not category[-1] but each of the users' categories
-                        proxann.do_q3(prompter, prompt_mode, cluster_data,rank_data, users_rank, category, args.do_both_ways)
+                        proxann.do_q3(prompter, prompt_mode, cluster_data,rank_data, info_to_bradley_terry, users_rank, category, args.do_both_ways)
 
                     elif prompt_mode in Q1_THEN_Q2_PROMPTS:
                         log_or_print("-- Executing Q1 / Q2...", logger)
@@ -242,6 +243,17 @@ def main():
                         "topic_match_id": topic_match_id,
                         "rank_data": rank_data
                     })
+                
+                if info_to_bradley_terry:
+                    all_info_bradley_terry.append({
+                        "id": id_,
+                        "model": model,
+                        "n_annotators": len(model_types),
+                        "annotators": model_types,
+                        "topic": cluster_id,
+                        "topic_match_id": topic_match_id,
+                        "info": info_to_bradley_terry,
+                    })
 
     # prompt_mode loop ends here
     if llm_results_q2 == []:
@@ -254,6 +266,8 @@ def main():
         llm_results_q2 = sorted(llm_results_q2, key=lambda x: x["id"])
     if llm_results_q3 is not None:
         llm_results_q3 = sorted(llm_results_q3, key=lambda x: x["id"])
+    if all_info_bradley_terry:
+        all_info_bradley_terry = sorted(all_info_bradley_terry, key=lambda x: x["id"])
 
     ############################################################################
     # Save results
@@ -266,12 +280,13 @@ def main():
         save_path += f"_seed{args.seed}"
     save_path += f"_{args.model_type}_{timestamp}"
     os.makedirs(save_path, exist_ok=True)
-
     save_results(llm_results_q1, save_path, "llm_results_q1.json")
     if llm_results_q2:
         save_results(llm_results_q2, save_path, "llm_results_q2.json")
     if llm_results_q3:
         save_results(llm_results_q3, save_path, "llm_results_q3.json")
+    if all_info_bradley_terry:
+        save_results(all_info_bradley_terry, save_path, "all_info_bradley_terry.json")
 
 if __name__ == "__main__":
     main()

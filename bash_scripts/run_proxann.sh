@@ -7,14 +7,14 @@ REMOVAL_CONDITION="loose"
 SAVE_PATH="data/tests"
 
 # Define dataset-specific configurations using arrays
-DATASET_KEYS=("wiki" "bills") #"bills" 
+DATASET_KEYS=("wiki") #"bills" 
 TM_MODEL_DATA_PATHS=(
   "data/json_out/arr_dec/config_pilot_wiki.json,data/json_out/arr_dec/config_pilot_wiki_part2.json"
-  "data/json_out/arr_dec/config_pilot_bills.json"
+  #"data/json_out/arr_dec/config_pilot_bills.json"
 )
 RESPONSE_CSV_PATHS=(
   "data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv"
-  "data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv"
+  #"data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv"
 )
 
 mkdir -p "$SAVE_PATH"
@@ -27,7 +27,7 @@ for i in "${!DATASET_KEYS[@]}"; do
 
   echo "Running for dataset: $DATASET_KEY"
 
-  SAVE_PATH_DTSET="data/arr_dec_responses/$DATASET_KEY"
+  SAVE_PATH_DTSET="$SAVE_PATH/$DATASET_KEY"
 
   mkdir -p "$SAVE_PATH_DTSET"
 

@@ -1,3 +1,4 @@
+from collections import defaultdict
 import configparser
 import itertools
 import json
@@ -561,6 +562,7 @@ class ProxAnn(object):
         prompt_mode: str,
         cluster_data: dict,
         rank_data: list,
+        info_to_bradley_terry: dict,
         users_rank: list,
         category: str,
         doing_both_ways: bool = False,
@@ -663,9 +665,11 @@ class ProxAnn(object):
         rank = [len(rank) - r + 1 for r in rank]  # Invert rank
 
         log_or_print(f"\033[95mLLM Rank:\n {rank}\033[0m", logger)
-        if users_rank != []:
+        if isinstance(users_rank, np.ndarray) and users_rank.size > 0:
             log_or_print(f"\033[95mUsers rank: {users_rank}\033[0m", logger)
         rank_data.append(rank)
+        info_to_bradley_terry["pair_ids_comb"] = pair_ids_comb
+        info_to_bradley_terry["orders_comb"] = orders_comb
 
         return
     
@@ -713,7 +717,7 @@ class ProxAnn(object):
         # we retain the inner dictionary, where each key represents a topic
         tm_model_data = tm_model_data[list(tm_model_data.keys())[0]]
         
-        llm_results_q1, llm_results_q2, llm_results_q3 = [], [], []
+        llm_results_q1, llm_results_q2, llm_results_q3, all_info_bradley_terry = [], [], [], []
         # ---------------------------------------------------------
         # For each topic ...
         # ---------------------------------------------------------
@@ -723,6 +727,7 @@ class ProxAnn(object):
             self._logger.info(f"Cluster: {cluster_id}")
             
             rank_data = []
+            info_to_bradley_terry = defaultdict(list)
             fit_data = [] 
             categories = []
             
@@ -743,7 +748,7 @@ class ProxAnn(object):
                 # ==============================================
                 # TODO: Add logic for when category is not category[-1] but each of the users' categories
                 category = categories[-1]
-                self.do_q3(prompter, q1_q3_prompt_mode, cluster_data,rank_data, [], category, do_both_ways)
+                self.do_q3(prompter, q1_q3_prompt_mode, cluster_data, rank_data, info_to_bradley_terry, [], category, do_both_ways)
 
                 # ----------------------------------------------
                 # Q1_THEN_Q2
@@ -775,12 +780,20 @@ class ProxAnn(object):
                     "rank_data": rank_data
                 })
                 
+            if info_to_bradley_terry:
+                all_info_bradley_terry.append({
+                    "id": cluster_id,
+                    "n_annotators": len(llm_models),
+                    "annotators": llm_models,
+                    "info": info_to_bradley_terry,
+                })
+                
         llm_results_q2 = sorted(llm_results_q2, key=lambda x: x["id"])
         llm_results_q3 = sorted(llm_results_q3, key=lambda x: x["id"])
         
         corr_data = self.compute_llm_tm_corrs(tm_model_data, llm_results_q3, llm_results_q2)
         
-        return corr_data
+        return corr_data, info_to_bradley_terry
     
     def compute_llm_tm_corrs(
         self,

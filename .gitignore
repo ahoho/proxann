@@ -206,3 +206,4 @@ test.json
 src/metric_mode/uploads
 src/metric_mode/configs
 data/files_pilot/cluster_rank_counts.json
+data/several_runs

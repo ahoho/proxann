@@ -178,7 +178,7 @@ def evaluate():
     # Progress Update before Running Metric
     evaluation_progress = 40
     
-    df = proxann.run_metric(
+    df, _ = proxann.run_metric(
         tm_model_data_path.as_posix(),
         llm_models=["qwen:32b"]
     )    
@@ -195,4 +195,4 @@ def evaluate_status():
     return jsonify({"progress": evaluation_progress})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=True, port=2091)
+    app.run(host='0.0.0.0', debug=True, port=8080)

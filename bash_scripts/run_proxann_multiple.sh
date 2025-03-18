@@ -8,19 +8,20 @@ SAVE_PATH="data/several_runs/gpt4o"
 TEMPERATURE=1.0
 
 # generate n random seeds
-n=1
+n=5
 seeds=($(shuf -i 1-1000 -n $n))
+#seeds=(70)
 echo "Seeds: ${seeds[@]}"
 
 # Define dataset-specific configurations using arrays
 DATASET_KEYS=("wiki") #"bills" 
 TM_MODEL_DATA_PATHS=(
-  "data/json_out/arr_dec/config_pilot_wiki.json,data/json_out/arr_dec/config_pilot_wiki_part2.json"
+  "data/data_used_in_paper/json_out/config_pilot_wiki.json,data/data_used_in_paper/json_out/config_pilot_wiki_part2.json"
   #"data/json_out/arr_dec/config_pilot_bills.json"
 )
 RESPONSE_CSV_PATHS=(
-  "data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv"
-  #"data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv"
+  "data/data_used_in_paper/qualtrics/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv"
+  #"data/data_used_in_paper/qualtrics/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv"
 )
 
 mkdir -p "$SAVE_PATH"

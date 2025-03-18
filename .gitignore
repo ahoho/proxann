@@ -207,3 +207,6 @@ src/metric_mode/uploads
 src/metric_mode/configs
 data/files_pilot/cluster_rank_counts.json
 data/several_runs
+data/data_used_in_paper
+*.tar.gz
+data/several_runs_10_03_25.tar.gz

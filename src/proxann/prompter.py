@@ -234,6 +234,7 @@ class Prompter:
         system_prompt_template_path: str,
         question: str,
         use_context: bool = False,
+        temperature: float = None,
     ) -> Union[str, List[str]]:
         """Public method to execute a prompt given a system prompt template and a question."""
 
@@ -244,6 +245,8 @@ class Prompter:
                 system_prompt_template = file.read()
 
         # Ensure hashable params for caching and get cached data / execute prompt
+        if temperature is not None:
+            self.params["temperature"] = temperature
         params_tuple = tuple(sorted(self.params.items()))
         
         print("Cache key:", hash_input(system_prompt_template, question, self.model_type, self.backend, params_tuple, self.context, use_context))

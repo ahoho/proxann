@@ -1,15 +1,16 @@
 #!/bin/bash
 
 # Define common variables
-MODEL_TYPE="gpt-4o-2024-08-06" #"qwen:32b" #"qwen:32b" #"llama3.3:70b" #"llama3.1:8b-instruct-q8_0" #,llama3.3:70b,qwen:32b
+MODEL_TYPE="qwen:32b" #"gpt-4o-2024-08-06" #"qwen:32b" #"qwen:32b" #"llama3.3:70b" #"llama3.1:8b-instruct-q8_0" #,llama3.3:70b,qwen:32b
 PROMPT_MODE="q1_then_q3_dspy,q1_then_q2_dspy"
 REMOVAL_CONDITION="loose"
-SAVE_PATH="data/several_runs/gpt4o"
-TEMPERATURE=1.0
+SAVE_PATH="data/several_runs/$MODEL_TYPE"
+TEMPERATURES=1.0,0.0,0.0
 
 # generate n random seeds
 n=5
-seeds=($(shuf -i 1-1000 -n $n))
+#seeds=($(shuf -i 1-1000 -n $n))
+seeds=(338 436 499 742 853)
 #seeds=(70)
 echo "Seeds: ${seeds[@]}"
 
@@ -40,6 +41,17 @@ for s in "${seeds[@]}"; do
 
     mkdir -p "$SAVE_PATH_DTSET"
 
+    echo python3 proxann_user_study.py \
+      --model_type "$MODEL_TYPE" \
+      --prompt_mode "$PROMPT_MODE" \
+      --removal_condition "$REMOVAL_CONDITION" \
+      --path_save_results "$SAVE_PATH_DTSET" \
+      --tm_model_data_path "$TM_MODEL_DATA_PATH" \
+      --response_csv "$RESPONSE_CSV" \
+      --dataset_key "$DATASET_KEY" \
+      --seed "$s" \
+      --temperatures "$TEMPERATURES"
+
     python3 proxann_user_study.py \
       --model_type "$MODEL_TYPE" \
       --prompt_mode "$PROMPT_MODE" \
@@ -49,6 +61,6 @@ for s in "${seeds[@]}"; do
       --response_csv "$RESPONSE_CSV" \
       --dataset_key "$DATASET_KEY" \
       --seed "$s" \
-      --temperature "$TEMPERATURE"
+      --temperatures "$TEMPERATURES"
   done
 done

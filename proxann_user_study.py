@@ -60,8 +60,8 @@ def parse_args():
         help="Path to save results.",
         default="data/files_pilot/results")
     parser.add_argument(
-        "--temperature", type=float, default=None,
-        help="Temperature value for the LLM generation."
+        "--temperatures", type=str, default=None,
+        help="Temperatures value for the LLM generation in Q1/Q2/Q3, separated by commas."
     )
     parser.add_argument(
         "--seed", type=int, default=None,
@@ -100,7 +100,11 @@ def main():
     proxann = ProxAnn(logger, args.config_path)
     
     # Get seed and temperature if given
-    custom_temperature = args.temperature if args.temperature is not None else None
+    custom_temperatures = [float(el) for el in args.temperatures.split(",")] if args.temperatures is not None else None
+    q1_temp = custom_temperatures[0] if custom_temperatures else None
+    q2_temp = custom_temperatures[1] if custom_temperatures else None
+    q3_temp = custom_temperatures[2] if custom_temperatures else None
+    print(f"Temperatures: {q1_temp}, {q2_temp}, {q3_temp}")
     custom_seed = args.seed if args.seed is not None else None
     custom_max_tokens = args.max_tokens if args.max_tokens is not None else None
         
@@ -169,7 +173,7 @@ def main():
 
                 for llm_model in model_types:
                     log_or_print(f"LLM: {llm_model}", logger)
-                    prompter = Prompter(model_type=llm_model, temperature=custom_temperature, seed=custom_seed, max_tokens=custom_max_tokens)
+                    prompter = Prompter(model_type=llm_model, seed=custom_seed, max_tokens=custom_max_tokens)
 
                     if prompt_mode in Q1_THEN_Q3_PROMPTS:
                         log_or_print("-- Executing Q1 / Q3...", logger)
@@ -178,7 +182,13 @@ def main():
                         # Q1
                         # ==============================================
                         if prompt_mode in Q1_THEN_Q3_PROMPTS:
-                            proxann.do_q1(prompter, cluster_data, users_cats, categories)
+                            proxann.do_q1(
+                                prompter=prompter, 
+                                cluster_data=cluster_data, 
+                                users_cats=users_cats, 
+                                categories=categories, 
+                                temperature=q1_temp
+                            )
                             category = categories[-1]
                         else:
                             category = None
@@ -187,8 +197,17 @@ def main():
                         # Q3
                         # ==============================================
                         # TODO: Add logic for when category is not category[-1] but each of the users' categories
-                        proxann.do_q3(prompter, prompt_mode, cluster_data,rank_data, info_to_bradley_terry, users_rank, category, args.do_both_ways)
-
+                        proxann.do_q3(
+                            prompter=prompter,
+                            prompt_mode=prompt_mode,
+                            cluster_data=cluster_data,
+                            rank_data=rank_data,
+                            info_to_bradley_terry=info_to_bradley_terry,
+                            users_rank=users_rank,
+                            category=category,
+                            temperature=q3_temp,
+                            doing_both_ways=args.do_both_ways
+                        )
                     elif prompt_mode in Q1_THEN_Q2_PROMPTS:
                         log_or_print("-- Executing Q1 / Q2...", logger)
 
@@ -196,7 +215,13 @@ def main():
                         # Q1
                         # ==============================================
                         if prompt_mode in Q1_THEN_Q2_PROMPTS:
-                            proxann.do_q1(prompter, cluster_data, users_cats, categories)
+                            proxann.do_q1(
+                                prompter=prompter, 
+                                cluster_data=cluster_data, 
+                                users_cats=users_cats, 
+                                categories=categories, 
+                                temperature=q1_temp
+                            )
                             category = categories[-1]
                         else:
                             category = None
@@ -206,7 +231,14 @@ def main():
                         # ==============================================
                         # if args.use_user_cats:
                         #    for_q2user_cats = users_cats
-                        labels = proxann.do_q2(prompter, prompt_mode, cluster_data, fit_data, category)
+                        labels = proxann.do_q2(
+                            prompter=prompter, 
+                            prompt_mode=prompt_mode, 
+                            cluster_data=cluster_data, 
+                            fit_data=fit_data, 
+                            category=category, 
+                            temperature=q2_temp
+                        )
 
                 # llm loop ends here
                 #  we save the results as if the LLMs are annotators
@@ -274,8 +306,9 @@ def main():
     ############################################################################
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     save_path = f"{args.path_save_results}/{args.prompt_mode}"
-    if args.temperature is not None:
-        save_path += f"_temp{args.temperature}"
+    if args.temperatures is not None:
+        temp_str = "_".join(args.temperatures.split(","))
+        save_path += f"_temp{temp_str}"
     if args.seed is not None:
         save_path += f"_seed{args.seed}"
     save_path += f"_{args.model_type}_{timestamp}"

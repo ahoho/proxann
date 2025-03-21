@@ -454,6 +454,7 @@ class ProxAnn(object):
         cluster_data: dict,
         users_cats: list,
         categories: list,
+        temperature: float = None,
         dft_system_prompt: str = "src/proxann/prompts/q1/simplified_system_prompt.txt",
         logger: logging.Logger = None
     ) -> None:
@@ -466,6 +467,8 @@ class ProxAnn(object):
         cluster_data : Information for a topic as given by the data loaded from args.tm_model_data_path. 
         users_cats : List of user-generated categories during the user study.
         categories : List to store the LLM-generated categories.
+        temperature : float, optional
+            Custom temperature for the LLM, by default None. If not given, the default temperature from the prompter object is used.
         dft_system_prompt : str, optional
             Default system prompt for Q1, by default "src/proxann/prompts/q1/simplified_system_prompt.txt".
         logging : logging.Logger, optional
@@ -473,9 +476,12 @@ class ProxAnn(object):
         """
         log_or_print("Executing Q1...", logger)
 
+        if temperature is not None:
+            self._logger.info(f"Using temperature {temperature} for Q1.")
+
         question = self.get_prompt_template(prompter.model_type,cluster_data, "q1")
         category, _ = prompter.prompt(
-            dft_system_prompt, question, use_context=False)
+            dft_system_prompt, question, use_context=False, temperature=temperature)
 
         categories.append(category)
         if users_cats != []:
@@ -492,6 +498,7 @@ class ProxAnn(object):
         fit_data: list,
         category: str,
         user_cats: list = None,
+        temperature: float = None,
         dft_system_prompt: str = None,
         use_context: bool = False,
         logger: logging.Logger = None
@@ -513,6 +520,8 @@ class ProxAnn(object):
             LLM-generated category.
         user_cats : list, optional
             List of user-generated categories during the user study, by default None.
+        temperature : float, optional
+            Custom temperature for the LLM, by default None. If not given, the default temperature from the prompter object is used.
         dft_system_prompt : str, optional
             Default system prompt for Q2.
         use_context : bool, optional
@@ -526,6 +535,9 @@ class ProxAnn(object):
             List of user categories.
         """
 
+        if temperature is not None:
+            self._logger.info(f"Using temperature {temperature} for Q2.")
+                    
         if prompt_mode != "q1_then_q2_dspy":
             log_or_print(f"Not a valid prompt mode: {prompt_mode}", logger)
             return
@@ -540,7 +552,7 @@ class ProxAnn(object):
                 questions = self.get_prompt_template(prompter.model_type,cluster_data, prompt_key, cat)
 
                 for question in questions:
-                    response_q2, _ = prompter.prompt(dft_system_prompt, question, use_context=use_context)
+                    response_q2, _ = prompter.prompt(dft_system_prompt, question, use_context=use_context, temperature=temperature)
                     score = extract_info_binary_q2(response_q2)
                     log_or_print(f"\033[92mFit: {score}\033[0m", logger)
                     fit_data.append(score)
@@ -549,7 +561,7 @@ class ProxAnn(object):
             labels = [category] * len(questions)
 
             for question in questions:
-                response_q2, _ = prompter.prompt(dft_system_prompt, question, use_context=use_context)
+                response_q2, _ = prompter.prompt(dft_system_prompt, question, use_context=use_context, temperature=temperature)
                 score = extract_info_binary_q2(response_q2)
                 log_or_print(f"\033[92mFit: {score}\033[0m", logger)
                 fit_data.append(score)
@@ -565,6 +577,7 @@ class ProxAnn(object):
         info_to_bradley_terry: dict,
         users_rank: list,
         category: str,
+        temperature: float = None,
         doing_both_ways: bool = False,
         dft_system_prompt: str = "src/proxann/prompts/q3_dspy/simplified_system_prompt.txt",
         use_context: bool = False,
@@ -587,6 +600,8 @@ class ProxAnn(object):
             List of user ranks.
         category : str
             LLM-generated category.
+        temperature : float, optional
+            Custom temperature for the LLM, by default None. If not given, the default temperature from the prompter object is used.
         doing_both_ways : bool, optional
             Whether to run Q3 twice: once with A as the first document, then reversed, by default False.
         dft_system_prompt : str, optional
@@ -596,7 +611,10 @@ class ProxAnn(object):
         logger : logging.Logger, optional
             Logger object, by default None.
         """
-
+                
+        if temperature is not None:
+            self._logger.info(f"Using temperature {temperature} for Q3.")
+        
         prompt_key = "q3_dspy"
         log_or_print(f"-- Using prompt key: {prompt_key}", logger)
         q3_out = self.get_prompt_template(prompter.model_type, cluster_data, prompt_key, category=category, doing_both_ways=doing_both_ways)
@@ -616,7 +634,7 @@ class ProxAnn(object):
                 f"-- Executing Q3 ({'both ways' if len(ways) > 1 else 'one way'})...", logger)
             for question in questions:
                 pairwise, pairwise_logprobs = prompter.prompt(
-                    dft_system_prompt, question, use_context=use_context
+                    dft_system_prompt, question, use_context=use_context, temperature=temperature
                 )
                 try:
                     label, order, rationale = extract_info_q1_q3(

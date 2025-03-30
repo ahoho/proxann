@@ -924,9 +924,18 @@ class BERTopicTrainer(TMTrainer):
 
         self._save_model_results(thetas_overall, betas, vocab, keys)
         self._save_init_params_to_yaml()
-        # for bertopic we also save the document_topic_info
+        
+        # for bertopic we also save the document_topic_info and thetas_approx and probs without the tiebreak
+        self._logger.info(f"Saving document_topic_info...")
         self.document_info.to_csv(self.model_path.joinpath(
             'document_topic_info.csv'), index=False)
+        
+        self._logger.info(f"Saving thetas_approx and probs...")
+        thetas_approx_sparse = sparse.csr_matrix(
+            thetas_approx, copy=True)
+        probs_sparse = sparse.csr_matrix(probs, copy=True)
+        sparse.save_npz(self.model_path.joinpath('thetas.npz'), thetas_approx_sparse)        
+        sparse.save_npz(self.model_path.joinpath('thetas.npz'), probs_sparse)
 
         return t_end
 

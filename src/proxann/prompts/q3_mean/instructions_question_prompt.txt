@@ -1,0 +1,10 @@
+Please act as an impartial judge and determine which of the two documents (A or B) is more closely related to the given CATEGORY. Avoid any positional bias, and ensure that the order in which the documents are presented does not influence your decision. Output your verdict strictly using this format: 'A' if DOCUMENT_A is more closely related to the CATEGORY, or 'B' if DOCUMENT_B is more closely related.
+
+[[ ## CATEGORY ## ]]
+{category}
+
+[[ ## DOCUMENT_A ## ]]
+{doc_a}
+
+[[ ## DOCUMENT_B ## ]]
+{doc_b}

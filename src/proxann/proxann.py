@@ -3,6 +3,7 @@ import configparser
 import itertools
 import json
 import logging
+import math
 import pathlib
 import random
 import re
@@ -21,6 +22,8 @@ from src.proxann.utils import (
     bradley_terry_model,
     extend_to_full_sentence,
     extract_info_binary_q2,
+    extract_info_mean_q2,
+    extract_info_mean_q3,
     extract_info_q1_q3,
     extract_logprobs,
     load_config_pilot,
@@ -370,7 +373,8 @@ class ProxAnn(object):
         ) -> List[str]:
             """Function to handle Q2."""
 
-            template_name = add_model_key_to_template(template_name)
+            if template_name == "q2_dspy":
+                template_name = add_model_key_to_template(template_name)
             template_path = load_template_path(template_name)
             return [load_template(template_path).format(category=cat, document=extend_to_full_sentence(doc['text'], num_words)) for doc in text["eval_docs"]]
 
@@ -417,7 +421,8 @@ class ProxAnn(object):
                             {"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
 
             # Template loading and formatting
-            template_name = add_model_key_to_template(template_name)
+            if template_name == "q3_dspy":
+                template_name = add_model_key_to_template(template_name)
             template_path = load_template_path(template_name)
             template = load_template(template_path)
 
@@ -436,8 +441,10 @@ class ProxAnn(object):
 
         question_handlers = {
             "q1": lambda text: handle_q1(text, few_shot_examples, nr_few_shot=nr_few_shot, generate_description=generate_description),
-            "q2_dspy": lambda text: handle_q2(text, category),
-            "q3_dspy": lambda text: handle_q3(text, category, doing_both_ways=doing_both_ways)
+            "q2_dspy": lambda text: handle_q2(text, category, template_name = "q2_dspy"),
+            "q3_dspy": lambda text: handle_q3(text, category, doing_both_ways=doing_both_ways),
+            "q2_mean": lambda text: handle_q2(text, category, template_name= "q2_mean"),
+            "q3_mean": lambda text: handle_q3(text, category, doing_both_ways=doing_both_ways, template_name= "q3_mean"),
         }
 
         if question_type not in question_handlers:
@@ -542,7 +549,9 @@ class ProxAnn(object):
             log_or_print(f"Not a valid prompt mode: {prompt_mode}", logger)
             return
 
-        prompt_key = "q2_dspy"
+        #prompt_key = "q2_dspy"
+        # @TODO: Extract the prompt key outside
+        prompt_key = "q2_mean"
         log_or_print(f"Using prompt key: {prompt_key}", logger)
 
         if user_cats:
@@ -550,10 +559,15 @@ class ProxAnn(object):
 
             for cat in user_cats:
                 questions = self.get_prompt_template(prompter.model_type,cluster_data, prompt_key, cat)
-
+                
                 for question in questions:
-                    response_q2, _ = prompter.prompt(dft_system_prompt, question, use_context=use_context, temperature=temperature)
-                    score = extract_info_binary_q2(response_q2)
+                    response_q2, logprobs_q2 = prompter.prompt(dft_system_prompt, question, use_context=use_context, temperature=temperature)
+                    if prompt_key == "q2_dspy":
+                        score = extract_info_binary_q2(response_q2)
+                    elif prompt_key == "q2_mean":
+                        score = extract_info_mean_q2(logprobs_q2)
+                    else:
+                        raise ValueError("Invalid prompt key for Q2.")
                     log_or_print(f"\033[92mFit: {score}\033[0m", logger)
                     fit_data.append(score)
         else:
@@ -561,8 +575,13 @@ class ProxAnn(object):
             labels = [category] * len(questions)
 
             for question in questions:
-                response_q2, _ = prompter.prompt(dft_system_prompt, question, use_context=use_context, temperature=temperature)
-                score = extract_info_binary_q2(response_q2)
+                response_q2, logprobs_q2 = prompter.prompt(dft_system_prompt, question, use_context=use_context, temperature=temperature)
+                if prompt_key == "q2_dspy":
+                        score = extract_info_binary_q2(response_q2)
+                elif prompt_key == "q2_mean":
+                    score = extract_info_mean_q2(logprobs_q2)
+                else:
+                    raise ValueError("Invalid prompt key for Q2.")
                 log_or_print(f"\033[92mFit: {score}\033[0m", logger)
                 fit_data.append(score)
 
@@ -578,7 +597,7 @@ class ProxAnn(object):
         users_rank: list,
         category: str,
         temperature: float = None,
-        doing_both_ways: bool = False,
+        doing_both_ways: bool = True,
         dft_system_prompt: str = "src/proxann/prompts/q3_dspy/simplified_system_prompt.txt",
         use_context: bool = False,
         logger: logging.Logger = None
@@ -615,7 +634,8 @@ class ProxAnn(object):
         if temperature is not None:
             self._logger.info(f"Using temperature {temperature} for Q3.")
         
-        prompt_key = "q3_dspy"
+        #prompt_key = "q3_dspy"
+        prompt_key = "q3_mean"
         log_or_print(f"-- Using prompt key: {prompt_key}", logger)
         q3_out = self.get_prompt_template(prompter.model_type, cluster_data, prompt_key, category=category, doing_both_ways=doing_both_ways)
 
@@ -626,8 +646,8 @@ class ProxAnn(object):
             questions, pair_ids = q3_out
             ways = [[questions, pair_ids]]
 
-        labels_one, orders_one, rationales_one, logprobs_one = [], [], [], []
-        labels_two, orders_two, rationales_two, logprobs_two = [], [], [], []
+        labels_one, orders_one, rationales_one, logprobs_one, all_info_logprobs_one = [], [], [], [], []
+        labels_two, orders_two, rationales_two, logprobs_two, all_info_logprobs_two = [], [], [], [], []
 
         for way_id, (questions, pair_ids) in enumerate(ways):
             log_or_print(
@@ -645,30 +665,43 @@ class ProxAnn(object):
                         rationales_one.append(rationale)
                         logprobs_one.append(extract_logprobs(
                             pairwise_logprobs, prompter.backend, logger))
-                        log_or_print(f"\033[92mOrder: {order}\033[0m", logger)
+                        all_info_logprobs_one.append(pairwise_logprobs)
+                        log_or_print(f"\033[92mOrder -->: {order}\033[0m", logger)
                     elif len(ways) > 1 and way_id == 1:
                         labels_two.append(label)
                         orders_two.append(order)
                         rationales_two.append(rationale)
                         logprobs_two.append(extract_logprobs(
                             pairwise_logprobs, prompter.backend, logger))
-                        log_or_print(f"\033[94mOrder: {order}\033[0m", logger)
+                        all_info_logprobs_two.append(pairwise_logprobs)
+                        log_or_print(f"\033[94mOrder <--: {order}\033[0m", logger)
                     else:
                         labels_one.append(label)
                         orders_one.append(order)
                         rationales_one.append(rationale)
                         logprobs_one.append(extract_logprobs(
                             pairwise_logprobs, prompter.backend, logger))
+                        all_info_logprobs_one.append(pairwise_logprobs)
                         log_or_print(f"\033[92mOrder: {order}\033[0m", logger)
                 except Exception as e:
                     log_or_print(
-                        f"-- Error extracting info from prompt: {e}", "error", logger)
-
+                        f"-- Error extracting info from prompt: {e}", "error", logger)                    
         # Combine results for ranking
         if len(ways) > 1:
-            pair_ids_comb = ways[0][1] + ways[1][1]
-            orders_comb = orders_one + orders_two
-            logprobs_comb = logprobs_one + logprobs_two
+            if prompt_key == "q3_dspy":
+                pair_ids_comb = ways[0][1] + ways[1][1]
+                orders_comb = orders_one + orders_two
+                logprobs_comb = logprobs_one + logprobs_two
+            elif prompt_key == "q3_mean":
+                
+                pair_ids_comb = ways[0][1]
+                orders_comb, logprobs_comb = [], []
+                for logprobs1, logprobs2 in zip(all_info_logprobs_one, all_info_logprobs_two):
+                    order, logprob = extract_info_mean_q3(logprobs1, logprobs2)
+                    orders_comb.append(order)
+                    logprobs_comb.append(logprob)
+            else:
+                raise ValueError("Invalid prompt key for Q3.")
         else:
             pair_ids_comb = ways[0][1]
             orders_comb = orders_one
@@ -688,7 +721,6 @@ class ProxAnn(object):
         rank_data.append(rank)
         info_to_bradley_terry["pair_ids_comb"] = pair_ids_comb
         info_to_bradley_terry["orders_comb"] = orders_comb
-
         return
     
     # this will be executed for each model the user wants to evaluate

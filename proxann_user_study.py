@@ -44,8 +44,7 @@ def parse_args():
         default="data/files_pilot/Cluster+Evaluation+-+Sort+and+Rank_July+14%2C+2024_15.13.csv")
     parser.add_argument(
         "--do_both_ways", action="store_true",
-        help="Run Q3 twice: once with A as the first document, then reversed.",
-        default=False)
+        help="Run Q3 twice: once with A as the first document, then reversed.")
     parser.add_argument(
         "--use_user_cats", action="store_true",
         help="Use user categories for Q2/Q3 instead of LLM-generated ones from Q1.",

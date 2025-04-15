@@ -1,0 +1,7 @@
+Please act as an impartial judge and assign an integer score from 1 to 5 indicating how well the DOCUMENT fits the given CATEGORY. Do not provide any reasoning or explanation
+
+[[ ## CATEGORY ## ]]
+{category}
+
+[[ ## DOCUMENT ## ]]
+{document}

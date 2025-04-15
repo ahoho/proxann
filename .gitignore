@@ -211,3 +211,4 @@ data/data_used_in_paper
 *.tar.gz
 data/several_runs_10_03_25.tar.gz
 .env_uc3m
+data/paper_wang

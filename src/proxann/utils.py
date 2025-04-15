@@ -16,7 +16,7 @@ import networkx as nx
 from scipy.stats import kendalltau, spearmanr
 from sklearn.metrics import ndcg_score
 from irrCAC.raw import CAC
-
+import math
 from src.utils.utils import log_or_print
 
 def load_template(template_path: str) -> str:
@@ -222,7 +222,64 @@ def extract_info_binary_q2(text):
 
     return fit_binary
 
+def extract_info_mean_q2(logprobs):
+    # logprobs is the second element return by prompter.prompt
+    tokens_probs = []
+    word_to_number = {
+        "uno": 1,
+        "dos": 2,   
+        "tres": 3,
+        "cuatro": 4,
+        "cinco": 5
+    }
 
+    print(len(logprobs[0].top_logprobs))
+    for top_logprobs in logprobs[0].top_logprobs:
+        raw_token = top_logprobs.token
+        try:
+            token_str = str(raw_token).lower()
+            token = word_to_number.get(token_str, int(raw_token))
+            print(f"Token: {raw_token}, Converted: {token}")
+        except (ValueError, TypeError):
+            print(f"Token: {raw_token} could not be converted to int")
+            continue
+
+        if token in {1, 2, 3, 4, 5}:  # set is faster for membership tests
+            prob = math.exp(top_logprobs.logprob)
+            tokens_probs.append((token, prob))
+
+    # final score
+    score = sum(token * prob for token, prob in tokens_probs)
+    
+    return score
+
+def extract_info_mean_q3(logprobs1, logprobs2):
+    token_probs = []
+    for i, logprobs in enumerate([logprobs1, logprobs2]):
+        for top_logprobs in logprobs[0].top_logprobs:
+            raw_token = top_logprobs.token
+            token_str = re.sub(r"[^\w]", "", str(raw_token)).lower()
+            if token_str in {"a", "b"}:
+                prob = math.exp(top_logprobs.logprob)
+                print(f"Token: {token_str}, Probability: {prob}")
+                # we assume the right token order is that from the first logprobs (--> way), so if we are in the second logprobs (<--) and the token is "A" we say it is "B" and vice versa
+                if i == 1:
+                    print("Switching A <-> B since we are in the second logprobs")
+                    token_str = "a" if token_str == "b" else "b"
+                token_probs.append((token_str, prob))     
+            else:
+                print(f"Token: {token_str} is not 'a' or 'b'")                
+    # final "probs"
+    prob_a = sum(prob for token, prob in token_probs if token == "a")
+    prob_b = sum(prob for token, prob in token_probs if token == "b")
+    
+    # convert back probs to logprobs
+    logprob_a = math.log(prob_a) if prob_a > 0 else float('-inf')
+    logprob_b = math.log(prob_b) if prob_b > 0 else float('-inf')    
+    
+    # keep the mode
+    return ("A", logprob_a) if prob_a > prob_b else ("B", logprob_b)
+        
 def extract_logprobs(pairwise_logprobs, backend, logger):
     """Extracts log probabilities associated with the pairwise rankings (i.e., whether the more related document is A or B) from LLM responses, handling different backends (i.e., LLM types)."""
 
@@ -742,13 +799,20 @@ def compute_correlations_one(
                 # Add annotator-specific results to the dictionary
                 annotator_results[f"fit_tau_users_{a}"] = kendalltau(mean_fit_data, f_llm_a)[
                     0]
+                
                 annotator_results[f"fit_tau_tm_{a}"] = kendalltau(prob_data, f_llm_a)[
                     0]
+                
+                # check if any element in f_llm_a is different from 0 or 1
+                if np.any(np.logical_and(f_llm_a != 0, f_llm_a != 1)):
+                    # if not, binarize each element
+                    f_llm_a = (np.array(f_llm_a) >= fit_threshold).astype(int)
+                    
                 annotator_results[f"fit_agree_users_{a}"] = np.mean(
                     binarized_fit_mv == f_llm_a)
                 annotator_results[f"fit_agree_tm_{a}"] = np.mean(
                     assign_data == f_llm_a)
-
+                
         corr_results.append({
             "id": d_us["id"],
             "model": d_us["model"],

@@ -170,7 +170,7 @@ class Prompter:
             max_tokens=params.get("max_tokens", 1000),
             seed=params.get("seed", 1234),
             logprobs=True,
-            top_logprobs=10,
+            top_logprobs=20, # this is the maximum value
         )
         result = response.choices[0].message.content
         logprobs = response.choices[0].logprobs.content

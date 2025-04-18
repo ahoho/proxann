@@ -253,32 +253,49 @@ def extract_info_mean_q2(logprobs):
     
     return score
 
-def extract_info_mean_q3(logprobs1, logprobs2):
+def extract_info_mean_q3(logprobs1, logprobs2, keep_only_most_top=False):
+    
     token_probs = []
-    for i, logprobs in enumerate([logprobs1, logprobs2]):
-        for top_logprobs in logprobs[0].top_logprobs:
-            raw_token = top_logprobs.token
-            token_str = re.sub(r"[^\w]", "", str(raw_token)).lower()
-            if token_str in {"a", "b"}:
-                prob = math.exp(top_logprobs.logprob)
-                print(f"Token: {token_str}, Probability: {prob}")
-                # we assume the right token order is that from the first logprobs (--> way), so if we are in the second logprobs (<--) and the token is "A" we say it is "B" and vice versa
-                if i == 1:
-                    print("Switching A <-> B since we are in the second logprobs")
-                    token_str = "a" if token_str == "b" else "b"
-                token_probs.append((token_str, prob))     
-            else:
-                print(f"Token: {token_str} is not 'a' or 'b'")                
-    # final "probs"
-    prob_a = sum(prob for token, prob in token_probs if token == "a")
-    prob_b = sum(prob for token, prob in token_probs if token == "b")
+    for logprob1, logprob2 in zip(logprobs1, logprobs2):
+        for i, logprob in enumerate([logprob1, logprob2]):
+            for top_logprobs in logprob.top_logprobs:
+                raw_token = top_logprobs.token
+                token_str = re.sub(r"[^\w]", "", str(raw_token)).lower()
+                if token_str in {"a", "b"}:
+                    prob = math.exp(top_logprobs.logprob)
+                    print(f"Token: {token_str}, Probability: {prob}")
+                    # we assume the right token order is that from the first logprobs (--> way), so if we are in the second logprobs (<--) and the token is "A" we say it is "B" and vice versa
+                    if i == 1:
+                        print("Switching A <-> B since we are in the second logprobs")
+                        token_str = "a" if token_str == "b" else "b"
+                    token_probs.append((token_str, prob, i))     
+                                        
+                if keep_only_most_top:
+                    if (len(token_probs) == 1 and i == 0) or (len(token_probs) == 2 and i == 1):
+                        # keep only the most top logprobs
+                        break
+                else:
+                    print(f"Token: {token_str} is not 'a' or 'b'")       
     
-    # convert back probs to logprobs
-    logprob_a = math.log(prob_a) if prob_a > 0 else float('-inf')
-    logprob_b = math.log(prob_b) if prob_b > 0 else float('-inf')    
-    
-    # keep the mode
-    return ("A", logprob_a) if prob_a > prob_b else ("B", logprob_b)
+    if keep_only_most_top:
+        logprob_1 = math.log(token_probs[0][1]) if token_probs[0][1] > 0 else float('-inf')
+        logprob_2 = math.log(token_probs[1][1]) if token_probs[1][1] > 0 else float('-inf')
+        
+        return (token_probs[0][0].capitalize(), logprob_1), (token_probs[1][0].capitalize(), logprob_2)
+        
+    else:
+        # final "probs"
+        prob_a = sum(prob for token, prob in token_probs if token == "a")
+        prob_b = sum(prob for token, prob in token_probs if token == "b")
+        
+        # convert back probs to logprobs
+        logprob_a = math.log(prob_a) if prob_a > 0 else float('-inf')
+        logprob_b = math.log(prob_b) if prob_b > 0 else float('-inf')
+        
+        result = ("A", logprob_a) if prob_a > prob_b else ("B", logprob_b) 
+                
+        # keep the mode
+        return result
         
 def extract_logprobs(pairwise_logprobs, backend, logger):
     """Extracts log probabilities associated with the pairwise rankings (i.e., whether the more related document is A or B) from LLM responses, handling different backends (i.e., LLM types)."""

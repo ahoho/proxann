@@ -636,6 +636,7 @@ class ProxAnn(object):
         
         #prompt_key = "q3_dspy"
         prompt_key = "q3_mean"
+        keep_only_most_top = False
         log_or_print(f"-- Using prompt key: {prompt_key}", logger)
         q3_out = self.get_prompt_template(prompter.model_type, cluster_data, prompt_key, category=category, doing_both_ways=doing_both_ways)
 
@@ -692,14 +693,28 @@ class ProxAnn(object):
                 pair_ids_comb = ways[0][1] + ways[1][1]
                 orders_comb = orders_one + orders_two
                 logprobs_comb = logprobs_one + logprobs_two
+                
             elif prompt_key == "q3_mean":
                 
-                pair_ids_comb = ways[0][1]
                 orders_comb, logprobs_comb = [], []
                 for logprobs1, logprobs2 in zip(all_info_logprobs_one, all_info_logprobs_two):
-                    order, logprob = extract_info_mean_q3(logprobs1, logprobs2)
-                    orders_comb.append(order)
-                    logprobs_comb.append(logprob)
+                    
+                    if keep_only_most_top:
+                        # Add the same pair ID twice: once for each direction's judgment, since we already flipped the labels in extract_info_mean_q3
+                        pair_ids_comb = ways[0][1] + ways[0][1]
+                        first_way, second_way = extract_info_mean_q3(logprobs1, logprobs2, keep_only_most_top=keep_only_most_top)
+                        
+                        orders_comb.append(first_way[0])
+                        orders_comb.append(second_way[0])
+                        
+                        logprobs_comb.append(first_way[1])
+                        logprobs_comb.append(second_way[1])
+                        
+                    else:        
+                        pair_ids_comb = ways[0][1]            
+                        order, logprob = extract_info_mean_q3(logprobs1, logprobs2)
+                        orders_comb.append(order)
+                        logprobs_comb.append(logprob)
             else:
                 raise ValueError("Invalid prompt key for Q3.")
         else:
@@ -721,6 +736,7 @@ class ProxAnn(object):
         rank_data.append(rank)
         info_to_bradley_terry["pair_ids_comb"] = pair_ids_comb
         info_to_bradley_terry["orders_comb"] = orders_comb
+        
         return
     
     # this will be executed for each model the user wants to evaluate

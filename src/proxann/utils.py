@@ -285,8 +285,8 @@ def extract_info_mean_q3(logprobs1, logprobs2, keep_only_most_top=False):
         
     else:
         # final "probs"
-        prob_a = sum(prob for token, prob in token_probs if token == "a")
-        prob_b = sum(prob for token, prob in token_probs if token == "b")
+        prob_a = sum(prob for token, prob, _ in token_probs if token == "a")
+        prob_b = sum(prob for token, prob, _ in token_probs if token == "b")
         
         # convert back probs to logprobs
         logprob_a = math.log(prob_a) if prob_a > 0 else float('-inf')

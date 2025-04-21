@@ -425,6 +425,16 @@ class ProxAnn(object):
                 template_name = add_model_key_to_template(template_name)
             template_path = load_template_path(template_name)
             template = load_template(template_path)
+            
+            if "with_eval" in template_name:
+                template = template.format(
+                    keywords = " ".join(text["topic_words"][:7]),
+                    exemplar_docs = "\n".join(
+                        f"- {extend_to_full_sentence(doc['text'], num_words)}" for doc in text["exemplar_docs"][:4]),
+                    category= "{category}",
+                    doc_a="{doc_a}",
+                    doc_b="{doc_b}"
+                )
 
             if doing_both_ways:
                 return (
@@ -445,6 +455,7 @@ class ProxAnn(object):
             "q3_dspy": lambda text: handle_q3(text, category, doing_both_ways=doing_both_ways),
             "q2_mean": lambda text: handle_q2(text, category, template_name= "q2_mean"),
             "q3_mean": lambda text: handle_q3(text, category, doing_both_ways=doing_both_ways, template_name= "q3_mean"),
+            "q3_mean_with_eval": lambda text: handle_q3(text, category, doing_both_ways=doing_both_ways, template_name= "q3_mean_with_eval"),
         }
 
         if question_type not in question_handlers:
@@ -657,6 +668,7 @@ class ProxAnn(object):
                 pairwise, pairwise_logprobs = prompter.prompt(
                     dft_system_prompt, question, use_context=use_context, temperature=temperature
                 )
+
                 try:
                     label, order, rationale = extract_info_q1_q3(
                         pairwise, get_label=(prompt_mode == "q1_and_q3"))
@@ -694,7 +706,7 @@ class ProxAnn(object):
                 orders_comb = orders_one + orders_two
                 logprobs_comb = logprobs_one + logprobs_two
                 
-            elif prompt_key == "q3_mean":
+            elif "q3_mean" in prompt_key:
                 
                 orders_comb, logprobs_comb = [], []
                 for logprobs1, logprobs2 in zip(all_info_logprobs_one, all_info_logprobs_two):

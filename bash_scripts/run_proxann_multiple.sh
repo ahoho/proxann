@@ -4,14 +4,14 @@
 MODEL_TYPE="gpt-4o-2024-08-06" #"gpt-4o-2024-08-06" #"qwen:32b" #"qwen:32b" #"llama3.3:70b" #"llama3.1:8b-instruct-q8_0" #,llama3.3:70b,qwen:32b
 PROMPT_MODE="q1_then_q3_dspy,q1_then_q2_dspy"
 REMOVAL_CONDITION="loose"
-SAVE_PATH="data/several_runs/$MODEL_TYPE"
+SAVE_PATH="data/several_runs/21_04_25/mean/$MODEL_TYPE"
 TEMPERATURES=1.0,0.0,0.0
 
 # generate n random seeds
-n=5
-#seeds=($(shuf -i 1-1000 -n $n))
-seeds=(338 436 499 742 853)
-#seeds=(70)
+n=4
+seeds=($(shuf -i 1-1000 -n $n))
+#seeds=(338 436 499 742 853)
+#seeds=(266)
 echo "Seeds: ${seeds[@]}"
 
 # Define dataset-specific configurations using arrays
@@ -50,7 +50,8 @@ for s in "${seeds[@]}"; do
       --response_csv "$RESPONSE_CSV" \
       --dataset_key "$DATASET_KEY" \
       --seed "$s" \
-      --temperatures "$TEMPERATURES"
+      --temperatures "$TEMPERATURES" \
+      --do_both_ways
 
     python3 proxann_user_study.py \
       --model_type "$MODEL_TYPE" \
@@ -61,6 +62,7 @@ for s in "${seeds[@]}"; do
       --response_csv "$RESPONSE_CSV" \
       --dataset_key "$DATASET_KEY" \
       --seed "$s" \
-      --temperatures "$TEMPERATURES"
+      --temperatures "$TEMPERATURES" \
+      --do_both_ways
   done
 done

@@ -89,6 +89,13 @@ llm:
       llama3.3:70b
     }
     host: http://kumo01.tsc.uc3m.es:11434
+  vllm:
+    available_models: {
+      "Qwen/Qwen3-8B",
+      "Qwen/Qwen3-0.6B",
+      "meta-llama/Meta-Llama-3-8B-Instruct"
+    }
+    host: http://kumo01.tsc.uc3m.es:6000/v1
   llama_cpp:
     host: http://kumo01:11435/v1/chat/completions
 user_study:

@@ -28,6 +28,7 @@ class Prompter:
         temperature: float = None,
         seed: int = None,
         max_tokens: int = None,
+        openai_key: str = None,
     ):
         self._logger = logger if logger else init_logger(config_path, __name__)
         self.config = load_yaml_config_file(config_path, "llm", logger)
@@ -36,6 +37,8 @@ class Prompter:
             "gpt", {}).get("available_models", {})
         self.OLLAMA_MODELS = self.config.get(
             "ollama", {}).get("available_models", {})
+        self.VLLM_MODELS = self.config.get(
+            "vllm", {}).get("available_models", {})
 
         self.model_type = model_type
         self.context = None
@@ -67,6 +70,15 @@ class Prompter:
             load_dotenv(self.config.get("gpt", {}).get("path_api_key", ".env"))
             self.backend = "openai"
             self._logger.info(f"Using OpenAI API with model: {model_type}")
+            
+            if openai_key is not None:
+                os.environ["OPENAI_API_KEY"] = openai_key
+                self._logger.info(f"Setting OpenAI API key from argument.")
+            else:
+                openai_key = os.getenv("OPENAI_API_KEY")
+                if openai_key is None:
+                    raise ValueError("OpenAI API key not found. Please set it in the .env file or pass it as an argument.")
+            
         elif model_type in self.OLLAMA_MODELS:
             ollama_host = self.config.get("ollama", {}).get(
                 "host", "http://kumo01.tsc.uc3m.es:11434"
@@ -80,6 +92,15 @@ class Prompter:
             )
             self._logger.info(
                 f"Using OLLAMA API with host: {ollama_host}"
+            )
+        elif model_type in self.VLLM_MODELS:
+            vllm_host = self.config.get("vllm", {}).get(
+                "host", "http://localhost:6000/v1"
+            )
+            os.environ['VLLM_HOST'] = vllm_host
+            self.backend = "vllm"
+            self._logger.info(
+                f"Using VLLM API with host: {vllm_host}"
             )
         elif model_type == "llama_cpp":
             self.llama_cpp_host = self.config.get("llama_cpp", {}).get(
@@ -107,12 +128,13 @@ class Prompter:
 
         print("Cache miss: computing results...")
         
-        if backend == "openai":
-            result, logprobs = Prompter._call_openai_api(
+        if backend == "openai" or backend == "vllm":
+            result, logprobs = Prompter._call_openai_api_vllm(
                 template=template,
                 question=question,
                 model_type=model_type,
                 params=dict(params),
+                backend=backend
             )
         elif backend == "ollama":
             result, logprobs, context = Prompter._call_ollama_api(
@@ -148,7 +170,7 @@ class Prompter:
         }
 
     @staticmethod
-    def _call_openai_api(template, question, model_type, params):
+    def _call_openai_api_vllm(template, question, model_type, params, backend):
         """Handles the OpenAI API call."""
 
         if template is not None:
@@ -161,7 +183,15 @@ class Prompter:
                 {"role": "user", "content": question},
             ]
 
-        open_ai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        if backend == "openai":
+            open_ai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        elif backend == "vllm":
+            open_ai_client = OpenAI(
+                base_url=os.getenv("VLLM_HOST"),
+                api_key="THIS_IS_AN_UNUSED_REQUIRED_PLACEHOLDER",
+            )
+        else:
+            raise ValueError(f"Unsupported backend: {backend}")
         response = open_ai_client.chat.completions.create(
             model=model_type,
             messages=messages,

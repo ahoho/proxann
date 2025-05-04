@@ -64,6 +64,7 @@ class ProxAnn(object):
         self,
         path_user_study_config_file: str,
         output_path: str = None,
+        user_provided_tpcs: Optional[List[int]] = None,
     ) -> int:
         """Generate a JSON file with user-provided model data.
         
@@ -75,6 +76,8 @@ class ProxAnn(object):
             Path to the user study configuration file.
         output_path : str
             Path to save the JSON file.
+        user_provided_tpcs : Optional[List[int]], optional
+            List of user-provided topics, by default None. If not provided, the function will use the topics from the configuration file.
         """
         self._logger.info(
             "Generating JSON file with user-provided model data starts...")
@@ -88,61 +91,74 @@ class ProxAnn(object):
         ############################
         N = int(user_config['all']['n_matches'])
         top_words_display = int(user_config['all']['top_words_display'])
+        
+        # if the user provides topics, we do not need to select them, but we need to return them in the same format the topic selector uses
+        # if the user provides topics, then we only allow for one model to be evaluated, so we need to check that if user_provided_tpcs is not None, then the user config only has one model
+        if user_provided_tpcs is not None:
+            # check if the user config has more than one model
+            if len(user_config.sections()) > 2:
+                error_msg = f"User provided topics, but more than one model is configured. Exiting..."
+                log_or_print(error_msg, self._logger)
+                return 1, error_msg
+            
+            selected_topics = [[(0, user_provided_tpcs[i]) for i in range(len(user_provided_tpcs))]]
+            log_or_print(f"Selected topics set from user input: {selected_topics}", self._logger)
+        else:
 
-        remove_topic_ids = []
-        all_topic_keys = []
-        for model in user_config.sections():
-            # Skip all section (configuration for all models)
-            if model == 'all':
-                continue
-            model_config = user_config[model]
-            # if trained with this repo code, we only need the model path
-            if model_config.getboolean('trained_with_thetas_eval'):
-                model_path = model_config['model_path']
-                # Load vocab dictionaries
-                vocab_w2id = {}
-                with (pathlib.Path(model_path)/'vocab.txt').open('r', encoding='utf8') as fin:
-                    for i, line in enumerate(fin):
-                        wd = line.strip()
-                        vocab_w2id[wd] = i
-                betas = np.load(pathlib.Path(model_path) / "betas.npy")
-            else:
-                vocab_path = model_config['vocab_path']
-                if vocab_path.endswith(".json"):
-                    with open(vocab_path) as infile:
-                        vocab_w2id = json.load(infile)
-
-                elif vocab_path.endswith()(".txt"):
-                    vocab_w2id = load_vocab_from_txt(vocab_path)
+            remove_topic_ids = []
+            all_topic_keys = []
+            for model in user_config.sections():
+                # Skip all section (configuration for all models)
+                if model == 'all':
+                    continue
+                model_config = user_config[model]
+                # if trained with this repo code, we only need the model path
+                if model_config.getboolean('trained_with_thetas_eval'):
+                    model_path = model_config['model_path']
+                    # Load vocab dictionaries
+                    vocab_w2id = {}
+                    with (pathlib.Path(model_path)/'vocab.txt').open('r', encoding='utf8') as fin:
+                        for i, line in enumerate(fin):
+                            wd = line.strip()
+                            vocab_w2id[wd] = i
+                    betas = np.load(pathlib.Path(model_path) / "betas.npy")
                 else:
-                    log_or_print(
-                        f"File does not have the required extension for loading the vocabulary. Exiting...", self._logger)
-                    sys.exit()
+                    vocab_path = model_config['vocab_path']
+                    if vocab_path.endswith(".json"):
+                        with open(vocab_path) as infile:
+                            vocab_w2id = json.load(infile)
 
-                betas_path = model_config['betas_path']
-                betas = np.load(betas_path)
+                    elif vocab_path.endswith()(".txt"):
+                        vocab_w2id = load_vocab_from_txt(vocab_path)
+                    else:
+                        log_or_print(
+                            f"File does not have the required extension for loading the vocabulary. Exiting...", self._logger)
+                        sys.exit()
 
-            #  Get keys
-            vocab_id2w = dict(zip(vocab_w2id.values(), vocab_w2id.keys()))
-            keys = [
-                [vocab_id2w[idx]
-                    for idx in row.argsort()[::-1][:top_words_display]]
-                for row in betas
-            ]
-            all_topic_keys.append(keys)
+                    betas_path = model_config['betas_path']
+                    betas = np.load(betas_path)
 
-            if model_config["remove_topic_ids"]:
-                remove_topic_ids.append(
-                    [int(el) for el in model_config["remove_topic_ids"].split(",")])
-            else:
-                # append empty list to keep the order
-                remove_topic_ids.append([])
+                #  Get keys
+                vocab_id2w = dict(zip(vocab_w2id.values(), vocab_w2id.keys()))
+                keys = [
+                    [vocab_id2w[idx]
+                        for idx in row.argsort()[::-1][:top_words_display]]
+                    for row in betas
+                ]
+                all_topic_keys.append(keys)
 
-        topic_selector = TopicSelector()
-        selected_topics = topic_selector.iterative_matching(
-            models=all_topic_keys, N=N, remove_topic_ids=remove_topic_ids)
+                if model_config["remove_topic_ids"]:
+                    remove_topic_ids.append(
+                        [int(el) for el in model_config["remove_topic_ids"].split(",")])
+                else:
+                    # append empty list to keep the order
+                    remove_topic_ids.append([])
 
-        log_or_print(f"Selected topics: {selected_topics}", self._logger)
+            topic_selector = TopicSelector()
+            selected_topics = topic_selector.iterative_matching(
+                models=all_topic_keys, N=N, remove_topic_ids=remove_topic_ids)
+        
+            log_or_print(f"Selected topics with TopicSelector: {selected_topics}", self._logger)
 
         ############################
         # JSON formatter           #
@@ -202,7 +218,22 @@ class ProxAnn(object):
                         log_or_print(
                             f"File does not have the required extension for loading the vocabulary. Exiting...", self._logger)
                         sys.exit()
-
+                
+                # check the number of topics selected for the models is less or equal to the number of topics in the model, and topics are valid IDs (all ids go from 0 to number of topics - 1)
+                this_model_tpcs = [
+                    el[1] for el in selected_topics if el[0] == idx_model]
+                
+                if len(this_model_tpcs) > thetas.shape[0]:
+                    error_msg = f"Number of topics selected for model {model} is greater than the number of topics in the model. Exiting..."
+                    log_or_print(error_msg, self._logger)
+                    return 1, error_msg
+                
+                for el in this_model_tpcs:
+                    if el < 0 or el >= thetas.shape[1]:
+                        error_msg = f"Topic ID {el} is not valid for model {model}. Exiting..."
+                        log_or_print(error_msg, self._logger)
+                        return 1, error_msg
+                    
                 #  Get keys
                 vocab_id2w = dict(zip(vocab_w2id.values(), vocab_w2id.keys()))
                 keys = [
@@ -273,14 +304,14 @@ class ProxAnn(object):
             output_path = pathlib.Path(path_json_save) / (pathlib.Path(path_user_study_config_file).stem + ".json")
             
         # Write JSON output to file
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'w') as file:
             json.dump(combined_out, file, indent=4)    
-
         
         if output_path.exists():
             return 0, output_path
         else:
-            return 1, None
+            return 1, "Error writing JSON file"
         
     def get_prompt_template(
         self,
@@ -556,13 +587,11 @@ class ProxAnn(object):
         if temperature is not None:
             self._logger.info(f"Using temperature {temperature} for Q2.")
                     
-        if prompt_mode != "q1_then_q2_dspy":
+        if prompt_mode not in ["q1_then_q2_dspy", "q1_then_q2_mean"]:
             log_or_print(f"Not a valid prompt mode: {prompt_mode}", logger)
             return
 
-        #prompt_key = "q2_dspy"
-        # @TODO: Extract the prompt key outside
-        prompt_key = "q2_mean"
+        prompt_key = "q2_mean" if prompt_mode == "q1_then_q2_mean" else "q2_dspy"
         log_or_print(f"Using prompt key: {prompt_key}", logger)
 
         if user_cats:
@@ -645,8 +674,12 @@ class ProxAnn(object):
         if temperature is not None:
             self._logger.info(f"Using temperature {temperature} for Q3.")
         
-        #prompt_key = "q3_dspy"
-        prompt_key = "q3_mean"
+        if prompt_mode not in ["q1_then_q3_dspy", "q1_then_q3_mean"]:
+            log_or_print(f"Not a valid prompt mode: {prompt_mode}", logger)
+            return
+        
+        prompt_key = "q3_mean" if prompt_mode == "q1_then_q3_mean" else "q3_dspy"
+        
         keep_only_most_top = False
         log_or_print(f"-- Using prompt key: {prompt_key}", logger)
         q3_out = self.get_prompt_template(prompter.model_type, cluster_data, prompt_key, category=category, doing_both_ways=doing_both_ways)
@@ -698,7 +731,7 @@ class ProxAnn(object):
                         log_or_print(f"\033[92mOrder: {order}\033[0m", logger)
                 except Exception as e:
                     log_or_print(
-                        f"-- Error extracting info from prompt: {e}", "error", logger)                    
+                        f"-- Error extracting info from prompt: {e}", "error", logger)   
         # Combine results for ranking
         if len(ways) > 1:
             if prompt_key == "q3_dspy":
@@ -756,11 +789,14 @@ class ProxAnn(object):
         self,
         tm_model_data_path,
         llm_models,
-        custom_temperature=None,
-        custom_seed=None,
+        q1_temp=0,
+        q2_temp=0,
+        q3_temp=0,
+        custom_seed=1234,
         do_both_ways=False,
         q1_q3_prompt_mode="q1_then_q3_dspy",
-        q1_q2_prompt_mode="q1_then_q2_dspy"
+        q1_q2_prompt_mode="q1_then_q2_dspy",
+        openai_key=None,
     ):  
         """
         Run "Proxann" metrics for a given topic model (full or set of topics) based on one or more LLMs.
@@ -771,8 +807,8 @@ class ProxAnn(object):
             Path to the topic modeling data.
         llm_models : list
             List of LLM models to use.
-        custom_temperature : float, optional
-            Custom temperature for the LLM, by default None.
+        temperatures : float, optional
+            Temperatures value for the LLM generation in Q1/Q2/Q3, separated by commas.
         custom_seed : int, optional
             Custom seed for the LLM, by default None.
         do_both_ways : bool, optional
@@ -781,6 +817,8 @@ class ProxAnn(object):
             Prompting mode for Q3, by default "q1_then_q3_dspy".
         q1_q2_prompt_mode : str, optional
             Prompting mode for Q2, by default "q1_then_q2_dspy".
+        openai_key : str, optional
+            OpenAI API key, by default None.
             
         Returns
         -------
@@ -811,28 +849,51 @@ class ProxAnn(object):
             
             for llm_model in llm_models:
                 # Create prompter for the LLM
-                prompter = Prompter(model_type=llm_model, temperature=custom_temperature, seed=custom_seed)
+                prompter = Prompter(model_type=llm_model, seed=custom_seed, openai_key=openai_key)
                 # ----------------------------------------------
                 # Q1_THEN_Q3
                 # ----------------------------------------------
                 self._logger.info("-- Executing Q1 / Q3...")
                 # ==============================================
                 # Q1
-                # ==============================================
-                self.do_q1(prompter, cluster_data, [], categories)
+                # ==============================================                
+                self.do_q1(
+                    prompter=prompter, 
+                    cluster_data=cluster_data, 
+                    users_cats=[], 
+                    categories=categories, 
+                    temperature=q1_temp
+                )
                 
                 # ==============================================
                 # Q3
                 # ==============================================
                 # TODO: Add logic for when category is not category[-1] but each of the users' categories
                 category = categories[-1]
-                self.do_q3(prompter, q1_q3_prompt_mode, cluster_data, rank_data, info_to_bradley_terry, [], category, do_both_ways)
+                self.do_q3(
+                    prompter=prompter,
+                    prompt_mode=q1_q3_prompt_mode,
+                    cluster_data=cluster_data,
+                    rank_data=rank_data,
+                    info_to_bradley_terry=info_to_bradley_terry,
+                    users_rank=[],
+                    category=category,
+                    temperature=q3_temp,
+                    doing_both_ways=do_both_ways
+                )
 
                 # ----------------------------------------------
                 # Q1_THEN_Q2
                 # ----------------------------------------------
                 self._logger.info("-- Executing Q1 / Q2...")
-                labels = self.do_q2(prompter, q1_q2_prompt_mode, cluster_data, fit_data, category)
+                labels = self.do_q2(
+                    prompter=prompter, 
+                    prompt_mode=q1_q2_prompt_mode, 
+                    cluster_data=cluster_data, 
+                    fit_data=fit_data, 
+                    category=category, 
+                    temperature=q2_temp
+                )
             
             llm_results_q1.append({
                 "id": cluster_id,
@@ -870,7 +931,7 @@ class ProxAnn(object):
         llm_results_q3 = sorted(llm_results_q3, key=lambda x: x["id"])
         
         corr_data = self.compute_llm_tm_corrs(tm_model_data, llm_results_q3, llm_results_q2)
-        
+                
         return corr_data, info_to_bradley_terry
     
     def compute_llm_tm_corrs(

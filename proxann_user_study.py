@@ -12,8 +12,8 @@ from src.proxann.utils import (
 )
 from src.utils.utils import init_logger, load_yaml_config_file, log_or_print
 
-Q1_THEN_Q2_PROMPTS = {"q1_then_binary_q2", "q1_then_q2_fix_cat", "q1_then_q2_dspy"}
-Q1_THEN_Q3_PROMPTS = {"q1_then_q3", "q1_then_q3_fix_cat", "q1_then_q3_dspy"}
+Q1_THEN_Q2_PROMPTS = {"q1_then_q2_dspy", "q1_then_q2_mean"}
+Q1_THEN_Q3_PROMPTS = {"q1_then_q3_dspy", "q1_then_q3_mean"}
 
 
 def parse_args():
@@ -100,9 +100,9 @@ def main():
     
     # Get seed and temperature if given
     custom_temperatures = [float(el) for el in args.temperatures.split(",")] if args.temperatures is not None else None
-    q1_temp = custom_temperatures[0] if custom_temperatures else None
-    q2_temp = custom_temperatures[1] if custom_temperatures else None
-    q3_temp = custom_temperatures[2] if custom_temperatures else None
+    q1_temp = custom_temperatures[0] if custom_temperatures else 0
+    q2_temp = custom_temperatures[1] if custom_temperatures else 0
+    q3_temp = custom_temperatures[2] if custom_temperatures else 0
     print(f"Temperatures: {q1_temp}, {q2_temp}, {q3_temp}")
     custom_seed = args.seed if args.seed is not None else None
     custom_max_tokens = args.max_tokens if args.max_tokens is not None else None

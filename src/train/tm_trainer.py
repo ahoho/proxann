@@ -71,7 +71,7 @@ class TMTrainer(ABC):
                 os.makedirs(old_model_dir)
                 shutil.move(self.model_path, old_model_dir)
 
-        self.model_path.mkdir(exist_ok=True)
+        self.model_path.mkdir(exist_ok=True, parents=True)
 
         # load config
         self.config = load_yaml_config_file(config_path, "topic_modeling", logger)
@@ -916,7 +916,7 @@ class BERTopicTrainer(TMTrainer):
         keys = []
         for k, v in self._model.get_topics().items():
             keys.append([el[0] for el in v])
-
+        
         model_file = self.model_path.joinpath('model.pickle')
         pickler(model_file, self._model)
 

@@ -14,7 +14,7 @@ DATASETS=(
     #"wikitext:/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/training_data/wikitext"
 )
 
-MODEL_BASE_PATH="data/models/final_models/model-runs"
+MODEL_BASE_PATH="data/tests_bertopic"
 VOCAB_FILE="vocab.json"
 EMBEDDINGS_SUFFIX="train.metadata.embeddings.jsonl.all-MiniLM-L6-v2.parquet"
 

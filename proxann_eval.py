@@ -67,7 +67,10 @@ def main():
     proxann = ProxAnn(logger, args.config_path)
 
     # Generate user provided JSON file
-    status, tm_model_data_path = proxann.generate_user_provided_json(path_user_study_config_file=args.user_study_config)
+    status, tm_model_data_path = proxann.generate_user_provided_json(
+        path_user_study_config_file=args.user_study_config,
+        #user_provided_tpcs=[2]
+    )
     
     if status == 0:
         logger.info("User provided JSON file generated successfully.")
@@ -75,11 +78,13 @@ def main():
         logger.error("Error generating user provided JSON file.")
         return 1
     
-    proxann.run_metric(
+    corr_data, _ = proxann.run_metric(
         tm_model_data_path.as_posix(),
         llm_models=["qwen:32b"]
     )
     
+    logger.info("Evaluation completed successfully.")
+    logger.info(f"Results: {corr_data}")
 
 if __name__ == "__main__":
     main()

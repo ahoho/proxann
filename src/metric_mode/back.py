@@ -4,17 +4,17 @@ import tarfile
 import zipfile
 import tempfile
 import shutil
-from werkzeug.utils import secure_filename
+from src.proxann.utils import is_openai_key_valid
+from werkzeug.utils import secure_filename # type: ignore
 
 from src.proxann.proxann import ProxAnn
 from src.utils.utils import init_logger
 
-global evaluation_progress
-evaluation_progress = 0
-
 app = Flask(__name__)
-UPLOAD_FOLDER = "src/metric_mode/uploads"
-CONFIG_FOLDER = "src/metric_mode/configs"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+print(BASE_DIR)
+CONFIG_FOLDER = os.path.join(BASE_DIR, "configs")
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 CONFIG_PATH="config/config.yaml"
 USER_STUDY_CONFIG="config/user_study/config_pilot_test.conf"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -24,16 +24,16 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 logger = init_logger(CONFIG_PATH, f"RunProxann-metric-mode")
 proxann = ProxAnn(logger, CONFIG_PATH)
 
-def generate_config(file_paths, trained_with_thetas_eval):
+def generate_config(file_paths, trained_with_thetas_eval, column_disp):
     """ Generates a configuration file dynamically based on uploaded files. """
     if trained_with_thetas_eval:
         config_content = f"""[all]
 method=elbow
 top_words_display=100
 ntop=7
-n_matches=4
+n_matches=1
 text_column=tokenized_text
-text_column_disp=text
+text_column_disp={column_disp}
 thr=0.1,0.8
 path_json_save={UPLOAD_FOLDER}/json_out/tests
 topic_selection_method=wmd
@@ -49,9 +49,9 @@ remove_topic_ids=
 method=elbow
 top_words_display=100
 ntop=7
-n_matches=4
+n_matches=1
 text_column=tokenized_text
-text_column_disp=text
+text_column_disp={column_disp}
 thr=0.1,0.8
 path_json_save={UPLOAD_FOLDER}/json_out/tests
 topic_selection_method=wmd
@@ -148,8 +148,10 @@ def upload():
 
     if set(required_files) != set(uploaded_files.keys()):
         return jsonify({"error": "Error: Missing required files. Please upload all required files."}), 400
+    
+    text_column_disp = request.form.get("text_column_disp", "text").strip()
 
-    _ = generate_config(uploaded_files, trained_with_thetas_eval)
+    _ = generate_config(uploaded_files, trained_with_thetas_eval, text_column_disp)
 
     return jsonify({
         "status": "Uploaded Successfully",
@@ -159,40 +161,65 @@ def upload():
 @app.route('/download-config')
 def download_config():
     config_path = os.path.join(CONFIG_FOLDER, "config.conf")
+    logger.info(f"Config file path: {config_path}")
     return send_file(config_path, as_attachment=True)
 
 @app.route('/evaluate', methods=['POST'])
 def evaluate():
-    """ Evaluation process that generates a DataFrame as results with real-time progress updates. """
-    global evaluation_progress
-    evaluation_progress = 0
+    """Evaluation process that generates a DataFrame as results with real-time progress updates."""
+
+    llm_model = request.form.get("llm_model")
+    q1_temp = float(request.form.get("q1_temp", 0))
+    q2_temp = float(request.form.get("q2_temp", 0))
+    q3_temp = float(request.form.get("q3_temp", 0))
+    custom_seed = int(request.form.get("custom_seed", 1234))
+    q1_q3_prompt_mode = request.form.get("q1_q3_prompt_mode")
+    q1_q2_prompt_mode = request.form.get("q1_q2_prompt_mode")
+    openai_key = request.form.get("openai_key")
+    do_both_ways = request.form.get("do_both_ways") == "on"  # checkbox
     
-    status, tm_model_data_path = proxann.generate_user_provided_json(path_user_study_config_file=USER_STUDY_CONFIG)
+    if not is_openai_key_valid(openai_key):
+        return jsonify({"error": "Invalid OpenAI API key."}), 400
+
+    logger.info(f"llm_model: {llm_model}, q1_temp: {q1_temp}, q2_temp: {q2_temp}, q3_temp: {q3_temp}, custom_seed: {custom_seed}, do_both_ways: {do_both_ways}")
     
+    # Topics to evaluate (comma-separated list or blank)
+    topics_raw = request.form.get("topics_to_evaluate", "").strip()
+    if topics_raw:
+        try:
+            topics_to_evaluate = [int(t.strip()) for t in topics_raw.split(",") if t.strip().isdigit()]
+        except ValueError:
+            return jsonify({"error": "Invalid topic IDs. Must be comma-separated integers."}), 400
+    else:
+        topics_to_evaluate = None
+
+    status, tm_model_data_path = proxann.generate_user_provided_json(
+        path_user_study_config_file=USER_STUDY_CONFIG,
+        user_provided_tpcs=topics_to_evaluate
+    )
+
     if status == 0:
         logger.info("User provided JSON file generated successfully.")
     else:
         logger.error("Error generating user provided JSON file.")
         return jsonify({"error": "Failed to generate user-provided JSON file."}), 500
-    
-    # Progress Update before Running Metric
-    evaluation_progress = 40
-    
+
     df, _ = proxann.run_metric(
         tm_model_data_path.as_posix(),
-        llm_models=["qwen:32b"]
-    )    
-    
-    evaluation_progress = 100  # Mark evaluation as complete
+        llm_models=[llm_model],
+        q1_temp=q1_temp,
+        q2_temp=q2_temp,
+        q3_temp=q3_temp,
+        custom_seed=custom_seed,
+        do_both_ways=do_both_ways,
+        q1_q3_prompt_mode=q1_q3_prompt_mode,
+        q1_q2_prompt_mode=q1_q2_prompt_mode,
+        openai_key=openai_key,
+    )
+
     table_html = df.to_html(classes='table table-striped table-bordered text-center', index=False)
 
     return jsonify({"table": table_html})
-
-@app.route('/evaluate_status', methods=['GET'])
-def evaluate_status():
-    """ Returns the current progress of the evaluation process. """
-    global evaluation_progress
-    return jsonify({"progress": evaluation_progress})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True, port=8080)

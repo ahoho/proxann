@@ -18,6 +18,7 @@ from sklearn.metrics import ndcg_score
 from irrCAC.raw import CAC
 import math
 from src.utils.utils import log_or_print
+import requests
 
 def load_template(template_path: str) -> str:
     with open(template_path, 'r') as file:
@@ -254,7 +255,6 @@ def extract_info_mean_q2(logprobs):
     return score
 
 def extract_info_mean_q3(logprobs1, logprobs2, keep_only_most_top=False):
-    
     token_probs = []
     for logprob1, logprob2 in zip(logprobs1, logprobs2):
         for i, logprob in enumerate([logprob1, logprob2]):
@@ -1072,3 +1072,13 @@ def load_or_calculate_npmi(config_pilot, npmi_save, logging=None):
     npmi_data.to_csv(npmi_save, index=False)
     logging.info(f"NPMI calculated in {(time.time() - start_time) / 60:.2f} minutes.")
     return npmi_data
+
+def is_openai_key_valid(api_key: str) -> bool:
+    headers = {
+        "Authorization": f"Bearer {api_key}"
+    }
+    try:
+        response = requests.get("https://api.openai.com/v1/models", headers=headers, timeout=5)
+        return response.status_code == 200
+    except requests.RequestException:
+        return False

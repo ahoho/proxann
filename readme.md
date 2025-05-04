@@ -8,7 +8,7 @@
 
 This repository contains the code and data for reproducing experiments from our paper, *ProxAnn: Use-Oriented Evaluations of Topic Models and Document Clustering.*
 
-## ✨ Features
+## Features
 
 1. **User Study Data Generation**:
    - Use the `src.user_study_data_collector` module to generate the JSON files containing the required topic model information to carry out the evaluation (or user study).
@@ -18,7 +18,7 @@ This repository contains the code and data for reproducing experiments from our 
 3. **Topic Model Training**:
    - Train topic and clustering models (currently, LDA-Mallet, LDA-Tomotopy, and BERTopic) under a unified structure using the `src.train` module.
 
-## 🛠️ Installation
+## Installation
 
 We recommend **Poetry** for installing the necessary dependencies, but an environment followed by the installation of the [requirements file](requirements.txt) can also be used.
 
@@ -50,7 +50,7 @@ We rely on [Ollama models](https://ollama.com/) for evaluating with open-source 
 ### Important: Training with LDA-Mallet
 Download the [latest release of Mallet](https://github.com/mimno/Mallet/releases) and place it in the `src/train` directory. You can use the script `bash_scripts/wget_mallet.sh` to automate this process.
 
-## 🚀 Usage
+## Usage
 
 You can use **ProxAnn** as a proxy for human annotators to evaluate the quality of topic models. To use it:
 
@@ -77,13 +77,18 @@ The script [``proxann_eval.py``](proxann_eval.py) contains a simple demonstratio
 
 ### Deploying ProxAnn as a Web Service
 
-You can also deploy ProxAnn as a web service:
-```python
+To run ProxAnn as a web service locally, execute the following command:
+
+```bash
 python3 -m src.metric_mode.back
 ```
-Alternatively, you can use the web service deployed by us: [...]
 
-## 🔄 Reproducibility
+This will start a web server that exposes ProxAnn's functionality via a REST API.
+
+Alternatively, you can use our hosted instance of the ProxAnn web service here: [https://proxann.uc3m.es/](https://proxann.uc3m.es/)
+
+
+## Reproducibility
 
 ### Data
 

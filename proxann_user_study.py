@@ -67,7 +67,7 @@ def parse_args():
         help="Seed for random number generator." 
     )
     parser.add_argument(
-        "---max_tokens", type=int, default=None,
+        "--max_tokens", type=int, default=None,
         help="Max tokens for the LLM generation."
     )
     return parser.parse_args()
@@ -303,14 +303,15 @@ def main():
     ############################################################################
     # Save results
     ############################################################################
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    save_path = f"{args.path_save_results}/{args.prompt_mode}"
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+    short_model = args.model_type.split("/")[-1]
+    save_path = f"{args.path_save_results}/{short_model}/{args.prompt_mode}"
     if args.temperatures is not None:
         temp_str = "_".join(args.temperatures.split(","))
         save_path += f"_temp{temp_str}"
     if args.seed is not None:
         save_path += f"_seed{args.seed}"
-    save_path += f"_{args.model_type}_{timestamp}"
+    save_path += f"_{timestamp}"
     os.makedirs(save_path, exist_ok=True)
     save_results(llm_results_q1, save_path, "llm_results_q1.json")
     if llm_results_q2:

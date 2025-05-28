@@ -55,7 +55,7 @@ class Prompter:
             # set max_tokens only if provided by the user; otherwise the default values are used
             
             # for gpt models, the parameter is 'max_completion_tokens'
-            if model_type in self.GPT_MODELS:
+            if model_type in self.GPT_MODELS or model_type in self.VLLM_MODELS:
                 self.params["max_completion_tokens"] = max_tokens
                 self._logger.info(f"Setting max_completion_tokens to: {max_tokens}")
             # for ollama models, the parameter is 'num_predict'
@@ -197,7 +197,7 @@ class Prompter:
             messages=messages,
             stream=False,
             temperature=params["temperature"],
-            max_tokens=params.get("max_tokens", 1000),
+            max_completion_tokens=params.get("max_completion_tokens", 1000),
             seed=params.get("seed", 1234),
             logprobs=True,
             top_logprobs=20, # this is the maximum value

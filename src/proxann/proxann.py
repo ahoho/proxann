@@ -781,7 +781,8 @@ class ProxAnn(object):
         rank_data.append(rank)
         info_to_bradley_terry["pair_ids_comb"] = pair_ids_comb
         info_to_bradley_terry["orders_comb"] = orders_comb
-        
+        info_to_bradley_terry["logprobs_comb"] = logprobs_comb
+
         return
     
     # this will be executed for each model the user wants to evaluate

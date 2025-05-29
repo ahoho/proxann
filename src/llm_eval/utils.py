@@ -5,15 +5,12 @@ from collections import Counter, defaultdict
 from copy import deepcopy
 from typing import List
 import choix
-from gensim.models import CoherenceModel
-from gensim.corpora import Dictionary
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import networkx as nx
 from scipy.stats import kendalltau, spearmanr, pearsonr
 from sklearn.metrics import ndcg_score
-from irrCAC.raw import CAC
 
 def extend_to_full_sentence(
     text: str,
@@ -88,18 +85,7 @@ def bradley_terry_model(
                 data.append((doc_id_to_index[pair["B"]], doc_id_to_index[pair["A"]]))  # B wins over A
         
         # Compute parameters using choix's MM algorithm
-        try:
-            params = choix.ilsr_pairwise(n_items, data, max_iter=1000)
-            
-        except Exception as e:
-            print(e)
-            print("-- -- Graph is not strongly connected. Printing adjacency matrix:")
-            graph = nx.DiGraph(data=data)
-            graph.add_edges_from(data)
-            adjacency_matrix = nx.to_numpy_array(graph, dtype=int)
-            print(adjacency_matrix)
-            print("-- -- Using a small regularization factor to solve the issue.--")
-            params = choix.ilsr_pairwise(n_items, data, alpha=0.001) # adding a little bit of regularization when the comparison graph is not connected,
+        params = choix.ilsr_pairwise(n_items, data, max_iter=num_iters, alpha=0.001)
             
         # Convert parameters to a DataFrame
         ranked_docs = sorted(
@@ -458,6 +444,8 @@ def compute_agreement_per_topic(
     """
     Compute agreement metrics (Krippendorff's alpha and Gwet's AC2 for fit and rank data) for each topic.
     """
+    from irrCAC.raw import CAC
+
     agreement_data = []
     #bin_fit_data_by_model = {"mallet": [], "ctm": [], "category-45": []}
     bin_fit_data_by_model = defaultdict(list)
@@ -859,6 +847,8 @@ def calculate_coherence(config_pilot, data_docs=[
     "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/files_pilot/document-data/wikitext/processed/labeled/vocab_15k/test.metadata.jsonl"
 ]):
     """Calculate NPMI coherence for each topic in eval_data."""
+    from gensim.models import CoherenceModel
+    from gensim.corpora import Dictionary
     docs = []
     for data_doc in data_docs:
         with open(data_doc) as infile:

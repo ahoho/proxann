@@ -707,8 +707,16 @@ def compute_correlations_one(
     
     return pd.DataFrame(corr_results)
 
-def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=None, fit_threshold = 4):
-    
+def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=None, fit_threshold = 4, rescale_ndcg=True):
+    ndcg_score_ = ndcg_score
+    if rescale_ndcg:
+        first_key = list(responses_by_id.keys())[0]
+        n_items = len(responses_by_id[first_key][0]["eval_docs"])
+        rs = range(n_items)
+        min_ndcg = ndcg_score([rs], [rs[::-1]])
+        # rescale to be between 0 and 1
+        ndcg_score_ = lambda x, y: (ndcg_score(x, y) - min_ndcg) / (1 - min_ndcg)
+
     corr_data = []    
     model_fit_data = defaultdict(list)
     model_rank_data = defaultdict(list)
@@ -758,8 +766,8 @@ def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=N
             fit_tau, _ = kendalltau(fit_data[i], prob_data)
             rank_tau, _ = kendalltau(rank_data[i], prob_data)
 
-            fit_ndcg = ndcg_score([fit_data[i]], [prob_data])
-            rank_ndcg = ndcg_score([rank_data[i]], [prob_data])
+            fit_ndcg = ndcg_score_([fit_data[i]], [prob_data])
+            rank_ndcg = ndcg_score_([rank_data[i]], [prob_data])
 
             fit_agree = np.mean(bin_fit_data[i] == assign_data)
 
@@ -788,8 +796,8 @@ def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=N
                     rank_tau_user_llm, _ = kendalltau(rank_data[i], rank_llm)
                     rank_tau_llm_tm, _ = kendalltau(rank_llm, prob_data)
 
-                    rank_ndcg_user_llm = ndcg_score([rank_data[i]], [rank_llm])
-                    rank_ndcg_llm_tm = ndcg_score([rank_llm], [prob_data])
+                    rank_ndcg_user_llm = ndcg_score_([rank_data[i]], [rank_llm])
+                    rank_ndcg_llm_tm = ndcg_score_([rank_llm], [prob_data])
                     
                     # add to the dictionary
                     annotator_results[f"rank_rho_user_{llm_annotator}"] = rank_rho_user_llm
@@ -809,8 +817,8 @@ def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=N
                     fit_tau_user_llm, _ = kendalltau(fit_data[i], fit_llm)
                     fit_tau_llm_tm, _ = kendalltau(fit_llm, prob_data)
                     
-                    fit_ndcg_user_llm = ndcg_score([fit_data[i]], [fit_llm])
-                    fit_ndcg_llm_tm = ndcg_score([fit_llm], [prob_data])
+                    fit_ndcg_user_llm = ndcg_score_([fit_data[i]], [fit_llm])
+                    fit_ndcg_llm_tm = ndcg_score_([fit_llm], [prob_data])
                     
                     # add to the dictionary
                     annotator_results[f"fit_rho_user_{llm_annotator}"] = fit_rho_user_llm

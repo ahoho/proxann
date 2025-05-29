@@ -545,6 +545,7 @@ def collect_fit_rank_data(
         # Collect data matrices for fit, rank, probability, and assignments
         fit_data = np.array([[doc["fit"] for doc in r["eval_docs"]] for r in group])
         rank_data = 8 - np.array([[doc["rank"] for doc in r["eval_docs"]] for r in group])  # Reverse rank
+        label_data = [r["category"] for r in group]
         prob_data = np.array([doc["prob"] for doc in group[0]["eval_docs"]])
         assign_data = np.array([doc["assigned_to_k"] for doc in group[0]["eval_docs"]])
 
@@ -562,8 +563,9 @@ def collect_fit_rank_data(
             "topic_match_id": group[0]["topic_match_id"],
             "fit_data": fit_data,
             "rank_data": rank_data,
+            "label_data": label_data,
             "prob_data": prob_data,
-            "assign_data": assign_data
+            "assign_data": assign_data,
         })
 
     # Sort correlation data by topic ID

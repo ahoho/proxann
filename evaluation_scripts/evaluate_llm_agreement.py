@@ -114,14 +114,14 @@ def compute_correlations(
 
 #%% Load the evaluation data and human responses
 data_jsons = [
-    "../../data/json_out/config_pilot_wiki.json",
-    "../../data/json_out/config_pilot_wiki_part2.json",
-    "../../data/json_out/config_bills_part1.json",
-    "../../data/json_out/config_bills_part2.json",
+    "../data/json_out/config_pilot_wiki.json",
+    "../data/json_out/config_pilot_wiki_part2.json",
+    "../data/json_out/config_bills_part1.json",
+    "../data/json_out/config_bills_part2.json",
 ]
 response_csvs = [
-    "../../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
-    "../../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv",
+    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
+    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv",
 ]
 start_date = "2024-12-06 09:00:00"
 
@@ -136,10 +136,10 @@ corr_data = sorted(corr_data, key=lambda x: x["id"])
 corr_ids = [x["id"] for x in corr_data]
 
 #%% Load the model output data
-base_path = Path("../../data/camera_ready_llm_out/mean/")
+base_path = Path("../data/camera_ready_llm_out/mean/")
 llm_data_patterns = {
     "gpt-4o": {
-        #"wiki": list(Path("../../data/llm_out/wiki").glob("q1_then_q3_dspy,q1_then_q2_dspy_temp1.0_seed*gpt-4o-*20250310*")),
+        #"wiki": list(Path("../data/llm_out/wiki").glob("q1_then_q3_dspy,q1_then_q2_dspy_temp1.0_seed*gpt-4o-*20250310*")),
         #"wiki": list(Path("../data/llm_out/wiki").glob("q1_then_q3_dspy,q1_then_q2_dspy_temp1.0_0.0_0.0_seed*_gpt-4o-2024-08-06*")),
         "wiki": list(Path(base_path, "wiki/gpt-4o-2024-08-06/").glob("*")),
         "bills": list(Path(base_path, "bills/gpt-4o-2024-08-06/").glob("*")),
@@ -463,7 +463,7 @@ for ax in [ax1, ax2]:
 
 # Save figure
 fig.set_size_inches(6.3, 1.6)
-plt.savefig('../../figures/human_llm_comparison_barplot.pdf', dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+plt.savefig('../figures/human_llm_comparison_barplot.pdf', dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
 plt.show()
 
 #%% big correlation plot
@@ -489,7 +489,7 @@ for item in llm_data[model][ds]:
         })
 
 plot_df = pd.DataFrame(plot_df)
-plot_df.to_csv(f"../../figures/{model}_{ds}_{task}_scores.csv", index=False)
+plot_df.to_csv(f"../figures/{model}_{ds}_{task}_scores.csv", index=False)
 
 
 plt.scatter(plot_df["score_llm"], plot_df["score_human"],  alpha=0.5)

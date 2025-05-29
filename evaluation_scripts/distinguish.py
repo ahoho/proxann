@@ -18,14 +18,14 @@ def read_json(fpath):
 
 #%% Load the evaluation data and human responses
 data_jsons = [
-    "../../data/json_out/config_pilot_wiki.json",
-    "../../data/json_out/config_pilot_wiki_part2.json",
-    "../../data/json_out/config_bills_part1.json",
-    "../../data/json_out/config_bills_part2.json",
+    "../data/json_out/config_pilot_wiki.json",
+    "../data/json_out/config_pilot_wiki_part2.json",
+    "../data/json_out/config_bills_part1.json",
+    "../data/json_out/config_bills_part2.json",
 ]
 response_csvs = [
-    "../../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
-    "../../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv",
+    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
+    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv",
 ]
 start_date = "2024-12-06 09:00:00"
 
@@ -42,26 +42,26 @@ corr_ids = [x["id"] for x in corr_data]
 #%% Load the model output data
 llm_data_paths = {
     "gpt4o": [
-        "../../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-mini-2024-07-18_20241213_102655",
-        "../../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-mini-2024-07-18_20241213_141345",
+        "../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-mini-2024-07-18_20241213_102655",
+        "../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_gpt-4o-mini-2024-07-18_20241213_141345",
     ],
     # "gpt4o-t0.7-0": [
-    #     "../../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_temp0.7_seed678_gpt-4o-2024-08-06_20250130_151207",
+    #     "../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_temp0.7_seed678_gpt-4o-2024-08-06_20250130_151207",
     # ],
     # "gpt4o-t0.7-1": [
-    #     "../../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_temp0.7_seed801_gpt-4o-2024-08-06_20250130_141958",
+    #     "../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_temp0.7_seed801_gpt-4o-2024-08-06_20250130_141958",
     # ],
     "llama3.1": [
-        "../../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_102533",
-        "../../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_133218",
+        "../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_102533",
+        "../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.1:8b-instruct-q8_0_20241213_133218",
     ],
     "llama3.1-70b": [
-        "../../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_llama3.3:70b_20250126_094116",
-        "../../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.3:70b_20250126_095221",
+        "../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_llama3.3:70b_20250126_094116",
+        "../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_llama3.3:70b_20250126_095221",
     ],
     "qwen-32b": [
-        "../../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_qwen:32b_20250126_223602",
-        "../../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_qwen:32b_20250126_223609",
+        "../data/llm_out/wiki/q1_then_q3_dspy,q1_then_q2_dspy_qwen:32b_20250126_223602",
+        "../data/llm_out/bills/q1_then_q3_dspy,q1_then_q2_dspy_qwen:32b_20250126_223609",
     ],
 }
 llm_fits, llm_ranks = {}, {}
@@ -471,7 +471,7 @@ plot_data = to_plot_df(permutation_test_results["gpt4o"], metric, dataset)
 fig = create_forest_plot(plot_data, figsize=(6.29, 2.75), metric_name="Rank Tau")
 
 # Save the figure
-fig.savefig(f"../../figures/forest_plot_{metric}_{dataset}.pdf", dpi=300, bbox_inches='tight')
+fig.savefig(f"../figures/forest_plot_{metric}_{dataset}.pdf", dpi=300, bbox_inches='tight')
 
 # %% small table of results
 perm_results = pd.concat([data.assign(llm=llm) for llm, data in permutation_test_results.items()])

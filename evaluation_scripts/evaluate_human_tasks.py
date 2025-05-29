@@ -12,7 +12,7 @@ from scipy.stats import kendalltau
 
 from irrCAC.raw import CAC
 
-sys.path.append("../../src/llm_eval")
+sys.path.append("../src/llm_eval")
 from utils import (
     process_responses,
     collect_fit_rank_data,
@@ -48,14 +48,14 @@ def read_json(fpath):
 
 #%% Load the evaluation data and human responses
 data_jsons = [
-    "../../data/json_out/config_pilot_wiki.json",
-    "../../data/json_out/config_pilot_wiki_part2.json",
-    "../../data/json_out/config_bills_part1.json",
-    "../../data/json_out/config_bills_part2.json",
+    "../data/json_out/config_pilot_wiki.json",
+    "../data/json_out/config_pilot_wiki_part2.json",
+    "../data/json_out/config_bills_part1.json",
+    "../data/json_out/config_bills_part2.json",
 ]
 response_csvs = [
-    "../../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
-    "../../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv",
+    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
+    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv",
 ]
 start_date = "2024-12-06 09:00:00"
 
@@ -145,7 +145,7 @@ for ds in ["wiki", "bills"]:
         )
     )
     # remove margins
-    corr_plot_faceted.save(f"../../figures/correlation_boxplot_{ds}.pdf", dpi=300, width=6.2, height=3.5, bbox_inches='tight')
+    corr_plot_faceted.save(f"../figures/correlation_boxplot_{ds}.pdf", dpi=300, width=6.2, height=3.5, bbox_inches='tight')
 
     # Make single-column version for length reasons, 
     for task in ["fit", "rank"]:
@@ -172,7 +172,7 @@ for ds in ["wiki", "bills"]:
             )
         )
         corr_plot_single_row
-        corr_plot_single_row.save(f"../../figures/correlation_boxplot_single_row_{ds}_{task}.pdf", dpi=300, width=3.1, height=1.8, bbox_inches='tight')
+        corr_plot_single_row.save(f"../figures/correlation_boxplot_single_row_{ds}_{task}.pdf", dpi=300, width=3.1, height=1.8, bbox_inches='tight')
 
     # make the topic ids categorical
     corr_plot_data = corr_plot_data.loc[corr_plot_data.coefficient.str.contains("Tau")]
@@ -208,4 +208,4 @@ for ds in ["wiki", "bills"]:
             axis_text_x=element_blank(),
         )
     )
-    corr_plot_faceted_by_topic.save(f"../../figures/correlation_boxplot_by_topic_{ds}.pdf", dpi=300, width=6.2, height=1.8, bbox_inches='tight')
+    corr_plot_faceted_by_topic.save(f"../figures/correlation_boxplot_by_topic_{ds}.pdf", dpi=300, width=6.2, height=1.8, bbox_inches='tight')

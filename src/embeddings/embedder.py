@@ -9,35 +9,27 @@ import torch
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
-from src.utils.utils import split_into_chunks
+from src.utils.utils import init_logger, split_into_chunks
 
 
 class Embedder(object):
     def __init__(
         self,
         batch_size: int = 128,
-        sbert_model: str = "multi-qa-mpnet-base-dot-v1",
+        sbert_model: str = "all-MiniLM-L6-v2",
         aggregate_embeddings: bool = False,
         use_gpu: bool = True,
-        logger: logging.Logger = None
+        logger: logging.Logger = None,
+        config_path: pathlib.Path = pathlib.Path("config/config.conf")
     ) -> None:
 
-        if logger:
-            self._logger = logger
-        else:
-            self._logger = logging.getLogger(__name__)
-            self._logger.setLevel(logging.INFO)
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            self._logger.addHandler(handler)
+        self._logger = logger if logger else init_logger(config_path, __name__)
 
         self._batch_size_embeddings = batch_size
         self._sbert_model = sbert_model
         self._aggregate_embeddings = aggregate_embeddings
         self._use_gpu = use_gpu
-        
+
     def calculate_embeddings(
         self,
         df: pd.DataFrame,
@@ -58,7 +50,7 @@ class Embedder(object):
             Dataframe with embeddings added.
         """
 
-        self._logger.info(f"-- -- Embeddings calculation starts...")
+        self._logger.info(f"Embeddings calculation starts...")
         start_time = time.time()
 
         device = 'cuda' if self._use_gpu and torch.cuda.is_available() else 'cpu'
@@ -66,7 +58,7 @@ class Embedder(object):
         model = SentenceTransformer(
             self._sbert_model,
             device=device)
-        
+
         def get_embedding(text):
             """Get embeddings for a text using SentenceTransformer.
             """
@@ -78,17 +70,17 @@ class Embedder(object):
 
         def encode_text(text):
             """Encode text into embeddings using SentenceTransformer. If the text is too long for the model and self._aggregate_embeddings is set to True, it will be split into chunks and the embeddings will be averaged. Otherwise, the embeddings will be calculated only for the part of the text that fits the model's maximum sequence length."""
-            
+
             if self._aggregate_embeddings:
                 if len(text) > model.get_max_seq_length():
                     # Split the text into chunks
                     text_chunks = split_into_chunks(
                         text, model.get_max_seq_length())
                     self._logger.info(
-                        f"-- -- {len(text_chunks)} chunks created. Embeddings calculation starts...")
+                        f"{len(text_chunks)} chunks created. Embeddings calculation starts...")
                 else:
                     self._logger.info(
-                        f"-- -- Chunking was not necessary. Embeddings calculation starts ...")
+                        f"Chunking was not necessary. Embeddings calculation starts ...")
                     text_chunks = [text]
             else:
                 text_chunks = [text]
@@ -97,7 +89,7 @@ class Embedder(object):
             for i, chunk in tqdm(enumerate(text_chunks)):
                 embedding = get_embedding(chunk)
                 embeddings.append(embedding)
-            
+
             if len(embeddings) > 1:
                 embeddings = np.mean(embeddings, axis=0)
             else:
@@ -110,13 +102,21 @@ class Embedder(object):
         df["embeddings"] = df[col_calculate_on].apply(encode_text)
 
         self._logger.info(
-            f"-- -- Embeddings extraction finished in {(time.time() - start_time)} seconds")
+            f"Embeddings extraction finished in {(time.time() - start_time)} seconds")
 
         return df
 
-def main():
 
+def main():
     argparser = argparse.ArgumentParser()
+
+    argparser.add_argument(
+        "--config_path",
+        help="Path to the configuration file.",
+        type=str,
+        default="config/config.conf",
+        required=False
+    )
     argparser.add_argument(
         "--source_file",
         help="Path to the source file containing the data to be processed. The file should be in JSON format.",
@@ -142,7 +142,7 @@ def main():
         "--sbert_model",
         help="SentenceTransformer model to use.",
         type=str,
-        default="multi-qa-mpnet-base-dot-v1",# all-MiniLM-L6-v2 is the default of bertopic
+        default="all-MiniLM-L6-v2",
         required=False
     )
     argparser.add_argument(
@@ -162,36 +162,42 @@ def main():
 
     args = argparser.parse_args()
 
-    # Read data
+    # Initialize the logger
+    logger = init_logger(args.config_path, Embedder.__name__)
+
+    # Log data loading information
+    logger.info(f"Reading data from {args.source_file}...")
+
     df = pd.read_json(args.source_file, lines=True)
+    logger.info(f"Data shape: {df.shape}.")
+    logger.info(f"Sample data: {df.head()}.")
 
-    print(f"-- -- Data read from {args.source_file}.")
-    print(f"-- -- Data shape: {df.shape}.")
-    print(f"-- -- Sample data: {df.head()}.")
-
-    print(f"-- --  Embedding calculation starts... ")
+    logger.info("Embedding calculation starts...")
     start_time = time.time()
 
-    # Create an instance of the class
+    # Create an instance of the Embedder class
     emb_calculator = Embedder(
         batch_size=args.batch_size,
         sbert_model=args.sbert_model,
-        aggregate_embeddings=False,
+        aggregate_embeddings=args.aggregate_embeddings,
+        logger=logger
     )
 
     # Calculate the embeddings
     df_with_embeddings = emb_calculator.calculate_embeddings(
         df,
-        col_calculate_on=args.calculate_on)
+        col_calculate_on=args.calculate_on
+    )
 
-    end_time = time.time() - start_time
-    print(f"-- -- Embedding calculation finished in {end_time}")
+    elapsed_time = time.time() - start_time
+    logger.info(
+        f"Embedding calculation finished in {elapsed_time} seconds.")
 
     # Save the dataframe with embeddings
-    path_save = pathlib.Path(args.output_file).parent / (pathlib.Path(args.output_file).name + f".{args.sbert_model}.parquet")
-    df_with_embeddings.to_parquet(path_save, index=False)
-
-    print(f"-- -- Data with embeddings saved to {args.output_file}.")
+    output_path = pathlib.Path(args.output_file).with_suffix(
+        f".{args.sbert_model}.parquet")
+    df_with_embeddings.to_parquet(output_path, index=False)
+    logger.info(f"Data with embeddings saved to {output_path}.")
 
 
 if __name__ == "__main__":

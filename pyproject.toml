@@ -1,0 +1,41 @@
+[project]
+name = "theta-evaluation"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Alexander Hoyle & Lorena Calvo-Bartolomé"}
+]
+license = {text = "MIT License"}
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "bertopic (==0.16.4)",
+    "boto3 (==1.35.97)",
+    "choix (==0.3.6)",
+    "dspy (==2.5.43)",
+    "flask (==3.1.0)",
+    "gensim (==4.3.3)",
+    "hdbscan (==0.8.40)",
+    "irrcac (==0.4.4)",
+    "joblib (==1.4.2)",
+    "kneed (==0.8.5)",
+    "matplotlib (==3.10.0)",
+    "networkx (==3.4.2)",
+    "ollama (==0.4.5)",
+    "openai (==1.59.6)",
+    "pandas (==2.2.3)",
+    "python-dotenv (==1.0.1)",
+    "pyyaml (==6.0.2)",
+    "requests (==2.32.3)",
+    "scikit-learn (==1.6.1)",
+    "sentence-transformers (==3.3.1)",
+    "tomotopy (==0.13.0)",
+    "torch (==2.5.1)",
+    "tqdm (==4.67.1)",
+    "pot (==0.9.5)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

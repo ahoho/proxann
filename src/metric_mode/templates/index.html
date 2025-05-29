@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ProxAnn</title>
+  <link rel="icon" type="image/png" href="/static/logo.png" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    .btn-lg {
+      font-size: 1.5rem;
+      padding: 0.5rem 1rem;
+    }
+
+    .fade-transition {
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+
+    .fade-hidden {
+      opacity: 0;
+      pointer-events: none;
+      position: absolute;
+      width: 100%;
+    }
+
+    #results {
+      width: 100%;
+      border-collapse: collapse;
+      overflow-x: auto;
+    }
+
+    #results th, #results td {
+      text-align: center;
+      padding: 10px;
+      border: 1px solid #dee2e6;
+    }
+
+    #results th {
+      background-color: #f8f9fa;
+      font-weight: bold;
+    }
+
+    .table-striped tbody tr:nth-of-type(odd) {
+      background-color: #f2f2f2;
+    }
+
+    #toast-success {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 1050;
+    }
+
+    #help-tooltip {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      opacity: 0;
+      transform: translateY(0);
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background-color: white;
+      padding: 0.75rem;
+      border: 1px solid #dee2e6;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      width: 250px;
+      max-width: 90vw;
+      z-index: 1051;
+      pointer-events: none;
+      white-space: normal;
+    }
+    #help-tooltip.show {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .help-button {
+      background-color: #17a2b8;
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      font-size: 1.2rem;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .help-button:hover {
+      background-color: #138496;
+    }
+
+    .help-container {
+      position: relative;
+      display: flex;
+      justify-content: flex-end;
+      margin-top: -2.5rem;
+      margin-bottom: 1rem;
+      z-index: 1050;
+    }
+
+    @media (max-width: 576px) {
+      h2 {
+        font-size: 1.5rem;
+      }
+
+      .btn-lg {
+        font-size: 1.2rem;
+        padding: 0.4rem 0.8rem;
+      }
+
+      #step-1-section, #step-2-section {
+        padding: 1rem !important;
+      }
+
+      .form-label,
+      .form-check-label {
+        font-size: 0.9rem;
+      }
+
+      .toast {
+        width: 100%;
+        max-width: 100%;
+      }
+
+      .help-button {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+      }
+
+      #help-tooltip {
+        width: 100%;
+        max-width: none;
+        right: auto;
+        left: 0;
+      }
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <div class="container mt-5 position-relative" style="min-height: 600px;">
+    <!-- Logo -->
+    <div class="d-flex justify-content-center mb-4">
+      <img src="/static/logo.png" alt="Logo" class="img-fluid" style="max-height: 100px; max-width: 100%; height: auto;" />
+    </div>
+
+    <!-- Header -->
+    <div class="text-center mb-4">
+      <h2 class="text-dark">Welcome to ProxAnn</h2>
+      <p class="text-muted">
+        This deployment is a demo of ProxAnn and supports evaluation using OpenAI models only.
+        To get started, upload your trained topic model files and set up the topics to evaluate.
+        You will later be asked to configure the prompting parameters and modes, and to provide a valid OpenAI API key.
+        <strong>Your API key is never stored or logged — it is used only temporarily during this evaluation.</strong>
+        If you prefer to use open-source models, you can run them locally with the
+        <a href="https://github.com/ahoho/theta-evaluation/tree/main">ProxAnn package</a>.
+      </p>
+    </div>
+
+    <!-- Step 1 -->
+  <div id="step-1-section" class="card shadow-sm p-4 mb-4 fade-transition">
+    <div class="d-flex justify-content-between align-items-start mb-2">
+      <h4 class="mb-0 fw-semibold text-dark">Step 1: Upload Your Model Files</h4>
+      <div class="position-relative" style="flex-shrink: 0;">
+        <button class="btn btn-info btn-sm rounded-circle" id="help-btn" style="width: 32px; height: 32px; padding: 0; font-weight: bold;">?</button>
+        <div id="help-tooltip" class="position-absolute">
+          <p class="mb-2">Download example files to see the required format.</p>
+          <a href="https://drive.google.com/drive/folders/14HeJKQH4eQktNP6Psf8g7qElkP7nX6xS?usp=sharing" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener noreferrer">Download</a>
+        </div>
+      </div>
+    </div>
+    <hr class="mt-1 mb-3" />
+    <p class="text-muted">
+      Upload your trained topic model files along with a corpus file.
+      If your model was trained using ProxAnn, simply upload the <code>.tar.gz</code> archive.
+      Otherwise, upload the <strong>Thetas</strong>, <strong>Betas</strong>, and <strong>Vocabulary files</strong> separately.
+    </p>
+    <p class="text-muted">
+      Additionally, you must specify the <strong>Text Column</strong> parameter, which indicates
+      the name of the column in your corpus that contains the text on which the model was trained (before preprocessing).
+    </p>
+
+    <form action="/upload" method="post" enctype="multipart/form-data" class="mt-3" onsubmit="showUploadProgress(event)">
+      <div class="mb-3">
+        <label class="form-label" for="corpus" data-bs-toggle="tooltip" title="Corpus file that was used to train the topic model. Accepted formats: .parquet, .jsonl, or .json. The file must include at least one column containing the raw, unprocessed text.">Corpus File</label>
+        <input class="form-control" type="file" name="corpus" id="corpus" required />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="text_column_disp" data-bs-toggle="tooltip" title="Name of the column in the corpus that contains the raw text used for training.">Text Column</label>
+        <input type="text" class="form-control" id="text_column_disp" name="text_column_disp" placeholder="text" required />
+      </div>
+
+      <div class="form-check mb-3">
+        <input type="checkbox" class="form-check-input" id="trained_with_thetas_eval" name="trained_with_thetas_eval" onchange="toggleFileRequirements()" checked />
+        <label class="form-check-label" for="trained_with_thetas_eval" data-bs-toggle="tooltip" title="Check this if your model was trained with ProxAnn and saved as a .tar.gz archive.">Trained with ProxAnn</label>
+      </div>
+
+      <div id="proxannFields" class="mb-3">
+        <label class="form-label" for="model" data-bs-toggle="tooltip" title="Compressed archive (.tar.gz or .zip) of the ProxAnn-trained model.">Model File (if trained with ProxAnn)</label>
+        <input class="form-control" type="file" name="model" id="model" />
+      </div>
+
+      <div id="externalFields">
+        <hr />
+        <p>If your model was trained separately, upload these additional files:</p>
+
+        <div class="mb-3">
+          <label class="form-label" for="thetas" data-bs-toggle="tooltip" title="Thetas matrix: document-topic distribution. Required if not using ProxAnn. Accepted formats: .npz, .npy.">Thetas File</label>
+          <input class="form-control" type="file" name="thetas" id="thetas" />
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="betas" data-bs-toggle="tooltip" title="Betas matrix: topic-word distribution. Must match model vocabulary. Accepted formats: .npy.">Betas File</label>
+          <input class="form-control" type="file" name="betas" id="betas" />
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="vocab" data-bs-toggle="tooltip" title="JSON file with vocabulary used during training (word index mapping). Accepted formats: .json.">Vocabulary File</label>
+          <input class="form-control" type="file" name="vocab" id="vocab" />
+        </div>
+      </div>
+
+      <!-- Spinner + Upload + Download -->
+      <div class="d-flex align-items-center justify-content-between mt-3">
+        <div id="upload-indicator" class="d-none text-primary d-flex align-items-center">
+          <div class="spinner-border me-2" role="status"></div>
+          <span>Uploading... please wait</span>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm" id="upload-btn">Upload</button>
+          <a href="{{ url_for('download_config') }}" class="btn btn-success btn-sm" id="download-config" style="display: none;">Download Config File</a>
+        </div>
+      </div>
+    </form>
+
+    <!-- Next button -->
+    <div class="d-flex justify-content-end mt-3">
+      <button id="next-step-btn" class="btn btn-outline-secondary btn-sm" onclick="goToStep2()" style="display: none;">
+        Next →
+      </button>
+    </div>
+    
+  </div>
+
+    <!-- Step 2 -->
+    <div id="step-2-section" class="card shadow-sm p-4 fade-transition fade-hidden">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4 class="fw-semibold text-dark">Step 2: Run Evaluation</h4>
+        <button class="btn btn-outline-secondary btn-sm" onclick="goToStep1()">← Back</button>
+      </div>
+      <hr class="mt-1 mb-3" />
+
+      <!-- Evaluation form -->
+      <form id="evaluation-form" class="mb-4">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="llm_model" class="form-label">LLM Model (GPT only)</label>
+            <select class="form-select" id="llm_model" name="llm_model" required>
+              <option value="gpt-4o-mini-2024-07-18">gpt-4o-mini-2024-07-18</option>
+              <option value="gpt-4o-2024-08-06">gpt-4o-2024-08-06</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label for="q1_temp" class="form-label">Q1 Temp</label>
+            <input type="number" class="form-control" step="0.01" id="q1_temp" name="q1_temp" value="1.0" required>
+          </div>
+          <div class="col-md-2">
+            <label for="q2_temp" class="form-label">Q2 Temp</label>
+            <input type="number" class="form-control" step="0.01" id="q2_temp" name="q2_temp" value="0.0" required>
+          </div>
+          <div class="col-md-2">
+            <label for="q3_temp" class="form-label">Q3 Temp</label>
+            <input type="number" class="form-control" step="0.01" id="q3_temp" name="q3_temp" value="0.0" required>
+          </div>
+          <div class="col-md-2">
+            <label for="custom_seed" class="form-label">Seed</label>
+            <input type="number" class="form-control" id="custom_seed" name="custom_seed" value="1234" required>
+          </div>
+
+          <!-- NEW FIELD: Topics to evaluate -->
+          <div class="col-md-6">
+            <label for="topics_to_evaluate" class="form-label">Topics to Evaluate</label>
+            <input
+              type="text"
+              class="form-control"
+              id="topics_to_evaluate"
+              name="topics_to_evaluate"
+              placeholder="e.g. 0, 2, 5 — leave blank to evaluate all"
+            />
+          </div>
+
+          <div class="col-md-6">
+            <label for="openai_key" class="form-label">OpenAI API Key</label>
+            <input type="password" class="form-control" id="openai_key" name="openai_key" placeholder="sk-..." required>
+            <div class="alert alert-warning mt-2" role="alert">
+              <strong>Privacy Notice:</strong> Your key is never stored. It is only used for this evaluation.
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <label for="q1_q3_prompt_mode" class="form-label">Q1 → Q3 Prompt Mode</label>
+            <select class="form-select" id="q1_q3_prompt_mode" name="q1_q3_prompt_mode" required>
+              <option value="q1_then_q3_dspy" selected>q1_then_q3_dspy</option>
+              <option value="q1_then_q3_mean">q1_then_q3_mean</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label for="q1_q2_prompt_mode" class="form-label">Q1 → Q2 Prompt Mode</label>
+            <select class="form-select" id="q1_q2_prompt_mode" name="q1_q2_prompt_mode" required>
+              <option value="q1_then_q2_dspy" selected>q1_then_q2_dspy</option>
+              <option value="q1_then_q2_mean">q1_then_q2_mean</option>
+            </select>
+          </div>
+
+          <div class="col-md-12 d-flex align-items-center">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="do_both_ways" name="do_both_ways">
+              <label class="form-check-label" for="do_both_ways">Do both directions</label>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <!-- Evaluation button -->
+      <div class="d-flex justify-content-end mt-3">
+        <button id="start-eval-btn" onclick="startEvaluation()" class="btn btn-warning btn-sm">
+          Start Evaluation
+        </button>
+      </div>
+
+      <!-- Spinner -->
+      <div id="evaluation-indicator" class="mt-3 d-none">
+        <div class="spinner-border text-info me-2" role="status"></div>
+        <span class="text-info">Evaluating... please wait</span>
+      </div>
+
+      <!-- Output -->
+      <div id="results" class="mt-4"></div>
+    </div>
+
+
+  <!-- Toasts -->
+  <div class="position-fixed top-0 end-0 p-3" style="z-index: 1055">
+    <!-- Upload Toast -->
+    <div class="toast align-items-center text-bg-success border-0" id="toast-upload-success" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          ✅ Files uploaded successfully! You can now proceed with evaluation.
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  
+    <!-- Evaluation Toast -->
+    <div class="toast align-items-center text-bg-success border-0" id="toast-success" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          ✅ Evaluation completed successfully.
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Main Script -->
+  <script>
+    function toggleFileRequirements() {
+      const trainedWithThetas = document.getElementById("trained_with_thetas_eval").checked;
+      const proxannFields = document.getElementById("proxannFields");
+      const externalFields = document.getElementById("externalFields");
+    
+      proxannFields.style.display = trainedWithThetas ? "block" : "none";
+      externalFields.style.display = trainedWithThetas ? "none" : "block";
+    
+      document.getElementById("thetas").required = !trainedWithThetas;
+      document.getElementById("betas").required = !trainedWithThetas;
+      document.getElementById("vocab").required = !trainedWithThetas;
+    
+      const scrollTarget = trainedWithThetas
+        ? document.getElementById("model")
+        : document.getElementById("thetas");
+    
+      if (scrollTarget) {
+        setTimeout(() => {
+          scrollTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 100); // permite aplicar estilos antes de desplazar
+      }
+    }    
+
+    function showUploadProgress(event) {
+      event.preventDefault();
+      document.getElementById("upload-indicator").classList.remove("d-none");
+    
+      const uploadBtn = document.getElementById("upload-btn");
+      uploadBtn.disabled = true;
+    
+      const form = event.target;
+      const formData = new FormData(form);
+    
+      fetch("/upload", {
+        method: "POST",
+        body: formData
+      })
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById("upload-indicator").classList.add("d-none");
+          uploadBtn.disabled = false;
+    
+          if (data.error) {
+            alert(data.error);
+          } else {
+            const toastUpload = new bootstrap.Toast(document.getElementById("toast-upload-success"));
+            toastUpload.show();
+    
+            document.getElementById("download-config").style.display = "inline-block";
+            document.getElementById("download-config").href = data.config_url;
+            document.getElementById("next-step-btn").style.display = "inline-block";
+          }
+        })
+        .catch(error => {
+          document.getElementById("upload-indicator").classList.add("d-none");
+          uploadBtn.disabled = false;
+          console.error("Error:", error);
+        });
+    }    
+
+    function goToStep2() {
+      document.getElementById("step-1-section").classList.add("fade-hidden");
+      setTimeout(() => {
+        document.getElementById("step-2-section").classList.remove("fade-hidden");
+      }, 300);
+    }
+
+    function goToStep1() {
+      document.getElementById("step-2-section").classList.add("fade-hidden");
+      setTimeout(() => {
+        document.getElementById("step-1-section").classList.remove("fade-hidden");
+      }, 300);
+    }
+
+    function startEvaluation() {
+      const startBtn = document.getElementById("start-eval-btn");
+      const indicator = document.getElementById("evaluation-indicator");
+      const form = document.getElementById("evaluation-form");
+    
+      startBtn.disabled = true;
+      indicator.classList.remove("d-none");
+      document.getElementById("results").innerHTML = "";
+    
+      const formData = new FormData(form);
+    
+      fetch("/evaluate", {
+        method: "POST",
+        body: formData
+      })
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById("results").innerHTML = data.table;
+          const toast = new bootstrap.Toast(document.getElementById("toast-success"));
+          toast.show();
+        })
+        .catch(error => {
+          console.error("Error:", error);
+          document.getElementById("results").innerHTML = "<div class='alert alert-danger'>Evaluation failed.</div>";
+        })
+        .finally(() => {
+          startBtn.disabled = false;
+          indicator.classList.add("d-none");
+        });
+    }
+  
+    document.getElementById("help-btn").addEventListener("mouseenter", function () {
+      document.getElementById("help-tooltip").style.display = "block";
+    });
+    document.getElementById("help-tooltip").addEventListener("mouseleave", function () {
+      document.getElementById("help-tooltip").style.display = "none";
+    });
+    document.getElementById("help-btn").addEventListener("mouseleave", function () {
+      setTimeout(() => {
+        if (!document.getElementById("help-tooltip").matches(":hover")) {
+          document.getElementById("help-tooltip").style.display = "none";
+        }
+      }, 300);
+    });
+    document.getElementById("q1_q3_prompt_mode").addEventListener("change", function () {
+      const mode = this.value;
+      const checkbox = document.getElementById("do_both_ways");
+    
+      if (mode === "q1_then_q3_mean") {
+        checkbox.checked = true;
+        checkbox.disabled = true;
+      } else {
+        checkbox.disabled = false;
+      }
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+      tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl)
+      });
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+      const helpBtn = document.getElementById("help-btn");
+      const helpTooltip = document.getElementById("help-tooltip");
+  
+      helpBtn.addEventListener("click", function (event) {
+        event.stopPropagation();
+        helpTooltip.classList.toggle("show");
+      });
+  
+      document.addEventListener("click", function (event) {
+        if (!helpTooltip.contains(event.target)) {
+        helpTooltip.classList.remove("show");
+      }
+      });
+    });
+    
+    window.addEventListener("DOMContentLoaded", toggleFileRequirements);
+  </script>
+</body>
+</html>

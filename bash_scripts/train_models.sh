@@ -1,26 +1,39 @@
 #!/bin/bash
 
+CONFIG_FILE="/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/config/config.yaml"
 TRAINER_TYPE="BERTopic"
 NUM_TOPICS=50
-SCRIPT="python3 main.py train_tm"
+SCRIPT="python3 src/train/tm_trainer.py"
 
-declare -A DATASETS
-DATASETS["bills"]="/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/training_data/bills"
-DATASETS["wikitext"]="/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/training_data/wikitext"
+cd "$(dirname "$0")/.."
 
-MODEL_BASE_PATH="/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/models/final_models/model-runs"
+export PYTHONPATH=$(pwd)
+
+DATASETS=(
+    "bills:data/training_data/bills"
+    #"wikitext:/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/training_data/wikitext"
+)
+
+MODEL_BASE_PATH="data/tests_bertopic"
 VOCAB_FILE="vocab.json"
 EMBEDDINGS_SUFFIX="train.metadata.embeddings.jsonl.all-MiniLM-L6-v2.parquet"
 
-echo "${!DATASETS[@]}"
+# Iterate through the array
+for DATASET_ENTRY in "${DATASETS[@]}"; do
+    # Split the dataset entry into name and path
+    IFS=':' read -r DATASET DATASET_PATH <<< "$DATASET_ENTRY"
+    
+    # Construct paths
+    CORPUS_FILE="${DATASET_PATH}/${EMBEDDINGS_SUFFIX}"
+    MODEL_PATH="${MODEL_BASE_PATH}/${DATASET}-labeled/vocab_15k/k-${NUM_TOPICS}/new_tests_bertopic"
+    VOCAB_PATH="${DATASET_PATH}/${VOCAB_FILE}"
 
-for DATASET in "${!DATASETS[@]}"; do
-    CORPUS_FILE="${DATASETS[$DATASET]}/${EMBEDDINGS_SUFFIX}"
-    MODEL_PATH="${MODEL_BASE_PATH}/${DATASET}-labeled/vocab_15k/k-${NUM_TOPICS}/bertopic"
-    VOCAB_PATH="${DATASETS[$DATASET]}/${VOCAB_FILE}"
-
+    # Output current processing dataset
     echo "Training model for dataset: $DATASET"
+
+    # Run the training script
     $SCRIPT \
+        --config_path "$CONFIG_FILE" \
         --corpus_file "$CORPUS_FILE" \
         --model_path "$MODEL_PATH" \
         --vocab_path "$VOCAB_PATH" \

@@ -122,6 +122,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.venv_hator
 env/
 venv/
 ENV/
@@ -164,7 +165,7 @@ cython_debug/
 src/train/Mallet-202108
 data/models
 data/logs
-data/json_out
+data/json_out/arr_dec
 *parquet
 *jsonl
 data/results
@@ -172,7 +173,7 @@ data/results
 src/analysis/topic-model-data
 data/human_annotations
 data/document-data
-src/llm_eval/.venv
+src/proxann/.venv
 data/modelFiles
 data/files_pilot/document-data
 cache
@@ -189,3 +190,30 @@ _from_lorena
 data/llm_out
 camera_ready_llm_out
 *.zip
+.vscode/settings.json
+notebooks/testing
+_under_development
+data/llm_out_tests_new
+data/json_out_
+data/dspy-saved
+data/cohrs
+data/tests
+data/top_docs
+data/llm_out/tests
+figures/repo/_tests
+notebooks/tests
+data/arr_dec_responses
+data/llm_out
+data/json_out/tests
+test.json
+src/metric_mode/uploads
+src/metric_mode/configs
+data/files_pilot/cluster_rank_counts.json
+data/several_runs
+data/data_used_in_paper
+*.tar.gz
+data/several_runs_10_03_25.tar.gz
+.env_uc3m
+data/paper_wang
+data/checking_agreement
+data/vllm

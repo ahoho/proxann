@@ -1,0 +1,16 @@
+Please act as an impartial judge and determine which of the two documents (A or B) is more closely related to the given CATEGORY. The CATEGORY was created based on a group of keywords and exemplar documents that reflect its core themes. Use these as guides to understand what fits the CATEGORY. Avoid any positional bias, and ensure that the order in which the documents are presented does not influence your decision. Output your verdict strictly using this format: 'A' if DOCUMENT_A is more closely related to the CATEGORY, or 'B' if DOCUMENT_B is more closely related.
+
+[[ ## CATEGORY ## ]]
+{category}
+
+[[ ## KEYWORDS ## ]]
+{keywords}
+
+[[ ## EXEMPLAR_DOCS ## ]]
+{exemplar_docs}
+
+[[ ## DOCUMENT_A ## ]]
+{doc_a}
+
+[[ ## DOCUMENT_B ## ]]
+{doc_a}

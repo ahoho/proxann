@@ -186,3 +186,6 @@ data/files_pilot/user_pairs_rank_tr_data.json
 .vscode
 replication_yms
 _from_lorena
+data/llm_out
+camera_ready_llm_out
+*.zip

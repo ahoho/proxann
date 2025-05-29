@@ -578,7 +578,8 @@ def compute_correlations_one(
     rank_llm_data=None,
     fit_llm_data=None,
     aggregation_method="mean",
-    fit_threshold=4,
+    fit_threshold_user=4,
+    fit_threshold_llm=1,
     rescale_ndcg=True,
 ):
     """Compute correlation coefficients for fit and rank data: average rank per question/document over annotators, then correlate those with the topic model probabilities (thetas).
@@ -655,8 +656,8 @@ def compute_correlations_one(
         rank_ndcg = ndcg_score_([mean_rank_data], [prob_data])
         
         # Calculate fit agreement
-        # binarized_fit_data = (fit_data >= fit_threshold).astype(int) # alternative to _mv
-        binarized_fit_mv = (np.round(np.mean(fit_data, axis=0)) >= fit_threshold).astype(int)
+        # binarized_fit_data = (fit_data >= fit_threshold_user).astype(int) # alternative to _mv
+        binarized_fit_mv = (np.round(np.mean(fit_data, axis=0)) >= fit_threshold_user).astype(int)
 
         fit_agree = np.mean(binarized_fit_mv == assign_data)
         
@@ -682,12 +683,12 @@ def compute_correlations_one(
         if f_llm is not None:
             
             for a, f_llm_a in zip(f_annotators, f_llm):
-
                 # Add annotator-specific results to the dictionary
                 annotator_results[f"fit_tau_users_{a}"] = kendalltau(mean_fit_data, f_llm_a)[0]
                 annotator_results[f"fit_tau_tm_{a}"] = kendalltau(prob_data, f_llm_a)[0]
-                annotator_results[f"fit_agree_users_{a}"] = np.mean(binarized_fit_mv == f_llm_a)
-                annotator_results[f"fit_agree_tm_{a}"] = np.mean(assign_data == f_llm_a)
+                f_llm_a_bin = (np.array(f_llm_a) >= fit_threshold_llm).astype(int)
+                annotator_results[f"fit_agree_users_{a}"] = np.mean(binarized_fit_mv == f_llm_a_bin)
+                annotator_results[f"fit_agree_tm_{a}"] = np.mean(assign_data == f_llm_a_bin)
 
 
         corr_results.append({

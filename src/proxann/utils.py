@@ -11,11 +11,11 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import networkx as nx
-from scipy.stats import kendalltau, spearmanr
+from scipy.stats import kendalltau, spearmanr, pearsonr
 from sklearn.metrics import ndcg_score
 
 import math
-from src.utils.utils import log_or_print
+from utils.utils import log_or_print
 import requests
 
 def load_template(template_path: str) -> str:
@@ -769,8 +769,8 @@ def compute_correlations_one(
             raise ValueError(f"Unknown aggregation method: {aggregation_method}")
 
         # Compute general correlations
-        fit_rho, _ = spearmanr(mean_fit_data, prob_data)
-        rank_rho, _ = spearmanr(mean_rank_data, prob_data)
+        fit_rho, _ = pearsonr(mean_fit_data, prob_data)
+        rank_rho, _ = pearsonr(mean_rank_data, prob_data)
         fit_tau, _ = kendalltau(mean_fit_data, prob_data)
         rank_tau, _ = kendalltau(mean_rank_data, prob_data)
         fit_ndcg = ndcg_score_([mean_fit_data], [prob_data])
@@ -785,8 +785,8 @@ def compute_correlations_one(
         # LLM correlations if r_llm
         if r_llm is not None:
             for a, r_llm_a in zip(r_annotators, r_llm):
-                rank_rho_users, _ = spearmanr(mean_rank_data, r_llm_a)
-                rank_rho_gt, _ = spearmanr(prob_data, r_llm_a)
+                rank_rho_users, _ = pearsonr(mean_rank_data, r_llm_a)
+                rank_rho_gt, _ = pearsonr(prob_data, r_llm_a)
                 rank_tau_users, _ = kendalltau(mean_rank_data, r_llm_a)
                 rank_tau_gt, _ = kendalltau(prob_data, r_llm_a)
                 rank_ndcg_users = ndcg_score_([mean_rank_data], [r_llm_a])
@@ -805,12 +805,14 @@ def compute_correlations_one(
 
             for a, f_llm_a in zip(f_annotators, f_llm):
                 # Add annotator-specific results to the dictionary
+                annotator_results[f"fit_rho_users_{a}"] = pearsonr(mean_fit_data, f_llm_a)[0]
+                annotator_results[f"fit_rho_tm_{a}"] = pearsonr(prob_data, f_llm_a)[0]
                 annotator_results[f"fit_tau_users_{a}"] = kendalltau(mean_fit_data, f_llm_a)[0]
                 annotator_results[f"fit_tau_tm_{a}"] = kendalltau(prob_data, f_llm_a)[0]
+
                 f_llm_a_bin = (np.array(f_llm_a) >= fit_threshold_llm).astype(int)
                 annotator_results[f"fit_agree_users_{a}"] = np.mean(binarized_fit_mv == f_llm_a_bin)
                 annotator_results[f"fit_agree_tm_{a}"] = np.mean(assign_data == f_llm_a_bin)
-
 
         corr_results.append({
             "id": d_us["id"],
@@ -884,8 +886,8 @@ def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=N
         for i in range(len(group)):  #  for each of the human annotators
 
             # compute the correlations
-            fit_rho, _ = spearmanr(fit_data[i], prob_data)
-            rank_rho, _ = spearmanr(rank_data[i], prob_data)
+            fit_rho, _ = pearsonr(fit_data[i], prob_data)
+            rank_rho, _ = pearsonr(rank_data[i], prob_data)
 
             fit_tau, _ = kendalltau(fit_data[i], prob_data)
             rank_tau, _ = kendalltau(rank_data[i], prob_data)
@@ -901,8 +903,8 @@ def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=N
             other_mean_rank_data = np.mean(
                 np.delete(rank_data, i, axis=0), axis=0)
 
-            fit_ia_rho, _ = spearmanr(fit_data[i], other_mean_fit_data)
-            rank_ia_rho, _ = spearmanr(rank_data[i], other_mean_rank_data)
+            fit_ia_rho, _ = pearsonr(fit_data[i], other_mean_fit_data)
+            rank_ia_rho, _ = pearsonr(rank_data[i], other_mean_rank_data)
 
             fit_ia_tau, _ = kendalltau(fit_data[i], other_mean_fit_data)
             rank_ia_tau, _ = kendalltau(rank_data[i], other_mean_rank_data)

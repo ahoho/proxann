@@ -11,10 +11,10 @@ def read_json(fpath):
         return json.load(infile)
     
 data_jsons = [
-    "../data/json_out/config_pilot_wiki.json",
-    "../data/json_out/config_pilot_wiki_part2.json",
-    "../data/json_out/config_bills_part1.json",
-    "../data/json_out/config_bills_part2.json",
+    "../data/json_out_from_submission/config_pilot_wiki.json",
+    "../data/json_out_from_submission/config_pilot_wiki_part2.json",
+    "../data/json_out_from_submission/config_bills_part1.json",
+    "../data/json_out_from_submission/config_bills_part2.json",
 ]
 response_csvs = [
     "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
@@ -61,7 +61,7 @@ for k in corr_data:
         human_diff = np.abs(human_fit_docs.min() - human_fit_docs.max())
         llm_diff = np.abs(llm_fit_doc - human_fit_docs.mean())
         if human_diff <= agree_th and llm_diff > disagree_th:
-            print(f"human diff: {human_diff:.2f}, llm diff: {llm_diff:.2f}")
+            print(f"{k}, human diff: {human_diff:.2f}, llm diff: {llm_diff:.2f}")
             disagreeable_docs.append({
                 "topic_id": k,
                 "doc_id": eval_doc["doc_id"],
@@ -73,3 +73,4 @@ for k in corr_data:
             })
 
 print(f"Found {len(disagreeable_docs)} disagreeable documents")
+# %%

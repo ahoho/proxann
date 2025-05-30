@@ -13,7 +13,7 @@ from scipy.stats import kendalltau
 from irrCAC.raw import CAC
 
 sys.path.append("../src/llm_eval")
-from utils import (
+from proxann.utils import (
     process_responses,
     collect_fit_rank_data,
     compute_correlations_one,
@@ -48,10 +48,10 @@ def read_json(fpath):
 
 #%% Load the evaluation data and human responses
 data_jsons = [
-    "../data/json_out/config_pilot_wiki.json",
-    "../data/json_out/config_pilot_wiki_part2.json",
-    "../data/json_out/config_bills_part1.json",
-    "../data/json_out/config_bills_part2.json",
+    "../data/json_out_from_submission/config_pilot_wiki.json",
+    "../data/json_out_from_submission/config_pilot_wiki_part2.json",
+    "../data/json_out_from_submission/config_bills_part1.json",
+    "../data/json_out_from_submission/config_bills_part2.json",
 ]
 response_csvs = [
     "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",

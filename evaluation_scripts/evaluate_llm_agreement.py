@@ -10,12 +10,12 @@ import pandas as pd
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from tqdm.auto import tqdm
-from scipy.stats import kendalltau
+from scipy.stats import kendalltau, pearsonr
 
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from utils import process_responses, collect_fit_rank_data, compute_correlations_one, compute_correlations_two, bradley_terry_model
+from proxann.utils import process_responses, collect_fit_rank_data, compute_correlations_one, compute_correlations_two, bradley_terry_model
 
 def read_json(fpath):
     with open(fpath) as infile:
@@ -114,10 +114,10 @@ def compute_correlations(
 
 #%% Load the evaluation data and human responses
 data_jsons = [
-    "../data/json_out/config_pilot_wiki.json",
-    "../data/json_out/config_pilot_wiki_part2.json",
-    "../data/json_out/config_bills_part1.json",
-    "../data/json_out/config_bills_part2.json",
+    "../data/json_out_from_submission/config_pilot_wiki.json",
+    "../data/json_out_from_submission/config_pilot_wiki_part2.json",
+    "../data/json_out_from_submission/config_bills_part1.json",
+    "../data/json_out_from_submission/config_bills_part2.json",
 ]
 response_csvs = [
     "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
@@ -215,18 +215,18 @@ for llm, paths_by_ds in llm_data_patterns.items():
                 "rank_data": [np.mean([x["rank_data"][0] for x in rank_item], axis=0).tolist()],
             })
             
-            # re-compute bradley terry across the full collection
-            rank = compute_bradley_terry(win_item, combine_runs=True)
+            # # re-compute bradley terry across the full collection
+            # rank = compute_bradley_terry(win_item, combine_runs=True)
 
-            llm_wins[llm][dataset].append({
-                "id": id,
-                "annotators": [llm],
-                "rank_data": [rank],
-            })
+            # llm_wins[llm][dataset].append({
+            #     "id": id,
+            #     "annotators": [llm],
+            #     "rank_data": [rank],
+            # })
         
 #%% Now evaluate
 task = "fit"
-metric = "agree"
+metric = "rho"
 agg = "mean"
 
 for model in llm_data_patterns:
@@ -245,7 +245,7 @@ for model in llm_data_patterns:
         user_tm_metric = corrs_ds[f"{task}_{metric}"]
 
         tau_topic_rank = kendalltau(combined_tm_metric.values, user_tm_metric.values, nan_policy="omit").statistic
-        print(f"{model} combined mean, {ds:5} llm-user {combined_user_metric.mean():0.3f}, tau topics {tau_topic_rank:0.3f}")
+        print(f"{model:15} combined, {ds:5} llm-user {combined_user_metric.mean():0.3f}, tau topics {tau_topic_rank:0.3f}")
 
 #%% loop and create a summary dataframe
 summary = []
@@ -497,5 +497,6 @@ plt.ylabel(f"Human {task.capitalize()}")
 plt.xlabel(f"LLM {task.capitalize()}")
 plt.title(f"{model} {ds} {task}")
 plt.show()
-
+print(kendalltau(plot_df["score_llm"], plot_df["score_human"], nan_policy="omit").statistic)
+print(pearsonr(plot_df["score_llm"], plot_df["score_human"]))
 #%% 

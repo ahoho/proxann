@@ -8,6 +8,7 @@ import time
 from typing import List
 import choix
 from tqdm import tqdm
+from itertools import  groupby
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -15,7 +16,7 @@ from scipy.stats import kendalltau, spearmanr, pearsonr
 from sklearn.metrics import ndcg_score
 
 import math
-from utils.utils import log_or_print
+from ..utils.utils import log_or_print
 import requests
 
 def load_template(template_path: str) -> str:
@@ -153,6 +154,55 @@ def bradley_terry_model(
 
     return ranked_df
 
+def compute_bradley_terry(win_data_by_run, responses, item_id, combine_runs=True, weighted=False, weight_n=20):
+    if weighted:
+        weighted_win_data_by_run = []
+        for run_data in win_data_by_run:
+            run_info = run_data["info"]
+            pairs = zip(run_info["pair_ids_comb"], run_info["orders_comb"], run_info["logprobs_comb"])
+            pair_ids_wtd, order_wtd = [], []
+            for pair_ids, order, logprob in pairs:
+                p_win = np.exp(logprob) / 2
+                
+                n_wins = min(weight_n, int(p_win * weight_n))
+                n_losses = weight_n - n_wins
+                rev_order = "B" if order == "A" else "A"
+
+                pair_ids_wtd.extend([pair_ids] * weight_n)
+                order_wtd.extend([order] * n_wins)
+                order_wtd.extend([rev_order] * n_losses)
+            weighted_info = {
+                "pair_ids_comb": pair_ids_wtd,
+                "orders_comb": order_wtd,
+            }
+            weighted_win_data_by_run.append({"info": weighted_info})
+        win_data_by_run = weighted_win_data_by_run
+
+    if combine_runs:
+        rank = _compute_bradley_terry_combined(win_data_by_run, responses, item_id)
+    else:
+        rank = []
+        for run_data in win_data_by_run:
+            rank_run = _compute_bradley_terry_combined([run_data])
+            rank.append(rank_run)
+        # rank is a list of lists, one for each run
+        rank = np.mean(rank, axis=0).tolist()  # average over runs
+
+    return rank
+
+def _compute_bradley_terry_combined(win_data_by_run: list, responses:dict, item_id:str):
+    ranked_docs = bradley_terry_model(
+        pair_ids=[pair_id for x in win_data_by_run for pair_id in x["info"]["pair_ids_comb"]],
+        orders=[order for x in win_data_by_run for order in x["info"]["orders_comb"]],
+        num_iters=2000,
+    )
+    true_order = [item["doc_id"] for item in responses[item_id][0]["eval_docs"]]
+    ranking_indices = {doc_id: idx for idx, doc_id in enumerate(ranked_docs['doc_id'])}
+    rank = [ranking_indices[doc_id] + 1 for doc_id in true_order]
+    rank = [len(rank) - r + 1 for r in rank] # invert the ranking
+    if any([r < 0 for r in rank]) or len(rank) != len(true_order):
+        raise ValueError
+    return rank
 
 def extract_info_q1_q3(text, get_label):
     """
@@ -983,6 +1033,46 @@ def compute_correlations_two(responses_by_id, rank_llm_data=None, fit_llm_data=N
     corr_data = pd.DataFrame(corr_data)
     return corr_data
 
+def compute_correlations(
+    corr_data,
+    rank_llm_data,
+    fit_llm_data,
+    aggregation_method="mean",
+    fit_threshold_user=4,
+    fit_threshold_llm=1,
+    rescale_ndcg=True,
+    bootstrap_annotators=False,
+    seed=42,
+):
+    corr_data_, rank_llm_data_, fit_llm_data_ = [], [], []
+    assert(len(rank_llm_data) == len(fit_llm_data))
+    rng = np.random.RandomState(seed)
+    
+    for rank_item, fit_item in zip(rank_llm_data, fit_llm_data):
+        for corr_item in corr_data:
+            if rank_item["id"] == corr_item["id"] == fit_item["id"]:
+                if bootstrap_annotators:
+                    corr_item = corr_item.copy()
+                    n_annotators = corr_item["fit_data"].shape[0]
+                    idx_to_leave_out = rng.choice(n_annotators, size=n_annotators, replace=True)
+                    corr_item["fit_data"] = corr_item["fit_data"][idx_to_leave_out, :]
+                    corr_item["rank_data"] = corr_item["rank_data"][idx_to_leave_out, :]
+                corr_data_.append(corr_item)
+                rank_llm_data_.append(rank_item)
+                fit_llm_data_.append(fit_item)
+                
+    assert(len(corr_data_) == len(rank_llm_data_) == len(fit_llm_data_))
+
+    return compute_correlations_one(
+        corr_data=corr_data_,
+        rank_llm_data=rank_llm_data_,
+        fit_llm_data=fit_llm_data_,
+        aggregation_method=aggregation_method,
+        fit_threshold_user=fit_threshold_user,
+        fit_threshold_llm=fit_threshold_llm,
+        rescale_ndcg=rescale_ndcg,
+    )
+
 
 def calculate_coherence(config_pilot, data_docs=[
     "/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/files_pilot/document-data/wikitext/processed/labeled/vocab_15k/train.metadata.jsonl",
@@ -1075,3 +1165,34 @@ def is_openai_key_valid(api_key: str) -> bool:
         return response.status_code == 200
     except requests.RequestException:
         return False
+
+def loo_from_corr_data(corr_data, seed=42, annotators_to_retain=None, keep_one=False):
+    np.random.seed(seed)
+    loo_data = []
+    corr_data = sorted(corr_data, key=lambda x: x["id"])
+    for topic_id, all_topic_data in groupby(corr_data, key=lambda x: x["id"]):
+        for i, topic_data in enumerate(all_topic_data):
+            if i == 0:
+                # drop the same annotator across evaluations within the topic
+                n = len(topic_data["fit_data"])
+                idxs = np.arange(n)
+                if annotators_to_retain is not None:
+                    idx_to_exclude_from_sampling = annotators_to_retain[topic_id]
+                else:
+                    idx_to_exclude_from_sampling = -1
+                if not keep_one:
+                    loo_idx = np.random.choice(idxs[idxs != idx_to_exclude_from_sampling], 1)
+                    keep_idxs = idxs[idxs != loo_idx]
+                else:
+                    loo_idx = idx_to_exclude_from_sampling
+                    keep_idxs = idxs[idxs == loo_idx]
+            topic_data = topic_data.copy()
+            topic_data["fit_data"] = topic_data["fit_data"][keep_idxs]
+            topic_data["rank_data"] = topic_data["rank_data"][keep_idxs]
+            topic_data["dropped"] = loo_idx
+            loo_data.append(topic_data)
+    return loo_data
+
+def read_json(fpath):
+    with open(fpath) as infile:
+        return json.load(infile)

@@ -748,6 +748,7 @@ def compute_correlations_one(
     aggregation_method="mean",
     fit_threshold_user=4,
     fit_threshold_llm=1,
+    binarize_tm_probs=False,
     rescale_ndcg=True,
 ):
     """Compute correlation coefficients for fit and rank data: average rank per question/document over annotators, then correlate those with the topic model probabilities (thetas).
@@ -771,14 +772,20 @@ def compute_correlations_one(
         rs = range(n_items)
         min_ndcg = ndcg_score([rs], [rs[::-1]])
         # rescale to be between 0 and 1
-        def ndcg_score_(x, y): return (
-            ndcg_score(x, y) - min_ndcg) / (1 - min_ndcg)
-
+        def ndcg_score_(x, y):
+            try:
+                return (ndcg_score(x, y) - min_ndcg) / (1 - min_ndcg)
+            except TypeError as e:
+                return 0.0
+            
     corr_results = []
     for d_us, d_r_llm, d_f_llm in zip(corr_data, rank_llm_data, fit_llm_data):
         fit_data = d_us["fit_data"]
         rank_data = d_us["rank_data"]
-        prob_data = d_us["prob_data"]
+        if not binarize_tm_probs:
+            prob_data = d_us["prob_data"]
+        else:
+            prob_data = d_us["assign_data"]
         assign_data = d_us["assign_data"]
 
         annotator_results = {}  # to store llm-correlations
@@ -1040,6 +1047,7 @@ def compute_correlations(
     aggregation_method="mean",
     fit_threshold_user=4,
     fit_threshold_llm=1,
+    binarize_tm_probs = False,
     rescale_ndcg=True,
     bootstrap_annotators=False,
     seed=42,
@@ -1070,6 +1078,7 @@ def compute_correlations(
         aggregation_method=aggregation_method,
         fit_threshold_user=fit_threshold_user,
         fit_threshold_llm=fit_threshold_llm,
+        binarize_tm_probs=binarize_tm_probs,
         rescale_ndcg=rescale_ndcg,
     )
 

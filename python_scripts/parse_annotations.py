@@ -33,25 +33,58 @@ from plotnine import (
 )
 
 #%%
-RESPONSE_CSV = "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_July+14%2C+2024_15.13.csv"
-DATA_JSONS = ["../data/json_out/config_first_round.json", "../data/json_out/config_second_round.json"]
+RESPONSE_CSVS = [
+    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
+    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv"
+]
+DATA_JSONS = [
+    "../data/json_out/config_pilot_wiki.json",
+    "../data/json_out/config_pilot_wiki_part2.json",
+    "../data/json_out/config_bills_part1.json",
+    "../data/json_out/config_bills_part2.json",
+]
 
-raw_responses = pd.read_csv(RESPONSE_CSV)
+raw_responses = pd.concat([pd.read_csv(csv) for csv in RESPONSE_CSVS])
 MIN_MINUTES = 5
-START_DATE = "2024-06-28 12:00:00" # TODO: possibly start from 06-29 given some changes
+START_DATE = "2024-12-06 00:00:00" #"2024-06-28 12:00:00" # TODO: possibly start from 06-29 given some changes
 n_eval_docs = 7
 
 # %% load data
 # first two rows are junk from Qualtrics
 column_names = dict(zip(raw_responses.columns, raw_responses.iloc[0]))
 raw_responses = raw_responses.iloc[2:]
-# remove preview data
+# remove preview data|
 raw_responses = raw_responses.loc[raw_responses["Status"] == "IP Address"]
 # only after recent change
 raw_responses = raw_responses.loc[raw_responses["StartDate"] >= START_DATE]
 
 print(f"Total responses: {len(raw_responses)}")
 
+# %% clean up the topic keys
+def clean_model_id(id):
+    parts = id.split("/")
+    data, model = None, None
+    if "wikitext-labeled" in parts:
+        data = "wiki"
+    elif "bills-labeled" in parts:
+        data = "bills"
+    if "mallet" in parts:
+        model = "mallet"
+    elif "ctm" in parts:
+        model = "ctm"
+    elif "category-45" in parts:
+        model = "category-45"
+    elif "bertopic" in parts:
+        model = "bertopic"
+    if data is None or model is None:
+        raise ValueError(f"Unknown id: {id}")
+    return f"{data}/{model}"
+
+def clean_cluster_id(id):
+    model_id_clean = clean_model_id(id)
+    cluster_number = id.split("/")[-1]
+    return f"{model_id_clean}/{cluster_number}"
+    
 # %% get the data
 eval_data = {}
 topics_per_model = Counter()
@@ -60,10 +93,12 @@ for json_fpath in DATA_JSONS:
         raw_eval_data = json.load(infile)
     
     for model_id, model_data in raw_eval_data.items():
+        model_id_clean = clean_model_id(model_id)
         for cluster_id, cluster_data in model_data.items():
             # the match id should align the topics across models
             cluster_data["topic_match_id"] = topics_per_model[model_id]
-            eval_data[f"{model_id}/{cluster_id}"] = cluster_data
+            cluster_data["cluster_id_full"] = f"{model_id}/{cluster_id}"
+            eval_data[f"{model_id_clean}/{cluster_id}"] = cluster_data
             topics_per_model[model_id] += 1
 
 
@@ -94,9 +129,13 @@ for _, row in raw_responses.iterrows():
         continue
 
     # retrieve the data for the cluster/topic that was used to generate the questions for this respondent
-    r["cluster_id"] = row["id"]
+    r["cluster_id"] = clean_cluster_id(row["id"])
+    r["cluster_id_full"] = row["id"]
     r["annotator_id"] = row["Q22"]
-    cluster_data = eval_data[r["cluster_id"]]
+    cluster_data = eval_data.get(r["cluster_id"])
+    if cluster_data is None:
+        print(f"Missing data for {r['cluster_id']}")
+        continue
     # check if completion time was too fast
     r["too_quick"] = float(row["Duration (in seconds)"]) < time_cutoff
 
@@ -104,7 +143,7 @@ for _, row in raw_responses.iterrows():
     r["category"] = row["cluster_label"]
 
     # make sure they didn't just copy the topic
-    r["failed_category"] = r["category"] in " ".join(cluster_data["topic_words"])
+    r["failed_category"] = r["category"].lower().strip() in " ".join(cluster_data["topic_words"])
 
     # check basic comprehension
     r["failed_purpose"] = "single category" not in row["practice_purpose"]
@@ -118,13 +157,16 @@ for _, row in raw_responses.iterrows():
 
     # did they do the practice ranking correctly?
     practice_ranks = [int(row[f"practice_rank_{i}"]) for i in range(4)]
+    if 5 in practice_ranks:
+        # correct a bug from the bills survey
+        practice_ranks[practice_ranks.index(5)] = 4
     r["failed_practice_rank_strict"] = practice_ranks != [1, 2, 3, 4]
     # extremely obvious
     r["failed_practice_rank_weak"] = practice_ranks[0] not in [1,2] or practice_ranks[3] != 4
 
     # determine when to throw people away
     r["remove"] = (
-        r["failed_purpose"] # if they got this wrong they almost certainly didn't understand the task
+        r["failed_purpose"] # did they understand the purpose? may be willing to add this back in
         or r["failed_category"] # if they just copied the topic, they are lazy
         or r["too_quick"] # much too quick and they probably didn't read the questions
         or r["failed_fit_check"] # this attention check is very clear
@@ -136,11 +178,25 @@ for _, row in raw_responses.iterrows():
         )
     )
 
+    # alternative way to remove --- separate out the major failures (likely affecting annotations)
+    # from lesser ones (related to training steps)
+    failure_count = (
+        r["failed_sponge_check_weak"] * 2
+        + r["failed_fit_check"] * 2
+        + r["failed_category"] * 2
+        + r["too_quick"]
+        + r["failed_purpose"]
+        + r["failed_fam_check"]
+        + r["failed_practice_rank_weak"]
+    )
+    r["remove_alt"] = failure_count > 1
+
     r["StartDate"] = row["StartDate"]
     r["time"] = float(row["Duration (in seconds)"])
 
     r["eval_docs"] = deepcopy(cluster_data["eval_docs"])
     assert len(r["eval_docs"]) == n_eval_docs
+    assert all(row[f"eval_id_{i}"] == str(r["eval_docs"][i]["doc_id"]) for i in range(n_eval_docs))
     r["exemplar_docs"] = cluster_data["exemplar_docs"]
     r["topic_words"] = cluster_data["topic_words"]
     
@@ -161,6 +217,7 @@ for _, row in raw_responses.iterrows():
 #%% Collect the attention check failures
 print(f"Total responses: {len(responses)}")
 print(f"Removed: {sum(r['remove'] for r in responses)}")
+print(f"Removed alt: {sum(r['remove_alt'] for r in responses)}")
 print(f"Too quick: {sum(r['too_quick'] for r in responses)}")
 print(f"Failed category: {sum(r['failed_category'] for r in responses)}")
 print(f"Failed purpose: {sum(r['failed_purpose'] for r in responses)}")
@@ -171,16 +228,17 @@ print(f"Failed sponge check strict: {sum(r['failed_sponge_check_strict'] for r i
 print(f"Failed practice rank weak: {sum(r['failed_practice_rank_weak'] for r in responses)}")
 print(f"Failed practice rank strict: {sum(r['failed_practice_rank_strict'] for r in responses)}")
 
-responses = [r for r in responses if not r["remove"]]
+responses = [r for r in responses if not r["remove_alt"]]
 responses_by_id = {cluster_id: [] for cluster_id in eval_data.keys()}
 for r in responses:
     responses_by_id[r["cluster_id"]].append(r)
 
 # %% Save the id counts
-counts = Counter([r["cluster_id"] for r in responses])
+counts = Counter({v["cluster_id_full"]: 0 for v in eval_data.values()})
+counts.update([r["cluster_id_full"] for r in responses])
 with open("../data/human_annotations/_cluster_rank_counts.json", "w") as outfile:
     json.dump(counts, outfile, indent=2)
-print(json.dumps(counts, indent=1))
+print(json.dumps(dict(counts.most_common()), indent=1))
 
 # %% Save the responses
 # get date from the last response
@@ -200,7 +258,7 @@ min_corr_agree = 0.75
 payout=1.5
 bonus_receivers = set()
 for id, group in responses_by_id.items():
-    
+    dataset = id.split("/")[0]
     if len(group) < 3:
         continue
     ranks = np.array([
@@ -211,18 +269,21 @@ for id, group in responses_by_id.items():
         mean_rank_without_i = np.mean(np.delete(ranks, i, axis=0), axis=0)
         corr, _ = spearmanr(rank_i, mean_rank_without_i)
         if corr >= min_corr_agree:
-            if not group[i]["failed_fam_check"]:
-                bonus_receivers.add(group[i]["annotator_id"])
+            if not group[i]["failed_fam_check"] and not group[i]["remove"]:
+                bonus_receivers.add((dataset, group[i]["annotator_id"]))
 
 # if time spent above a certain threshold, they get a bonus
 bonus_time = 60 * 15
 for r in responses:
     if r["time"] > bonus_time:
-        if not r["failed_fam_check"]:
-            bonus_receivers.add(r["annotator_id"])
+        if not r["failed_fam_check"] and not r["remove"]:
+            bonus_receivers.add((dataset, r["annotator_id"]))
 
 print(f"# Bonus receivers: {len(bonus_receivers)}")
-print("\n".join([f"{id},{payout}" for id in sorted(bonus_receivers) if id not in paid_bonuses]))
+print("wiki")
+print("\n".join([f"{id},{payout}" for ds, id in sorted(bonus_receivers) if id not in paid_bonuses and ds == "wiki"]))
+print("bills")
+print("\n".join([f"{id},{payout}" for ds, id in sorted(bonus_receivers) if id not in paid_bonuses and ds == "bills"]))
 
 #%% 
 # collect the categories per topic -- this is just for a latex table, so doesn't need to be complete

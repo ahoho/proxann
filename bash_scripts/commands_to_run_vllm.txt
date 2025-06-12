@@ -1,0 +1,17 @@
+# Llama 3.1 8B (4090)
+vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --port 8008 --download-dir /scratch/.cache --max-model-len 4096
+
+# Llama 3.3 70B (A100 80g)
+vllm serve casperhansen/llama-3.3-70b-instruct-awq --port 8008 --download-dir /scratch/.cache --max-model-len 3072 --quantization awq_marlin
+
+# Qwen 2.5 72B (A100 80g)
+vllm serve Qwen/Qwen2.5-72B-Instruct-AWQ --port 8008 --download-dir /scratch/.cache --max-model-len 3072 --quantization awq_marlin
+
+# Qwen 3 32B (A100 80g)
+vllm serve Qwen/Qwen3-32B --port 8008 --download-dir /scratch/.cache --max-model-len 3072 --chat-template ./qwen3_nonthinking.jinja
+
+# Qwen 3 30B MoE (A100 80g)
+vllm serve Qwen/Qwen3-30B-A3B --port 8008 --download-dir /scratch/.cache --max-model-len 3072 --chat-template ./qwen3_nonthinking.jinja
+
+# Qwen 3 8B (A100 80g)
+vllm serve Qwen/Qwen3-8B --port 8008 --download-dir /scratch/.cache --max-model-len 3072 --chat-template ./qwen3_nonthinking.jinja

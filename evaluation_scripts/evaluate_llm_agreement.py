@@ -7,8 +7,6 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
 from tqdm.auto import tqdm
 from scipy.stats import kendalltau, pearsonr
 
@@ -80,6 +78,7 @@ def compute_correlations(
     fit_threshold_user=4,
     fit_threshold_llm=1,
     rescale_ndcg=True,
+    binarize_tm_probs=False,
     bootstrap_annotators=False,
     seed=42,
 ):
@@ -110,6 +109,7 @@ def compute_correlations(
         fit_threshold_user=fit_threshold_user,
         fit_threshold_llm=fit_threshold_llm,
         rescale_ndcg=rescale_ndcg,
+        binarize_tm_probs=binarize_tm_probs,
     )
 
 #%% Load the evaluation data and human responses
@@ -164,14 +164,13 @@ llm_data_patterns = {
         "wiki": list(Path(base_path, "wiki/Qwen3-32B/").glob("*")),
         "bills": list(Path(base_path, "bills/Qwen3-32B/").glob("*")),
     },
-    "qwen-3-30b-moe": {
-        "wiki": list(Path(base_path, "wiki/Qwen3-30B-A3B/").glob("*")),
-        "bills": list(Path(base_path, "bills/Qwen3-30B-A3B/").glob("*")),
-    },
+    # "qwen-3-30b-moe": {
+    #     "wiki": list(Path(base_path, "wiki/Qwen3-30B-A3B/").glob("*")),
+    #     "bills": list(Path(base_path, "bills/Qwen3-30B-A3B/").glob("*")),
+    # },
 }
 llm_fits, llm_ranks, llm_wins = {}, {}, {}
 
-# TODO: majority vote instead
 #%%
 for llm, paths_by_ds in llm_data_patterns.items():
     llm_fits[llm] = defaultdict(list)
@@ -223,10 +222,11 @@ for llm, paths_by_ds in llm_data_patterns.items():
             #     "annotators": [llm],
             #     "rank_data": [rank],
             # })
-        
+
+
 #%% Now evaluate
 task = "fit"
-metric = "rho"
+metric = "tau"
 agg = "mean"
 
 for model in llm_data_patterns:
@@ -239,14 +239,15 @@ for model in llm_data_patterns:
             fit_threshold_user=4, # 3 may be better?
             fit_threshold_llm=4,
             rescale_ndcg=True,
+            binarize_tm_probs=True,
         )
         combined_user_metric = corrs_ds[f"{task}_{metric}_users_{model}"]
         combined_tm_metric = corrs_ds[f"{task}_{metric}_tm_{model}"]
         user_tm_metric = corrs_ds[f"{task}_{metric}"]
 
         tau_topic_rank = kendalltau(combined_tm_metric.values, user_tm_metric.values, nan_policy="omit").statistic
-        print(f"{model:15} combined, {ds:5} llm-user {combined_user_metric.mean():0.3f}, tau topics {tau_topic_rank:0.3f}")
-
+        print(f"{model:15}, {ds:5} llm-user {combined_user_metric.mean():0.3f}, tau topics {tau_topic_rank:0.3f}")
+    
 #%% loop and create a summary dataframe
 summary = []
 n_resample_annotators = 1
@@ -340,7 +341,7 @@ color_mapping = dict(zip(model_order, colors))
 
 # Task order (Fit before Rank)
 tasks = ['fit', 'rank']
-task_labels = ['Fit (Step 2)', 'Rank (Step 3)']
+task_labels = ['Fit Step', 'Rank Step']
 datasets = ['wiki', 'bills']
 dataset_labels = {'wiki': 'Wiki', 'bills': 'Bills'}
 

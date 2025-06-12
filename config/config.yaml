@@ -94,7 +94,16 @@ llm:
       "Qwen/Qwen3-8B",
       "Qwen/Qwen3-0.6B",
       "meta-llama/Llama-3.3-70B-Instruct",
-      "meta-llama/Meta-Llama-3.1-8B-Instruct"
+      "meta-llama/Meta-Llama-3.1-8B-Instruct",
+      "casperhansen/llama-3.3-70b-instruct-awq",
+      "Qwen/Qwen2.5-72B-Instruct-AWQ",
+      "Qwen/Qwen2.5-32B-Instruct-GPTQ-Int8",
+      "Qwen/Qwen2.5-32B-Instruct",
+      "Qwen/Qwen2.5-7B-Instruct",
+      "Qwen/Qwen3-32B-FP8",
+      "Qwen/Qwen3-32B",
+      "Qwen/Qwen2.5-32B-Instruct",
+      "Qwen/Qwen3-30B-A3B"
     }
     host: http://localhost:8000/v1
   llama_cpp:

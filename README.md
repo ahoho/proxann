@@ -20,21 +20,23 @@ This repository contains the code and data for reproducing experiments from our 
 
 ## Installation
 
-We recommend **Poetry** for installing the necessary dependencies, but an environment followed by the installation of the [requirements file](requirements.txt) can also be used.
+We recommend **uv** for installing the necessary dependencies
 
 ### Steps for deployment with Poetry
 
-1. Install Poetry by following the official guide: [Poetry Installation Guide](https://python-poetry.org/docs/#installing-with-the-official-installer)
+1. Install uv by following the [official guide](https://docs.astral.sh/uv/getting-started/installation/)
 
-2. Verify that Poetry is using Python 3.11 (preferably version 3.11.11):
-   ```bash
-   poetry run python --version
-   ```
+2. Create a local environment (it will use the python version specified in pyproject.toml)
+  ```bash
+  uv venv
+  ```
 
-3. Install project dependencies:
-   ```bash
-   poetry install
-   ```
+3. Install dependencies
+  ```bash
+  uv pip install -e .
+  ```
+
+3. Run scripts in this repository with either `uv run <bash script>.sh` or `uv run python <python script>.py`. You can also first run `source .venv/bin/activate` to avoid the need for `uv run`.
 
 ### LLM configuration
 #### GPT models

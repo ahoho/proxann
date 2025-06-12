@@ -1,13 +1,11 @@
 [project]
-name = "theta-evaluation"
-version = "0.1.0"
+name = "proxann"
+version = "0.2.0"
 description = ""
-authors = [
-    {name = "Alexander Hoyle & Lorena Calvo-Bartolomé"}
-]
-license = {text = "MIT License"}
-readme = "README.md"
+authors = [{ name = "Lorena Calvo-Bartolomé & Alexander Hoyle" }]
 requires-python = ">=3.11,<4.0"
+readme = "README.md"
+license = { text = "MIT License" }
 dependencies = [
     "bertopic (==0.16.4)",
     "boto3 (==1.35.97)",
@@ -32,10 +30,12 @@ dependencies = [
     "tomotopy (==0.13.0)",
     "torch (==2.5.1)",
     "tqdm (==4.67.1)",
-    "pot (==0.9.5)"
+    "pot (==0.9.5)",
 ]
 
-
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = false

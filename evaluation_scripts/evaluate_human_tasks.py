@@ -1,22 +1,11 @@
 #%% Imports
-from itertools import combinations, groupby
 import json 
-import sys
 
-import numpy as np
 import pandas as pd
 
-from sklearn.metrics.pairwise import cosine_similarity
-from tqdm.auto import tqdm
-from scipy.stats import kendalltau
-
-from irrCAC.raw import CAC
-
-sys.path.append("../src/llm_eval")
 from proxann.utils import (
     process_responses,
     collect_fit_rank_data,
-    compute_correlations_one,
     compute_correlations_two,
     compute_agreement_per_topic
 )
@@ -24,18 +13,11 @@ from proxann.utils import (
 from plotnine import (
     ggplot,
     aes,
-    geom_point,
-    geom_bar,
     geom_boxplot,
-    geom_errorbar,
     facet_wrap,
     facet_grid,
-    position_dodge,
     theme_classic,
-    coord_cartesian,
-    scale_fill_brewer,
     scale_fill_manual,
-    scale_color_brewer,
     theme,
     element_text,
     element_blank,
@@ -45,19 +27,39 @@ from plotnine import (
 def read_json(fpath):
     with open(fpath) as infile:
         return json.load(infile)
+    
+USE_FINAL_DATA = True
 
 #%% Load the evaluation data and human responses
-data_jsons = [
-    "../data/json_out_from_submission/config_pilot_wiki.json",
-    "../data/json_out_from_submission/config_pilot_wiki_part2.json",
-    "../data/json_out_from_submission/config_bills_part1.json",
-    "../data/json_out_from_submission/config_bills_part2.json",
-]
-response_csvs = [
-    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
-    "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv",
-]
-start_date = "2024-12-06 09:00:00"
+if USE_FINAL_DATA:
+    data_jsons = [
+        "../data/json_out/config_wiki_part1.json",
+        "../data/json_out/config_wiki_part2.json",
+        "../data/json_out/config_bills_part1.json",
+        "../data/json_out/config_bills_part2.json",
+    ]
+    response_csvs = [
+        "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
+        "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv",
+    ]
+    start_date = "2024-12-06 09:00:00"
+
+    data_cats = ["wiki", "bills"]
+    model_cats = ["mallet", "ctm", "bertopic"]
+    model_cats_pretty = ["Mallet", "CTM", "BERTopic"]
+else: # this is the pilot data
+    data_jsons = [
+        "../data/files_pilot/config_first_round.json",
+        "../data/files_pilot/config_second_round.json",
+    ]
+    response_csvs = [
+        "../data/files_pilot/Cluster+Evaluation+-+Sort+and+Rank_July+14%2C+2024_15.13.csv"
+    ]
+    start_date = "2024-06-28 12:00:00"
+
+    data_cats = ["wiki"]
+    model_cats = ["mallet", "ctm", "category-45"]
+    model_cats_pretty = ["Mallet", "CTM", "Label-derived"]
 
 responses = {}
 for csv in response_csvs:
@@ -75,17 +77,17 @@ agreement_data_by_topic, _ = compute_agreement_per_topic(responses)
 agreement_data_by_topic["dataset"] = ["wiki" if "wiki" in id else "bills" for id in agreement_data_by_topic["id"]]
 
 #%% Make table
-# make dataset categorical, ordered as wiki, bills
-agreement_data_by_topic["dataset"] = pd.Categorical(agreement_data_by_topic["dataset"], categories=["wiki", "bills"], ordered=True)
-# make model categorical: mallet, ctm, bertopic
-agreement_data_by_topic["model"] = pd.Categorical(agreement_data_by_topic["model"], categories=["mallet", "ctm", "bertopic"], ordered=True)
+# make dataset  and model categorical
+agreement_data_by_topic["dataset"] = pd.Categorical(agreement_data_by_topic["dataset"], categories=data_cats, ordered=True)
+agreement_data_by_topic["model"] = pd.Categorical(agreement_data_by_topic["model"], categories=model_cats, ordered=True)
 print(
     agreement_data_by_topic
         .replace({
             "mallet": "Mallet",
             "ctm": "CTM",
             "bertopic": "BERTopic",
-            "wiki": "i\texttt{Wiki}",
+            "category-45": "Label-derived",
+            "wiki": "\\texttt{Wiki}",
             "bills": "\\texttt{Bills}",
         })
         .groupby(["dataset", "model"])[["fit_alpha", "rank_alpha"]]
@@ -97,15 +99,18 @@ print(
 )
 
 # %% Plot the correlations between humans and topic models
-
 corr_mode2 = compute_correlations_two(responses)
 corr_mode2["dataset"] = corr_mode2["id"].apply(lambda x: "wiki" if "wiki" in x else "bills")
 corr_mode2["dataset"] = pd.Categorical(corr_mode2["dataset"], categories=["wiki", "bills"], ordered=True)
-corr_mode2["model"] = corr_mode2["model"].replace({"mallet": "Mallet", "ctm": "CTM", "bertopic": "BERTopic"})
-corr_mode2["model"] = pd.Categorical(corr_mode2["model"], categories=["Mallet", "CTM", "BERTopic"], ordered=True)
+corr_mode2["model"] = corr_mode2["model"].replace({"mallet": "Mallet", "ctm": "CTM", "bertopic": "BERTopic", "category-45": "Label-derived"})
+corr_mode2["model"] = pd.Categorical(corr_mode2["model"], categories=model_cats_pretty, ordered=True)
 
 #%% change data from wide to long, where each row is (model, fit/rank, rho/tau, value)
-for ds in ["wiki", "bills"]:
+for ds in data_cats:
+    if USE_FINAL_DATA:
+        pilot = ""
+    else:
+        pilot = "_pilot"
     corr_plot_data = pd.melt(
         corr_mode2.loc[corr_mode2.dataset == ds].drop(columns=["topic", "n_annotators", "annotator", "dataset"]),
         id_vars=["model", "id", "topic_match_id"],
@@ -145,7 +150,7 @@ for ds in ["wiki", "bills"]:
         )
     )
     # remove margins
-    corr_plot_faceted.save(f"../figures/correlation_boxplot_{ds}.pdf", dpi=300, width=6.2, height=3.5, bbox_inches='tight')
+    corr_plot_faceted.save(f"../figures/correlation_boxplot_{ds}{pilot}.pdf", dpi=300, width=6.2, height=3.5, bbox_inches='tight')
 
     # Make single-column version for length reasons, 
     for task in ["fit", "rank"]:
@@ -172,7 +177,7 @@ for ds in ["wiki", "bills"]:
             )
         )
         corr_plot_single_row
-        corr_plot_single_row.save(f"../figures/correlation_boxplot_single_row_{ds}_{task}.pdf", dpi=300, width=3.1, height=1.8, bbox_inches='tight')
+        corr_plot_single_row.save(f"../figures/correlation_boxplot_single_row_{ds}_{task}{pilot}.pdf", dpi=300, width=3.1, height=1.8, bbox_inches='tight')
 
     # make the topic ids categorical
     corr_plot_data = corr_plot_data.loc[corr_plot_data.coefficient.str.contains("Tau")]
@@ -208,4 +213,5 @@ for ds in ["wiki", "bills"]:
             axis_text_x=element_blank(),
         )
     )
-    corr_plot_faceted_by_topic.save(f"../figures/correlation_boxplot_by_topic_{ds}.pdf", dpi=300, width=6.2, height=1.8, bbox_inches='tight')
+    corr_plot_faceted_by_topic.save(f"../figures/correlation_boxplot_by_topic_{ds}{pilot}.pdf", dpi=300, width=6.2, height=1.8, bbox_inches='tight')
+# %%

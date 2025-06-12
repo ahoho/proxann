@@ -21,6 +21,7 @@ def load_template(template_path: str) -> str:
     with open(template_path, 'r') as file:
         return file.read()
 
+
 def extend_to_full_sentence(
     text: str,
     num_words: int

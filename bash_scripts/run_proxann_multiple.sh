@@ -18,7 +18,7 @@ echo "Seeds: ${seeds[@]}"
 # Define dataset-specific configurations using arrays
 DATASET_KEYS=("wiki" "bills")
 TM_MODEL_DATA_PATHS=(
-  "data/data_used_in_paper/json_out/config_pilot_wiki.json,data/data_used_in_paper/json_out/config_pilot_wiki_part2.json"
+  "data/data_used_in_paper/json_out/config_wiki_part1.json,data/data_used_in_paper/json_out/config_wiki_part2.json"
   "data/data_used_in_paper/json_out/config_bills_part1.json,data/data_used_in_paper/json_out/config_bills_part2.json"
 )
 RESPONSE_CSV_PATHS=(

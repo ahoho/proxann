@@ -1,5 +1,4 @@
 #%% Imports
-from itertools import combinations, groupby
 import json 
 from pathlib import Path
 from collections import defaultdict
@@ -13,111 +12,18 @@ from scipy.stats import kendalltau, pearsonr
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from proxann.utils import process_responses, collect_fit_rank_data, compute_correlations_one, compute_correlations_two, bradley_terry_model
+from proxann.utils import process_responses, collect_fit_rank_data, compute_correlations, compute_correlations_two
 
 def read_json(fpath):
     with open(fpath) as infile:
         return json.load(infile)
-    
-
-def compute_bradley_terry(win_data_by_run, combine_runs=True, weighted=False, weight_n=20):
-    if weighted:
-        weighted_win_data_by_run = []
-        for run_data in win_data_by_run:
-            run_info = run_data["info"]
-            pairs = zip(run_info["pair_ids_comb"], run_info["orders_comb"], run_info["logprobs_comb"])
-            pair_ids_wtd, order_wtd = [], []
-            for pair_ids, order, logprob in pairs:
-                p_win = np.exp(logprob) / 2
-                
-                n_wins = min(weight_n, int(p_win * weight_n))
-                n_losses = weight_n - n_wins
-                rev_order = "B" if order == "A" else "A"
-
-                pair_ids_wtd.extend([pair_ids] * weight_n)
-                order_wtd.extend([order] * n_wins)
-                order_wtd.extend([rev_order] * n_losses)
-            weighted_info = {
-                "pair_ids_comb": pair_ids_wtd,
-                "orders_comb": order_wtd,
-            }
-            weighted_win_data_by_run.append({"info": weighted_info})
-        win_data_by_run = weighted_win_data_by_run
-
-    if combine_runs:
-        rank = _compute_bradley_terry_combined(win_data_by_run)
-    else:
-        rank = []
-        for run_data in win_data_by_run:
-            rank_run = _compute_bradley_terry_combined([run_data])
-            rank.append(rank_run)
-        # rank is a list of lists, one for each run
-        rank = np.mean(rank, axis=0).tolist()  # average over runs
-
-    return rank
-    
-def _compute_bradley_terry_combined(win_data_by_run: list):
-    ranked_docs = bradley_terry_model(
-        pair_ids=[pair_id for x in win_data_by_run for pair_id in x["info"]["pair_ids_comb"]],
-        orders=[order for x in win_data_by_run for order in x["info"]["orders_comb"]],
-        num_iters=2000,
-    )
-    true_order = [item["doc_id"] for item in responses[id][0]["eval_docs"]]
-    ranking_indices = {doc_id: idx for idx, doc_id in enumerate(ranked_docs['doc_id'])}
-    rank = [ranking_indices[doc_id] + 1 for doc_id in true_order]
-    rank = [len(rank) - r + 1 for r in rank] # invert the ranking
-    if any([r < 0 for r in rank]) or len(rank) != len(true_order):
-        raise ValueError
-    return rank
-
-def compute_correlations(
-    corr_data,
-    rank_llm_data,
-    fit_llm_data,
-    aggregation_method="mean",
-    fit_threshold_user=4,
-    fit_threshold_llm=1,
-    rescale_ndcg=True,
-    binarize_tm_probs=False,
-    bootstrap_annotators=False,
-    seed=42,
-):
-    corr_data_, rank_llm_data_, fit_llm_data_ = [], [], []
-    assert(len(rank_llm_data) == len(fit_llm_data))
-    rng = np.random.RandomState(seed)
-    
-    for rank_item, fit_item in zip(rank_llm_data, fit_llm_data):
-        for corr_item in corr_data:
-            if rank_item["id"] == corr_item["id"] == fit_item["id"]:
-                if bootstrap_annotators:
-                    corr_item = corr_item.copy()
-                    n_annotators = corr_item["fit_data"].shape[0]
-                    idx_to_leave_out = rng.choice(n_annotators, size=n_annotators, replace=True)
-                    corr_item["fit_data"] = corr_item["fit_data"][idx_to_leave_out, :]
-                    corr_item["rank_data"] = corr_item["rank_data"][idx_to_leave_out, :]
-                corr_data_.append(corr_item)
-                rank_llm_data_.append(rank_item)
-                fit_llm_data_.append(fit_item)
-                
-    assert(len(corr_data_) == len(rank_llm_data_) == len(fit_llm_data_))
-
-    return compute_correlations_one(
-        corr_data=corr_data_,
-        rank_llm_data=rank_llm_data_,
-        fit_llm_data=fit_llm_data_,
-        aggregation_method=aggregation_method,
-        fit_threshold_user=fit_threshold_user,
-        fit_threshold_llm=fit_threshold_llm,
-        rescale_ndcg=rescale_ndcg,
-        binarize_tm_probs=binarize_tm_probs,
-    )
 
 #%% Load the evaluation data and human responses
 data_jsons = [
-    "../data/json_out_from_submission/config_pilot_wiki.json",
-    "../data/json_out_from_submission/config_pilot_wiki_part2.json",
-    "../data/json_out_from_submission/config_bills_part1.json",
-    "../data/json_out_from_submission/config_bills_part2.json",
+    "../data/json_out/config_wiki_part1.json",
+    "../data/json_out/config_wiki_part2.json",
+    "../data/json_out/config_bills_part1.json",
+    "../data/json_out/config_bills_part2.json",
 ]
 response_csvs = [
     "../data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv",
@@ -136,11 +42,9 @@ corr_data = sorted(corr_data, key=lambda x: x["id"])
 corr_ids = [x["id"] for x in corr_data]
 
 #%% Load the model output data
-base_path = Path("../data/camera_ready_llm_out/mean/")
+base_path = Path("../data/llm_out/mean/")
 llm_data_patterns = {
     "gpt-4o": {
-        #"wiki": list(Path("../data/llm_out/wiki").glob("q1_then_q3_dspy,q1_then_q2_dspy_temp1.0_seed*gpt-4o-*20250310*")),
-        #"wiki": list(Path("../data/llm_out/wiki").glob("q1_then_q3_dspy,q1_then_q2_dspy_temp1.0_0.0_0.0_seed*_gpt-4o-2024-08-06*")),
         "wiki": list(Path(base_path, "wiki/gpt-4o-2024-08-06/").glob("*")),
         "bills": list(Path(base_path, "bills/gpt-4o-2024-08-06/").glob("*")),
     },
@@ -164,44 +68,36 @@ llm_data_patterns = {
         "wiki": list(Path(base_path, "wiki/Qwen3-32B/").glob("*")),
         "bills": list(Path(base_path, "bills/Qwen3-32B/").glob("*")),
     },
-    # "qwen-3-30b-moe": {
-    #     "wiki": list(Path(base_path, "wiki/Qwen3-30B-A3B/").glob("*")),
-    #     "bills": list(Path(base_path, "bills/Qwen3-30B-A3B/").glob("*")),
-    # },
 }
-llm_fits, llm_ranks, llm_wins = {}, {}, {}
+llm_fits, llm_ranks = {}, {}
 
 #%%
 for llm, paths_by_ds in llm_data_patterns.items():
     llm_fits[llm] = defaultdict(list)
     llm_ranks[llm] = defaultdict(list)
-    llm_wins[llm] = defaultdict(list)
 
     for dataset, paths in paths_by_ds.items():
-        fits_, ranks_, wins_ = [], [], []
+        fits_, ranks_ = [], []
         # iterate over all seeds
         for seed, path in enumerate(paths):
             fits_seed = read_json(f"{path}/llm_results_q2.json")
             ranks_seed = read_json(f"{path}/llm_results_q3.json")
-            wins_seed = read_json(f"{path}/all_info_bradley_terry.json")
 
             # point is to move from "seed by topic"
             # [[topic_0_seed_0, topic_1_seed_0, ...], [topic_0_seed_1, topic_1_seed_1, ...]]
             # to "topic by seed"
             # [[topic_0_seed_0, topic_0_seed_1, ...], [topic_1_seed_0, topic_1_seed_1, ...]]
-            for i, (fit_item, rank_item, win_item) in enumerate(zip(fits_seed, ranks_seed, wins_seed)):
-                assert(fit_item["id"] == rank_item["id"] == win_item["id"])
+            for i, (fit_item, rank_item) in enumerate(zip(fits_seed, ranks_seed)):
+                assert(fit_item["id"] == rank_item["id"])
                 if seed == 0:
                     fits_.append([fit_item])
                     ranks_.append([rank_item])
-                    wins_.append([win_item])
                 else:
                     fits_[i].append(fit_item)
                     ranks_[i].append(rank_item)
-                    wins_[i].append(win_item)
 
         # then we can average over all seeds
-        for fit_item, rank_item, win_item in zip(fits_, ranks_, wins_):
+        for fit_item, rank_item in zip(fits_, ranks_):
             id = fit_item[0]["id"]
             llm_fits[llm][dataset].append({
                 "id": id,
@@ -213,18 +109,8 @@ for llm, paths_by_ds in llm_data_patterns.items():
                 "annotators": [llm],
                 "rank_data": [np.mean([x["rank_data"][0] for x in rank_item], axis=0).tolist()],
             })
-            
-            # # re-compute bradley terry across the full collection
-            # rank = compute_bradley_terry(win_item, combine_runs=True)
 
-            # llm_wins[llm][dataset].append({
-            #     "id": id,
-            #     "annotators": [llm],
-            #     "rank_data": [rank],
-            # })
-
-
-#%% Now evaluate
+#%% Individual evaluation
 task = "fit"
 metric = "tau"
 agg = "mean"
@@ -467,7 +353,7 @@ fig.set_size_inches(6.3, 1.6)
 plt.savefig('../figures/human_llm_comparison_barplot.pdf', dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
 plt.show()
 
-#%% big correlation plot
+#%% big correlation plot (not in paper)
 model = "gpt-4o"
 ds = "bills"
 task = "rank"
@@ -500,4 +386,3 @@ plt.title(f"{model} {ds} {task}")
 plt.show()
 print(kendalltau(plot_df["score_llm"], plot_df["score_human"], nan_policy="omit").statistic)
 print(pearsonr(plot_df["score_llm"], plot_df["score_human"]))
-#%% 

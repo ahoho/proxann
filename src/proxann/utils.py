@@ -7,16 +7,14 @@ from copy import deepcopy
 import time
 from typing import List
 import choix
-from tqdm import tqdm
 from itertools import  groupby
 import numpy as np
 import pandas as pd
-import networkx as nx
 from scipy.stats import kendalltau, spearmanr, pearsonr
 from sklearn.metrics import ndcg_score
 
 import math
-from ..utils.utils import log_or_print
+from utils.utils import log_or_print
 import requests
 
 def load_template(template_path: str) -> str:

@@ -14,15 +14,14 @@ This repository contains the code and data for reproducing experiments from our 
    - Use the `src.user_study_data_collector` module to generate the JSON files containing the required topic model information to carry out the evaluation (or user study).
 2. **Proxy-Based Evaluation**:
    - Perform LLM proxy evaluations using the `src.proxann` module.
-
 3. **Topic Model Training**:
    - Train topic and clustering models (currently, LDA-Mallet, LDA-Tomotopy, and BERTopic) under a unified structure using the `src.train` module.
 
 ## Installation
 
-We recommend **uv** for installing the necessary dependencies
+We recommend **uv** for installing the necessary dependencies.
 
-### Steps for deployment with Poetry
+### Steps for deployment with uv
 
 1. Install uv by following the [official guide](https://docs.astral.sh/uv/getting-started/installation/)
 
@@ -38,122 +37,151 @@ We recommend **uv** for installing the necessary dependencies
 
 3. Run scripts in this repository with either `uv run <bash script>.sh` or `uv run python <python script>.py`. You can also first run `source .venv/bin/activate` to avoid the need for `uv run`.
 
-### LLM configuration
-#### GPT models
-You must configure an ``.env`` file located in the root directory with the following format:
+### Configuration
+
+#### 1. LLMs
+
+##### GPT Models (OpenAI)
+
+To use GPT models via the OpenAI API, create a `.env` file in the root directory with the following content:
 ```bash
 OPENAI_API_KEY=[your_open_ai_api_key]
 ```
 You can also modify the path to the ``.env`` file in the [configuration file](config/config.yaml).
 
-#### Open-source models
-We rely on [Ollama models](https://ollama.com/) for evaluating with open-source large language models. You must have the model running and specify the endpoint where it is deployed in the [configuration file](config/config.yaml).
+##### Open-Source Models (via vLLM)
+We rely on [vLLM models](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html?ref=blog.mozilla.ai) for evaluating with open-source large language models. You must have the model running and specify the endpoint where it is deployed in the [configuration file](config/config.yaml).
 
-### Important: Training with LDA-Mallet
-Download the [latest release of Mallet](https://github.com/mimno/Mallet/releases) and place it in the `src/train` directory. You can use the script `bash_scripts/wget_mallet.sh` to automate this process.
+#### 2. Topics Models
 
-## Usage
+The `src.train` module supports multiple topic modeling backends. No extra setup is required for most of them.
 
-You can use **ProxAnn** as a proxy for human annotators to evaluate the quality of topic models. To use it:
+**Only if you're using LDA-Mallet**, follow these steps:
 
-1. Initialize a [ProxAnn](src/proxann/proxann.py) object.
-    ```python
-    from src.proxann.proxann import ProxAnn
-    proxann = ProxAnn()
-    ```
-2. Generate a user-provided JSON file using the user study configuration (``path_user_study_config_file``). You can find example configurations [here](config/user_study).
-    ```python
-    status, tm_model_data_path = proxann.generate_user_provided_json(path_user_study_config_file)
-    ```
-    - If ``status == 0``, the JSON file was generated successfully.
-    - Otherwise, an error occurred, and execution should be stopped.
-
-3. Run the evaluation metrics using the ``run_metric()`` method, specifying the generated JSON file and the LLM model(s) to use:
-    ```python
-    proxann.run_metric(
-        tm_model_data_path.as_posix(),
-        llm_models=["qwen:32b"]
-    )
-    ```
-The script [``proxann_eval.py``](proxann_eval.py) contains a simple demonstration of this.
-
-### Deploying ProxAnn as a Web Service
-
-To run ProxAnn as a web service locally, execute the following command:
-
+1. Download the [latest release of Mallet](https://github.com/mimno/Mallet/releases).
+2. Place the contents in the `src/train` directory.
+3. Optionally, you can use the provided script to automate the download:
 ```bash
-python3 -m src.metric_mode.back
+bash bash_scripts/wget_mallet.sh
 ```
 
-This will start a web server that exposes ProxAnn's functionality via a REST API.
 
-Alternatively, you can use our hosted instance of the ProxAnn web service here: [https://proxann.uc3m.es/](https://proxann.uc3m.es/)
+## **Getting Started**
+
+This section will guide you through the process of setting up and using ProxAnn, from choosing the right LLM to running your first metric.
+
+### **Choosing the Right LLM for ProxAnn Metrics**
+
+ProxAnn’s performance varies depending on the language model used. This section summarizes how different LLMs perform across tasks and datasets, helping you balance accuracy with computational cost.
+
+<div style="background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; padding: 12px; border-radius: 6px; margin-bottom: 1em;"> <strong>Recommendation:</strong> For best overall alignment with human judgments, <strong>GPT-4o</strong> and <strong>Qwen 2.5–72B</strong> perform the strongest across both Fit and Rank steps. <strong>Qwen 1.5–32B</strong> is a solid cost-effective alternative. Avoid <strong>Llama 3.1–8B</strong>, which consistently underperforms. </div>
+
+#### **Alternative Annotator Test**
+
+This test estimates how often ProxAnn (with a given LLM) performs *as well as or better than* a random human annotator.
+Metrics are **advantage probabilities**. Asterisks (`*`) and daggers (`†`) mark statistical significance: `*` indicates the LLM outperforms a random human annotator (p < 0.05, t-test); `†` shows significance under a Wilcoxon signed-rank test.
+
+<div style="display: flex; justify-content: center; gap: 40px; flex-wrap: wrap;">
+
+  <!-- Wiki Table -->
+  <div>
+    <h4 style="text-align: center;">Wiki</h4>
+    <table border="1" cellpadding="6" cellspacing="0">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Doc ρ (Fit)</th>
+          <th>Doc ρ (Rank)</th>
+          <th>Topic ρ (Fit)</th>
+          <th>Topic ρ (Rank)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>GPT-4o</td><td>0.56<sup>*†</sup></td><td>0.68<sup>*†</sup></td><td>0.66<sup>†</sup></td><td>0.55<sup>†</sup></td></tr>
+        <tr><td>Llama 3.1 8B</td><td>0.22</td><td>0.36</td><td>0.05</td><td>0.11</td></tr>
+        <tr><td>Llama 3.1 70B</td><td>0.57<sup>*†</sup></td><td>0.67<sup>*†</sup></td><td>0.58<sup>†</sup></td><td>0.50<sup>†</sup></td></tr>
+        <tr><td>Qwen 1.5 8B</td><td>0.56<sup>*†</sup></td><td>0.58<sup>†</sup></td><td>0.46</td><td>0.39</td></tr>
+        <tr><td>Qwen 1.5 32B</td><td>0.55<sup>*†</sup></td><td>0.63<sup>†</sup></td><td>0.47</td><td>0.42</td></tr>
+        <tr><td>Qwen 2.5 72B</td><td>0.52<sup>†</sup></td><td>0.68<sup>*†</sup></td><td>0.66<sup>†</sup></td><td>0.46</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Bills Table -->
+  <div>
+    <h4 style="text-align: center;">Bills</h4>
+    <table border="1" cellpadding="6" cellspacing="0">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Doc ρ (Fit)</th>
+          <th>Doc ρ (Rank)</th>
+          <th>Topic ρ (Fit)</th>
+          <th>Topic ρ (Rank)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>GPT-4o</td><td>0.65<sup>*†</sup></td><td>0.71<sup>*†</sup></td><td>0.77<sup>*†</sup></td><td>0.75<sup>*†</sup></td></tr>
+        <tr><td>Llama 3.1 8B</td><td>0.30</td><td>0.53<sup>†</sup></td><td>0.14</td><td>0.44</td></tr>
+        <tr><td>Llama 3.1 70B</td><td>0.66<sup>*†</sup></td><td>0.67<sup>*†</sup></td><td>0.70<sup>*†</sup></td><td>0.60<sup>†</sup></td></tr>
+        <tr><td>Qwen 1.5 8B</td><td>0.66<sup>*†</sup></td><td>0.57<sup>†</sup></td><td>0.80<sup>*†</sup></td><td>0.43</td></tr>
+        <tr><td>Qwen 1.5 32B</td><td>0.67<sup>*†</sup></td><td>0.68<sup>*†</sup></td><td>0.74<sup>*†</sup></td><td>0.70<sup>*†</sup></td></tr>
+        <tr><td>Qwen 2.5 72B</td><td>0.61<sup>*†</sup></td><td>0.71<sup>*†</sup></td><td>0.78<sup>*†</sup></td><td>0.65<sup>†</sup></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+#### **Relationship between automated and human topic rankings**
+The plot and table below show how well ProxAnn’s topic rankings align with human judgments, using Kendall’s τ as the correlation metric. The *Human* row reflects inter-annotator agreement, and NPMI provides a traditional baseline.
+
+<div align="center">
+  <img src="figures/human_llm_comparison_barplot.png" alt="Human vs LLM correlation barplot" width="1000">
+</div>
+
+<br>
+
+<div align="center">
+  <table border="1" cellpadding="6" cellspacing="0">
+    <thead>
+      <tr>
+        <th>Metric / Model</th>
+        <th>Wiki (Fit)</th>
+        <th>Bills (Fit)</th>
+        <th>Wiki (Rank)</th>
+        <th>Bills (Rank)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>NPMI</td><td>-0.15 (0.14)</td><td>0.01 (0.10)</td><td>-0.18 (0.10)</td><td>-0.02 (0.12)</td></tr>
+      <tr><td><strong>GPT-4o</strong></td><td>0.22 (0.13)</td><td>0.31 (0.13)</td><td>0.27 (0.14)</td><td>0.29 (0.11)</td></tr>
+      <tr><td><strong>Llama 3.1 8B</strong></td><td>0.19 (0.18)</td><td>0.16 (0.18)</td><td>-0.35 (0.14)</td><td>0.15 (0.14)</td></tr>
+      <tr><td><strong>Qwen 1.5 8B</strong></td><td>0.35 (0.16)</td><td>0.12 (0.16)</td><td>0.33 (0.16)</td><td>0.28 (0.13)</td></tr>
+      <tr><td><strong>Qwen 1.5 32B</strong></td><td>0.20 (0.18)</td><td><strong>0.34 (0.11)</strong></td><td><strong>0.51 (0.11)</strong></td><td><strong>0.30 (0.13)</strong></td></tr>
+      <tr><td><strong>Llama 3.1 70B</strong></td><td>0.41 (0.14)</td><td>0.26 (0.15)</td><td>0.36 (0.13)</td><td>0.19 (0.13)</td></tr>
+      <tr><td><strong>Qwen 2.5 72B</strong></td><td><strong>0.48 (0.13)</strong></td><td>0.22 (0.17)</td><td>0.36 (0.12)</td><td>0.21 (0.15)</td></tr>
+      <tr><td><em>Human (HTM)</em></td><td>0.41 (0.09)</td><td>0.09 (0.14)</td><td>0.34 (0.09)</td><td>0.18 (0.12)</td></tr>
+    </tbody>
+  </table>
+</div>
 
 
-## Reproducibility
+### **Preparing Topic Models for ProxAnn**
 
-### Data
 
-We use the Wiki and Bills preprocessed datasets from [Hoyle et al. 2022](https://aclanthology.org/2022.findings-emnlp.390/) in their 15,000-term vocabulary form, available in the [original repository](https://github.com/ahoho/topics).
+### **Evaluating Topic Model Estimates with ProxAnn Metrics**
 
-### Models
 
-We reuse the 50-topics LDA-Mallet and CTM topic models from [Hoyle et al. 2022](https://aclanthology.org/2022.findings-emnlp.390/) and train a BERTopic model for each dataset using the same experimental setup with default hyperparameters, implemented in the `src.train.tm_trainer.BERTopicTrainer` class. These trained models are available upon request.
+### **Running LLMs Independently (Prompter)**
 
-### User Study Configuration
 
-We randomly sample 8 of the 50 topics from the Wiki and Bills datasets for each of the three models. For each sampled topic, the corresponding topics from the remaining models are selected based on the smallest word-mover's distance, as implemented in the `src.user_study_data_collector.topics_docs_selection.topic_selector` class.
 
-Using the [user study configuration files](config/user_study), JSON files (one per dataset) can be generated to set up the user and ProxAnn studies. These configuration files must adhere to the following structure:
+### **End-to-End Example: A Practical Walkthrough**
 
-- **Model-Specific Settings:**
-  For each model being evaluated, specify the paths based on its training origin:
-  - If the model was **not trained using this code** (`trained_with_thetas_eval=False`), provide:
-    - `thetas_path`: Path to the document-topic distribution.
-    - `betas_path`: Path to the word-topic distribution.
-    - `vocabulary_path`: Path to the vocabulary file.
-    - `corpus_path`: Path to the corpus file.
-  - If the model **was trained using this code** (`trained_with_thetas_eval=True`), provide:
-    - `model_path`: Path to the model file.
-    - `corpus_path`: Path to the corpus file.
-  - Additionally, `remove_topic_ids` can contain numbers (separated by commas) representing topics that should not be considered for matching.
 
-The generated JSON files are available [here](data/json_out) and can be created using the following command:
+### **Evaluating New LLMs with Human and Topic Model Data**
 
-```bash
-python3 get_user_study_data.py --user_study_config <path_user_study_config_file>
-```
 
-### Human Annotations
+### **Reproducing Results from the Paper**
 
-User responses were collected through Prolific using the `src.annotations.annotation_server` server. The collected responses are XXX [update this depending on where the files are saved].
-
-### LLM Annotations
-
-To obtain LLM annotations, run the `proxann_user_study.py` (or its bash version `bash_scripts/run_proxann.sh`) script with the following parameters:
-
-- **`--model_type "$MODEL_TYPE"`**  
-  Specifies the language model(s) to be used for generating annotations. Both open-source and closed-source models are supported. Refer to `config/config.yaml` for the currently available models. New models can be added as needed.
-
-- **`--prompt_mode "$PROMPT_MODE"`**  
-  Defines the evaluation steps to perform. Options include:
-  - `q1_then_q2_dspy`: Step 1 – Category Identification, followed by Step 2 – Relevance Judgment.  
-  - `q1_then_q3_dspy`: Step 1 – Category Identification, followed by Step 3 – Representativeness Ranking.  
-  Multiple modes can be specified simultaneously, separated by commas.
-
-- **`--removal_condition "$REMOVAL_CONDITION"`**  
-  Determines the criteria for disqualifying responses:  
-  - `loose`: Disqualifies responses with one or more failures.  
-  - `strict`: Disqualifies responses only if all conditions fail.
-
-- **`--path_save_results "$SAVE_PATH"`**  
-  Specifies the directory path where the generated annotations will be saved.
-
-- **`--tm_model_data_path "$TM_MODEL_DATA_PATH"`**  
-  Path to the user study JSON files generated during the setup phase.
-
-- **`--response_csv "$RESPONSE_CSV"`**  
-  Path to the CSV file containing human annotations collected through Qualtrics.
-
-- **`--dataset_key "$DATASET_KEY"`**  
-  Identifies the dataset to be annotated (e.g., `Wiki`, `Bills`).

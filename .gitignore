@@ -160,5 +160,13 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-all_info_bradley_terry.json
+*no_commit/
+*logs/
+*.nobackup
 .DS_Store
+.env_uc3m
+src/metric_mode/uploads
+src/train/Mallet-202108
+python_scripts/_old
+
+old_readme.md

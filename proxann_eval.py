@@ -38,21 +38,21 @@ Arguments:
 
 import argparse
 
-from src.proxann.proxann import ProxAnn
-from src.utils.utils import init_logger
+from proxann.llm_annotations.proxann import ProxAnn
+from proxann.utils.file_utils import init_logger
 
 
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config_path", type=str,  required=False, default="config/config.yaml",
+        "--config_path", type=str,  required=False, default="src/proxann/config/config.yaml",
         help="Path to the configuration file.")
     parser.add_argument(
         "--user_study_config",
         help="Path to the user study configuration file.",
         required=False,
-        default="config/config_pilot.conf")
+        default="data/user_study/config_pilot_test.conf")
     
     return parser.parse_args()
 
@@ -80,7 +80,7 @@ def main():
     
     corr_data, _ = proxann.run_metric(
         tm_model_data_path.as_posix(),
-        llm_models=["qwen:32b"]
+        llm_models=["gpt-4o-2024-08-06"]
     )
     
     logger.info("Evaluation completed successfully.")

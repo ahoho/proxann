@@ -5,12 +5,12 @@ import datetime
 
 import pandas as pd
 
-from src.proxann.prompter import Prompter
-from src.proxann.proxann import ProxAnn
-from src.proxann.utils import (
+from proxann.llm_annotations.prompter import Prompter
+from proxann.llm_annotations.proxann import ProxAnn
+from proxann.llm_annotations.utils import (
     collect_fit_rank_data, load_config_pilot, normalize_key, process_responses
 )
-from src.utils.utils import init_logger, load_yaml_config_file, log_or_print
+from proxann.utils.file_utils import init_logger, load_yaml_config_file, log_or_print
 
 Q1_THEN_Q2_PROMPTS = {"q1_then_q2_mean"}
 Q1_THEN_Q3_PROMPTS = {"q1_then_q3_mean"}
@@ -20,54 +20,58 @@ def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config_path", type=str,  required=False, default="config/config.yaml",
-        help="Path to the configuration file.")
+        "--config_path", type=str,  required=False, 
+        default="src/proxann/config/config.yaml",
+        help="Path to the configuration file."
+    )
     parser.add_argument(
-        "--running_mode", type=str, default="run", required=False,
-        help="Running mode: run or eval.")
+        "--running_mode", type=str, required=False,
+        default="run",
+        help="Running mode: run or eval."
+    )
     parser.add_argument(
-        "--dataset_key", type=str, default="wiki",
-        help="Dataset to use for filtering the data.")
+        "--dataset_key", type=str, required=True,
+        help="Dataset to use for filtering the data."
+    )
     parser.add_argument(
-        "--model_type", type=str, default="llama3.2",
-        help="LLM types to evaluate, separated by commas (e.g., llama3.2,llama3.1:8b-instruct-q8_0).")
+        "--model_type", type=str, required=True,
+        help="LLM types to evaluate, separated by commas (e.g., llama3.2,llama3.1:8b-instruct-q8_0)."
+    )
     parser.add_argument(
-        "--prompt_mode", type=str, default="q1_then_q3_dspy,q1_then_q2_dspy",
-        help="Prompting modes, separated by commas (e.g., q1_then_q3_dspy,q1_then_q2_dspy).")
+        "--prompt_mode", type=str, required=False,
+        default="q1_then_q3_mean,q1_then_q2_mean",
+        help="Prompting modes, separated by commas (e.g., q1_then_q3_mean,q1_then_q2_mean)."
+    )
     parser.add_argument(
-        "--tm_model_data_path", type=str,
-        help="Path to JSON config files with model data (from user_study_data_collector).",
-        default="data/files_pilot/config_first_round.json,data/files_pilot/config_second_round.json")
+        "--tm_model_data_path", type=str, required=True,
+        help="Path to JSON config files with model data (from user_study_data_collector)."
+    )
     parser.add_argument(
-        "--response_csv", type=str,
-        help="Path to the CSV with human responses from Qualtrics.",
-        default="data/files_pilot/Cluster+Evaluation+-+Sort+and+Rank_July+14%2C+2024_15.13.csv")
+        "--response_csv", type=str, required=True,
+        help="Path to the CSV with human responses from Qualtrics."
+    )
     parser.add_argument(
-        "--do_both_ways", action="store_true",
-        help="Run Q3 twice: once with A as the first document, then reversed.")
-    parser.add_argument(
-        "--use_user_cats", action="store_true",
-        help="Use user categories for Q2/Q3 instead of LLM-generated ones from Q1.",
-        default=False)
-    parser.add_argument(
-        "--removal_condition", type=str,
+        "--removal_condition", type=str, required=False,
         default="loose",
         help="Condition for disqualifying responses ('loose': 1+ failures, 'strict': all failures)."
     )
     parser.add_argument(
-        "--path_save_results", type=str,
+        "--path_save_results", type=str, required=True,
         help="Path to save results.",
-        default="data/files_pilot/results")
+    )
     parser.add_argument(
-        "--temperatures", type=str, default=None,
+        "--temperatures", type=str, required=False,
+        default=None,
         help="Temperatures value for the LLM generation in Q1/Q2/Q3, separated by commas."
     )
     parser.add_argument(
-        "--seed", type=int, default=None,
+        "--seed", type=int, required=False,
+        default=None, 
         help="Seed for random number generator." 
     )
     parser.add_argument(
-        "--max_tokens", type=int, default=None,
+        "--max_tokens", type=int, required=False,
+        default=None,
         help="Max tokens for the LLM generation."
     )
     return parser.parse_args()
@@ -205,7 +209,6 @@ def main():
                             users_rank=users_rank,
                             category=category,
                             temperature=q3_temp,
-                            doing_both_ways=args.do_both_ways
                         )
                     elif prompt_mode in Q1_THEN_Q2_PROMPTS:
                         log_or_print("-- Executing Q1 / Q2...", logger)
@@ -228,8 +231,6 @@ def main():
                         # ==============================================
                         # Q2
                         # ==============================================
-                        # if args.use_user_cats:
-                        #    for_q2user_cats = users_cats
                         labels = proxann.do_q2(
                             prompter=prompter, 
                             prompt_mode=prompt_mode, 

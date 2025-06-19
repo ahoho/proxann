@@ -37,5 +37,8 @@ dependencies = [
 requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+sources = ["src"]
+
 [tool.uv]
 package = false

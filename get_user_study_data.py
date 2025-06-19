@@ -8,7 +8,7 @@ Then, using the path of the model as key, the output of all models is grouped in
 """
 
 import argparse
-from src.proxann.proxann import ProxAnn
+from proxann.llm_annotations.proxann import ProxAnn
 
 def main():
 
@@ -18,7 +18,7 @@ def main():
         help="Path to the configuration file.",
         type=str,
         required=False,
-        default="config/config.yaml"
+        default="src/proxann/config/config.yaml"
     )
     argparser.add_argument(
         "--user_study_config",

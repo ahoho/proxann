@@ -162,14 +162,16 @@ cython_debug/
 
 *no_commit/
 *logs/
+*old/
 *.nobackup
 *.exclude_backup
+data/training_data
+data/models
 .DS_Store
 .env_uc3m
-src/metric_mode/uploads
-src/train/Mallet-202108
+src/proxann/llm_annotations/frontend/uploads
+*Mallet-202108
 python_scripts/_old
 data/json_out/tests
+data/tests
 cache
-
-old_readme.md

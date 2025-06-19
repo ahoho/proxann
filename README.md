@@ -1,10 +1,8 @@
-<!-- markdownlint-disable MD041 -->
-<!-- markdownlint-disable MD033 -->
-<p align="center" style="display: flex; align-items: center; justify-content: center;">
-  <img src="./figures/repo/Proxann8.png" alt="Logo" width="150" height="150" style="display: inline-block;">
-</p>
-<!-- markdownlint-enable MD033 -->
-<!-- markdownlint-disable MD041 -->
+<!-- markdownlint-disable MD033 MD041 -->
+<div align="center">
+  <img src="./figures/repo/Proxann8.png" alt="Logo" width="150" height="150">
+</div>
+<!-- markdownlint-enable MD033 MD041 -->
 
 This repository contains the code and data for reproducing experiments from our paper, *ProxAnn: Use-Oriented Evaluations of Topic Models and Document Clustering.*
 
@@ -33,19 +31,20 @@ This repository contains the code and data for reproducing experiments from our 
     - [1. Initialize the `Prompter`](#1-initialize-the-prompter)
     - [2. Make a Prompt Call](#2-make-a-prompt-call)
   - [**Human Annotations**](#human-annotations)
-  - [**Evaluating New LLMs with Human and Topic Model Data**](#evaluating-new-llms-with-human-and-topic-model-data)
+  - [**LLM Annotations**](#llm-annotations)
+    - [Required Parameters](#required-parameters)
+    - [Optional Parameters](#optional-parameters)
   - [**Reproducing Results from the Paper**](#reproducing-results-from-the-paper)
-    - [Data](#data)
-
+    - [Required Files and Directory Structure](#required-files-and-directory-structure)
 
 ## **Features**
 
 1. **User Study Data Generation**:
-   - Use the `src.user_study_data_collector` module to generate the JSON files containing the required topic model information to carry out the evaluation (or user study).
+   - Use the `proxann.data_formatter` module to generate the JSON files containing the required topic model information to carry out the evaluation (or user study).
 2. **Proxy-Based Evaluation**:
-   - Perform LLM proxy evaluations using the `src.proxann` module.
+   - Perform LLM proxy evaluations using the `proxann.llm_annotations` module.
 3. **Topic Model Training**:
-   - Train topic and clustering models (currently, LDA-Mallet, LDA-Tomotopy, and BERTopic) under a unified structure using the `src.train` module.
+   - Train topic and clustering models (currently, LDA-Mallet, LDA-Tomotopy, and BERTopic) under a unified structure using the `proxann.topic_models.train` module.
 
 ## **Installation**
 
@@ -56,11 +55,13 @@ We recommend **uv** for installing the necessary dependencies.
 1. Install uv by following the [official guide](https://docs.astral.sh/uv/getting-started/installation/)
 
 2. Create a local environment (it will use the python version specified in pyproject.toml)
+
   ```bash
   uv venv
   ```
 
 3. Install dependencies
+
   ```bash
   uv pip install -e .
   ```
@@ -74,12 +75,15 @@ We recommend **uv** for installing the necessary dependencies.
 #### GPT Models (OpenAI)
 
 To use GPT models via the OpenAI API, create a `.env` file in the root directory with the following content:
+
 ```bash
 OPENAI_API_KEY=[your_open_ai_api_key]
 ```
+
 You can also modify the path to the ``.env`` file in the [configuration file](config/config.yaml).
 
 #### Open-Source Models (via vLLM)
+
 We rely on [vLLM models](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html?ref=blog.mozilla.ai) for evaluating with open-source large language models. You must have the model running and specify the endpoint where it is deployed in the [configuration file](config/config.yaml).
 
 ### 2. Topics Models
@@ -91,6 +95,7 @@ The `src.train` module supports multiple topic modeling backends. No extra setup
 1. Download the [latest release of Mallet](https://github.com/mimno/Mallet/releases).
 2. Place the contents in the `src/train` directory.
 3. Optionally, you can use the provided script to automate the download:
+
 ```bash
 bash bash_scripts/wget_mallet.sh
 ```
@@ -165,6 +170,7 @@ Metrics are **advantage probabilities**. Asterisks (`*`) and daggers (`†`) mar
 </div>
 
 #### **Relationship between automated and human topic rankings**
+
 The plot and table below show how well ProxAnn’s topic rankings align with human judgments, using Kendall’s τ as the correlation metric. The *Human* row reflects inter-annotator agreement, and NPMI provides a traditional baseline.
 
 <div align="center">
@@ -205,8 +211,10 @@ ProxAnn expects output from *traditional topic models*, where each document is r
 
 To be used with ProxAnn, models must be saved as NumPy arrays (`.npy` or `.npz`), along with:
 
-* A JSON file containing the model vocabulary (i.e., the words indexing the columns in $\beta_k$).
-* A plain-text corpus file (one document per line).
+- A JSON file containing the model vocabulary (i.e., the words indexing the columns in $\beta_k$).
+- A plain-text corpus file (one document per line).
+
+Here, you can download examples files that meet these requirements.
 
 Alternatively, you can train topic models directly using ProxAnn's training module. In that case, only the corpus is required. See [`bash_scripts/train_models.sh`](bash_scripts/train_models.sh) for an example of how to invoke [`src/train/tm_trainer.py`](src/train/tm_trainer.py).
 
@@ -216,10 +224,10 @@ Alternatively, you can train topic models directly using ProxAnn's training modu
 
 ProxAnn creates a JSON file that serves as input for both human and LLM-based evaluations. This file contains:
 
-* Top words for each topic (`topic_words`)
-* Representative documents (`exemplar_docs`) using various selection methods (`thetas`, `thetas_sample`, `sall`, etc.)
-* Evaluation documents with topic assignment probabilities (`eval_docs`)
-* A distractor document for each topic
+- Top words for each topic (`topic_words`)
+- Representative documents (`exemplar_docs`) using various selection methods (`thetas`, `thetas_sample`, `sall`, etc.)
+- Evaluation documents with topic assignment probabilities (`eval_docs`)
+- A distractor document for each topic
 
 **Example structure:**
 
@@ -246,19 +254,19 @@ ProxAnn creates a JSON file that serves as input for both human and LLM-based ev
 
 To generate the above JSON files, you’ll need a YAML config file like those in [`config/user_study`](config/user_study). Each config should specify how to load model outputs depending on how the model was trained:
 
-* If the model was **not trained with ProxAnn** (`trained_with_thetas_eval=False`), provide:
+- If the model was **not trained with ProxAnn** (`trained_with_thetas_eval=False`), provide:
 
-  * `thetas_path`: Document-topic matrix (docs × topics)
-  * `betas_path`: Topic-word matrix (topics × vocab size)
-  * `vocabulary_path`: Vocabulary file
-  * `corpus_path`: Original documents (one per line)
+  - `thetas_path`: Document-topic matrix (docs × topics)
+  - `betas_path`: Topic-word matrix (topics × vocab size)
+  - `vocabulary_path`: Vocabulary file
+  - `corpus_path`: Original documents (one per line)
 
-* If the model **was trained using ProxAnn** (`trained_with_thetas_eval=True`), provide:
+- If the model **was trained using ProxAnn** (`trained_with_thetas_eval=True`), provide:
 
-  * `model_path`: Path to the trained model
-  * `corpus_path`: As above
+  - `model_path`: Path to the trained model
+  - `corpus_path`: As above
 
-* You can also specify `remove_topic_ids` to exclude topics from evaluation.
+- You can also specify `remove_topic_ids` to exclude topics from evaluation.
 
 ---
 
@@ -281,7 +289,7 @@ To evaluate your topic model using ProxAnn:
 #### 1. Initialize the ProxAnn object
 
 ```python
-from src.proxann.proxann import ProxAnn
+from proxann.llm_annotations.proxann import ProxAnn
 proxann = ProxAnn()
 ```
 
@@ -293,8 +301,8 @@ Use a user study configuration file (see examples in [`config/user_study`](confi
 status, tm_model_data_path = proxann.generate_user_provided_json(path_user_study_config_file)
 ```
 
-* If `status == 0`, the JSON was created successfully.
-* Otherwise, an error occurred, and evaluation should be halted.
+- If `status == 0`, the JSON was created successfully.
+- Otherwise, an error occurred, and evaluation should be halted.
 
 #### 3. Run the ProxAnn evaluation
 
@@ -305,8 +313,8 @@ proxann.run_metric(
 )
 ```
 
-* `llm_models` is a list of LLMs to use for evaluation.
-* These must be pre-defined in your [`config/config.yaml`](config/config.yaml), under the deployment section you're using (e.g., `vllm`, `openai`, etc.).
+- `llm_models` is a list of LLMs to use for evaluation.
+- These must be pre-defined in your [`config/config.yaml`](config/config.yaml), under the deployment section you're using (e.g., `vllm`, `openai`, etc.).
 
 Example `config.yaml` snippet for a VLLM setup:
 
@@ -325,7 +333,7 @@ See [`proxann_eval.py`](proxann_eval.py) for a minimal runnable example.
 You can also run ProxAnn as a REST API server:
 
 ```bash
-python3 -m src.metric_mode.back
+python3 -m proxann.llm_annotations.frontend.back
 ```
 
 This launches a local web server that exposes ProxAnn’s evaluation pipeline via HTTP endpoints.
@@ -333,6 +341,9 @@ This launches a local web server that exposes ProxAnn’s evaluation pipeline vi
 Alternatively, use the hosted instance at:
 👉 [https://proxann.uc3m.es/](https://proxann.uc3m.es/)
 
+<div align="center">
+  <img src="figures/Rettan.png" alt="ProxAnn frontend" width="1000">
+</div>
 
 ---
 
@@ -347,7 +358,7 @@ The `Prompter` class includes a **caching mechanism** that ensures repeated prom
 #### 1. Initialize the `Prompter`
 
 ```python
-from src.proxann.prompter import Prompter
+from proxann.proxann.prompter import Prompter
 
 llm_model = "Qwen/Qwen3-8B"  # Must match a model defined in `available_models` for your deployment type (e.g., VLLM, OpenAI)
 prompter = Prompter(model_type=llm_model)
@@ -366,80 +377,124 @@ result, logprobs = prompter.prompt(system_prompt, question_prompt)
 
 ### **Human Annotations**
 
-User responses were collected through Prolific using the `src.annotations.annotation_server` server. More details on this will be provided soon.
+User responses were collected through Prolific using the `user_annotations/annotation_server.py` server. More details on this will be provided soon.
 
-### **Evaluating New LLMs with Human and Topic Model Data**
+### **LLM Annotations**
 
-To obtain LLM annotations, run the `proxann_user_study.py` (or its bash version `bash_scripts/run_proxann.sh`) script with the following parameters:
+To generate LLM-based annotations, run [`proxann_user_study.py`](proxann_user_study.py) (or the bash wrapper [`bash_scripts/run_proxann_multiple.sh`](bash_scripts/run_proxann_multiple.sh)) with the following parameters:
 
-- **`--model_type "$MODEL_TYPE"`**  
-  Specifies the language model(s) to be used for generating annotations. Both open-source and closed-source models are supported. Refer to `config/config.yaml` for the currently available models. New models can be added as needed.
+#### Required Parameters
 
-- **`--prompt_mode "$PROMPT_MODE"`**  
-  Defines the evaluation steps to perform. Options include:
-  - `q1_then_q2_mean`: Step 1 – Category Identification, followed by Step 2 – Relevance Judgment.  
-  - `q1_then_q3_mean`: Step 1 – Category Identification, followed by Step 3 – Representativeness Ranking.  
-  Multiple modes can be specified simultaneously, separated by commas.
+- **`--model_type "$MODEL_TYPE"`**
+  LLM(s) to be used for generating annotations. Multiple models can be specified, separated by commas. These must be defined in `available_models` under the chosen deployment section in [`config/config.yaml`](config/config.yaml).
 
-- **`--removal_condition "$REMOVAL_CONDITION"`**  
-  Determines the criteria for disqualifying responses:  
-  - `loose`: Disqualifies responses with one or more failures.  
-  - `strict`: Disqualifies responses only if all conditions fail.
+- **`--tm_model_data_path "$TM_MODEL_DATA_PATH"`**
+  Path to the JSON file containing model output, generated in the setup phase (e.g., using `get_user_study_data.py`).
 
-- **`--path_save_results "$SAVE_PATH"`**  
-  Specifies the directory path where the generated annotations will be saved.
+- **`--dataset_key "$DATASET_KEY"`**
+  Identifier for the dataset being evaluated (e.g., `Wiki`, `Bills`).
 
-- **`--tm_model_data_path "$TM_MODEL_DATA_PATH"`**  
-  Path to the user study JSON files generated during the setup phase.
+- **`--response_csv "$RESPONSE_CSV"`**
+  Path to a CSV file containing human annotation responses (e.g., from Qualtrics).
 
-- **`--response_csv "$RESPONSE_CSV"`**  
-  Path to the CSV file containing human annotations collected through Qualtrics.
+- **`--path_save_results "$SAVE_PATH"`**
+  Directory where generated annotations and results will be saved.
 
-- **`--dataset_key "$DATASET_KEY"`**  
-  Identifies the dataset to be annotated (e.g., `Wiki`, `Bills`).
+#### Optional Parameters
 
+- **`--prompt_mode "$PROMPT_MODE"`** *(default: `q1_then_q3_mean,q1_then_q2_mean`)*
+  Which evaluation steps to perform. Comma-separated list of options:
 
-    parser.add_argument(
-        "--do_both_ways", action="store_true",
-        help="Run Q3 twice: once with A as the first document, then reversed.")
-    parser.add_argument(
-        "--use_user_cats", action="store_true",
-        help="Use user categories for Q2/Q3 instead of LLM-generated ones from Q1.",
-        default=False)
-    parser.add_argument(
-        "--removal_condition", type=str,
-        default="loose",
-        help="Condition for disqualifying responses ('loose': 1+ failures, 'strict': all failures)."
-    )
-    parser.add_argument(
-        "--path_save_results", type=str,
-        help="Path to save results.",
-        default="data/files_pilot/results")
-    parser.add_argument(
-        "--temperatures", type=str, default=None,
-        help="Temperatures value for the LLM generation in Q1/Q2/Q3, separated by commas."
-    )
-    parser.add_argument(
-        "--seed", type=int, default=None,
-        help="Seed for random number generator." 
-    )
-    parser.add_argument(
-        "--max_tokens", type=int, default=None,
-        help="Max tokens for the LLM generation."
+  - `q1_then_q2_mean`: Category Identification → Relevance Judgment
+  - `q1_then_q3_mean`: Category Identification → Representativeness Ranking
+
+- **`--config_path "$CONFIG_PATH"`** *(default: `src/proxann/config/config.yaml`)*
+  Path to the main configuration YAML file.
+
+- **`--running_mode "$MODE"`** *(default: `run`)*
+  Mode of execution: `run` or `eval`.
+
+- **`--removal_condition "$REMOVAL_CONDITION"`** *(default: `loose`)*
+  Condition for disqualifying invalid responses:
+
+  - `loose`: Exclude if **any** evaluation fails.
+  - `strict`: Exclude only if **all** fail.
+
+- **`--temperatures "$TEMP_LIST"`**
+  Comma-separated temperatures for LLM generation in Q1/Q2/Q3 (e.g., `"0.7,0.3,0.5"`).
+
+- **`--seed "$SEED"`**
+  Integer seed for random number generation (for reproducibility).
+
+- **`--max_tokens "$MAX_TOKENS"`**
+  Maximum number of tokens allowed in LLM completions.
 
 ### **Reproducing Results from the Paper**
 
+To reproduce the results from our paper using ProxAnn, ensure the following datasets, models, and configuration files are placed in the correct directories. These paths correspond to those expected by the script [`bash_scripts/run_proxann_multiple.sh`](bash_scripts/run_proxann_multiple.sh).
 
-#### Data
+#### Required Files and Directory Structure
 
-- **Datasets:** We use the Wiki and Bills preprocessed datasets from [Hoyle et al. 2022](https://aclanthology.org/2022.findings-emnlp.390/) in their 15,000-term vocabulary form, available in the [original repository](https://github.com/ahoho/topics).
+- **Datasets**
+  Preprocessed Wiki and Bills datasets (15,000-term vocabulary) from Hoyle et al. (2022).
 
-- **Models**: We reuse the 50-topics LDA-Mallet and CTM topic models from [Hoyle et al. 2022](https://aclanthology.org/2022.findings-emnlp.390/) and train a BERTopic model for each dataset using the same experimental setup with default hyperparameters, implemented in the `src.train.tm_trainer.BERTopicTrainer` class. The trained models are available here. 
+  Download: [🔗](https://drive.google.com/file/d/1qdH0rI5m24vexaF0lzo_KZQEsVD5qMQJ/view?usp=drive_link)
 
-- **User Study Configuration:** We randomly sample 8 of the 50 topics from the Wiki and Bills datasets for each of the three models. The config files we used for the study are available at XXX and the output that feeds the next two steps (Human Annotations and LLM Annotation) are availabe XXX.
+  Save to: `data/training_data/`
 
-- **User Study Data (Input for Human and LLM annotations):**
-  
-- **Human annotations:**
+- **Trained Topic Models**
+  Includes LDA-Mallet and CTM models from Hoyle et al., and BERTopic models trained using `proxann.topic_models.train.BERTopicTrainer`.
 
-- **LLM annotations:**
+  Download: [🔗](https://drive.google.com/file/d/18TMTOoq9qwlWZtB3CSpRfv-5TaC1VzC7/view?usp=drive_link)
+
+  Save to: `data/models/`
+
+- **User Study Configuration Files**
+  Configuration files for sampling 8 topics per model per dataset.
+
+  Available in: `data/user_study/`
+
+- **User Study JSON Files**
+  Generated using `get_user_study_data.py`.
+
+  Save to: `data/json_out/`
+
+  Expected files:
+
+  - `data/json_out/config_wiki_part1.json`
+  - `data/json_out/config_wiki_part2.json`
+  - `data/json_out/config_bills_part1.json`
+  - `data/json_out/config_bills_part2.json`
+
+- **Human Annotations**
+  Collected via Qualtrics, matching the user study JSON files.
+  Save to:
+
+  - `data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank_December+12,+2024_05.19.csv`
+  - `data/human_annotations/Cluster+Evaluation+-+Sort+and+Rank+-+Bills_December+14,+2024_13.20.csv`
+
+- **LLM Annotations**
+  LLM outputs for all models evaluated in the paper.
+
+  Save to: `data/llm_out/`
+
+- **Coherence Scores**
+  Topic coherence evaluation metrics.
+
+  Save to: `data/cohrs/`
+
+Once the files are in place, you can run:
+
+```bash
+bash bash_scripts/run_proxann_multiple.sh
+```
+
+To ensure full reproducibility, use the same random seeds that appear in the filenames of our saved evaluation outputs. For example, in the file:
+
+```
+data/llm_out/mean/wiki/Qwen2.5-72B-Instruct-AWQ/q1_then_q3_mean,q1_then_q2_mean_temp1.0_0.0_0.0_seed174_20250529_1352
+```
+
+the seed used is `174`.
+
+Once you have both the LLM-generated and human annotations in place, you can reproduce all tables and figures from the paper using the notebooks and scripts provided in [`evaluation_scripts`](evaluation_scripts).

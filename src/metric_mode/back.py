@@ -173,15 +173,15 @@ def evaluate():
     q2_temp = float(request.form.get("q2_temp", 0))
     q3_temp = float(request.form.get("q3_temp", 0))
     custom_seed = int(request.form.get("custom_seed", 1234))
-    q1_q3_prompt_mode = request.form.get("q1_q3_prompt_mode")
-    q1_q2_prompt_mode = request.form.get("q1_q2_prompt_mode")
+    #q1_q3_prompt_mode = request.form.get("q1_q3_prompt_mode")
+    #q1_q2_prompt_mode = request.form.get("q1_q2_prompt_mode")
     openai_key = request.form.get("openai_key")
-    do_both_ways = request.form.get("do_both_ways") == "on"  # checkbox
+    #do_both_ways = request.form.get("do_both_ways") == "on"  # checkbox
     
     if not is_openai_key_valid(openai_key):
         return jsonify({"error": "Invalid OpenAI API key."}), 400
 
-    logger.info(f"llm_model: {llm_model}, q1_temp: {q1_temp}, q2_temp: {q2_temp}, q3_temp: {q3_temp}, custom_seed: {custom_seed}, do_both_ways: {do_both_ways}")
+    logger.info(f"llm_model: {llm_model}, q1_temp: {q1_temp}, q2_temp: {q2_temp}, q3_temp: {q3_temp}, custom_seed: {custom_seed}")
     
     # Topics to evaluate (comma-separated list or blank)
     topics_raw = request.form.get("topics_to_evaluate", "").strip()
@@ -211,9 +211,9 @@ def evaluate():
         q2_temp=q2_temp,
         q3_temp=q3_temp,
         custom_seed=custom_seed,
-        do_both_ways=do_both_ways,
-        q1_q3_prompt_mode=q1_q3_prompt_mode,
-        q1_q2_prompt_mode=q1_q2_prompt_mode,
+        do_both_ways=True,
+        q1_q3_prompt_mode="q1_then_q3_mean",
+        q1_q2_prompt_mode="q1_then_q2_mean",
         openai_key=openai_key,
     )
 

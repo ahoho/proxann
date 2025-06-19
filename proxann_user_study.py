@@ -12,8 +12,8 @@ from src.proxann.utils import (
 )
 from src.utils.utils import init_logger, load_yaml_config_file, log_or_print
 
-Q1_THEN_Q2_PROMPTS = {"q1_then_q2_dspy", "q1_then_q2_mean"}
-Q1_THEN_Q3_PROMPTS = {"q1_then_q3_dspy", "q1_then_q3_mean"}
+Q1_THEN_Q2_PROMPTS = {"q1_then_q2_mean"}
+Q1_THEN_Q3_PROMPTS = {"q1_then_q3_mean"}
 
 
 def parse_args():

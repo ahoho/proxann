@@ -14,7 +14,7 @@ from scipy.stats import kendalltau, spearmanr, pearsonr
 from sklearn.metrics import ndcg_score
 
 import math
-from utils.utils import log_or_print
+from src.utils.utils import log_or_print
 import requests
 
 def load_template(template_path: str) -> str:

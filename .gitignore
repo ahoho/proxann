@@ -163,10 +163,13 @@ cython_debug/
 *no_commit/
 *logs/
 *.nobackup
+*.exclude_backup
 .DS_Store
 .env_uc3m
 src/metric_mode/uploads
 src/train/Mallet-202108
 python_scripts/_old
+data/json_out/tests
+cache
 
 old_readme.md

@@ -375,9 +375,13 @@ result, logprobs = prompter.prompt(system_prompt, question_prompt)
 - `system_prompt` is optional and can be left as `None`.
 - You may also override the `temperature` or other generation parameters at call time.
 
+---
+
 ### **Human Annotations**
 
 User responses were collected through Prolific using the `user_annotations/annotation_server.py` server. More details on this will be provided soon.
+
+---
 
 ### **LLM Annotations**
 
@@ -428,6 +432,8 @@ To generate LLM-based annotations, run [`proxann_user_study.py`](proxann_user_st
 
 - **`--max_tokens "$MAX_TOKENS"`**
   Maximum number of tokens allowed in LLM completions.
+
+---
 
 ### **Reproducing Results from the Paper**
 

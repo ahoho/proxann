@@ -27,9 +27,7 @@ from sklearn.preprocessing import normalize
 from tqdm import tqdm
 from umap import UMAP
 
-from proxann.utils.file_utils import (file_lines, get_embeddings_from_str, init_logger,
-                             load_vocab_from_txt, load_yaml_config_file,
-                             pickler, read_dataframe)
+from proxann.utils.file_utils import (file_lines, get_embeddings_from_str, init_logger,load_vocab_from_txt, load_yaml_config_file,  pickler, read_dataframe)
 
 # from cuml.manifold import UMAP
 
@@ -291,7 +289,15 @@ class MalletLDATrainer(TMTrainer):
         super().__init__(model_path, logger, config_path)
 
         # Load parameters from config
+        
+        # get current path
+        current_path = pathlib.Path(__file__).parent.resolve()
         mallet_config = self.config.get("mallet", {})
+        mallet_path = mallet_config.get("mallet_path", None)
+        if mallet_path is None or not (current_path / mallet_path).exists():
+            self._logger.error(
+                "Mallet path not provided or does not exist. Please check the configuration.")
+        
         default_params = {
             "alpha": float(mallet_config.get("alpha", 5.0)),
             "optimize_interval": int(mallet_config.get("optimize_interval", 10)),
@@ -301,11 +307,7 @@ class MalletLDATrainer(TMTrainer):
             "token_regexp": mallet_config.get(
                 "token_regexp", r"[\p{L}\p{N}][\p{L}\p{N}\p{P}]*\p{L}"
             ),
-            "mallet_path": pathlib.Path(
-                mallet_config.get(
-                    "mallet_path", "src/train/Mallet-202108/bin/mallet"
-                )
-            ),
+            "mallet_path": (current_path / mallet_path),
         }
 
         # Apply default parameters and override with kwargs

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-CONFIG_FILE="/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/config/config.yaml"
-TRAINER_TYPE="BERTopic"
+CONFIG_FILE="src/proxann/config/config.yaml"
+TRAINER_TYPE="MalletLda"
 NUM_TOPICS=50
-SCRIPT="python3 src/train/tm_trainer.py"
+SCRIPT="python3 -m proxann.topic_models.train.tm_trainer"
 
 cd "$(dirname "$0")/.."
 
@@ -14,7 +14,7 @@ DATASETS=(
     #"wikitext:/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/training_data/wikitext"
 )
 
-MODEL_BASE_PATH="data/tests_bertopic"
+MODEL_BASE_PATH="data/test/malet"
 VOCAB_FILE="vocab.json"
 EMBEDDINGS_SUFFIX="train.metadata.embeddings.jsonl.all-MiniLM-L6-v2.parquet"
 

@@ -23,7 +23,7 @@ topic_modeling:
     num_iters: 1000
     doc_topic_thr: 0.0
     token_regexp: "[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{P}]*\\p{L}"
-    mallet_path: src/train/Mallet-202108/bin/mallet
+    mallet_path: Mallet-202108/bin/mallet
   tomotopy:
     num_iters: 2000
     alpha: 5.0

@@ -174,4 +174,5 @@ src/proxann/llm_annotations/frontend/uploads
 python_scripts/_old
 data/json_out/tests
 data/tests
+data/test
 cache

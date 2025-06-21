@@ -267,7 +267,7 @@ class Prompter:
         temperature: float = None,
     ) -> Union[str, List[str]]:
         """Public method to execute a prompt given a system prompt template and a question."""
-
+    
         # Load the system prompt template
         system_prompt_template = None
         if system_prompt_template_path is not None:

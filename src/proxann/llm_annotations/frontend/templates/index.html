@@ -476,51 +476,26 @@
         });
     }
   
-    document.getElementById("help-btn").addEventListener("mouseenter", function () {
-      document.getElementById("help-tooltip").style.display = "block";
-    });
-    document.getElementById("help-tooltip").addEventListener("mouseleave", function () {
-      document.getElementById("help-tooltip").style.display = "none";
-    });
-    document.getElementById("help-btn").addEventListener("mouseleave", function () {
-      setTimeout(() => {
-        if (!document.getElementById("help-tooltip").matches(":hover")) {
-          document.getElementById("help-tooltip").style.display = "none";
-        }
-      }, 300);
-    });
-    document.getElementById("q1_q3_prompt_mode").addEventListener("change", function () {
-      const mode = this.value;
-      const checkbox = document.getElementById("do_both_ways");
-    
-      if (mode === "q1_then_q3_mean") {
-        checkbox.checked = true;
-        checkbox.disabled = true;
-      } else {
-        checkbox.disabled = false;
-      }
-    });
-
     document.addEventListener("DOMContentLoaded", function () {
-      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+      // Inicializar tooltips de Bootstrap
+      const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
       tooltipTriggerList.forEach(function (tooltipTriggerEl) {
-        new bootstrap.Tooltip(tooltipTriggerEl)
+        new bootstrap.Tooltip(tooltipTriggerEl);
       });
-    });
 
-    document.addEventListener("DOMContentLoaded", function () {
+      // Lógica del botón de ayuda
       const helpBtn = document.getElementById("help-btn");
       const helpTooltip = document.getElementById("help-tooltip");
-  
+
       helpBtn.addEventListener("click", function (event) {
         event.stopPropagation();
         helpTooltip.classList.toggle("show");
       });
-  
+
       document.addEventListener("click", function (event) {
-        if (!helpTooltip.contains(event.target)) {
-        helpTooltip.classList.remove("show");
-      }
+        if (!helpTooltip.contains(event.target) && !helpBtn.contains(event.target)) {
+          helpTooltip.classList.remove("show");
+        }
       });
     });
     

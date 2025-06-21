@@ -1,3 +1,5 @@
+from datetime import datetime
+import numpy as np
 from flask import Flask, render_template, request, url_for, send_file, jsonify
 import os
 import tarfile
@@ -5,6 +7,7 @@ import zipfile
 import tempfile
 import shutil
 import re
+from pathlib import Path
 from werkzeug.utils import secure_filename # type: ignore
 
 from proxann.llm_annotations.utils import is_openai_key_valid
@@ -52,12 +55,15 @@ def format_column_label_html(col_name):
 
 def generate_config(file_paths, trained_with_thetas_eval, column_disp):
     """ Generates a configuration file dynamically based on uploaded files. """
+    
+    betas = np.load(file_paths['betas'], allow_pickle=True)
+    
     if trained_with_thetas_eval:
         config_content = f"""[all]
 method=elbow
 top_words_display=100
 ntop=7
-n_matches=1
+n_matches=-1
 text_column=tokenized_text
 text_column_disp={column_disp}
 thr=0.1,0.8
@@ -220,8 +226,10 @@ def evaluate():
 
     status, tm_model_data_path = proxann.generate_user_provided_json(
         path_user_study_config_file=USER_STUDY_CONFIG,
-        user_provided_tpcs=topics_to_evaluate
+        user_provided_tpcs=topics_to_evaluate,
+        output_path = Path(f"{UPLOAD_FOLDER}/json_out/tests") / f"{datetime.today().strftime('%Y%m%d_%H%M%S')}_user_provided.json"
     )
+    print(tm_model_data_path)
 
     if status == 0:
         logger.info("User provided JSON file generated successfully.")
@@ -239,6 +247,7 @@ def evaluate():
         openai_key=openai_key,
     )
     
+    print(df)
     df.columns = [format_column_label_html(col) for col in df.columns]
     table_html = df.to_html(escape=False, classes='table table-striped table-bordered text-center', index=False)
 

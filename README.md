@@ -174,7 +174,7 @@ Metrics are **advantage probabilities**. Asterisks (`*`) and daggers (`†`) mar
 The plot and table below show how well ProxAnn’s topic rankings align with human judgments, using Kendall’s τ as the correlation metric. The *Human* row reflects inter-annotator agreement, and NPMI provides a traditional baseline.
 
 <div align="center">
-  <img src="figures/human_llm_comparison_barplot.png" alt="Human vs LLM correlation barplot" width="1000">
+  <img src="./figures/repo/human_llm_comparison_barplot.png" alt="Human vs LLM correlation barplot" width="1000">
 </div>
 
 <br>
@@ -307,9 +307,13 @@ status, tm_model_data_path = proxann.generate_user_provided_json(path_user_study
 #### 3. Run the ProxAnn evaluation
 
 ```python
-proxann.run_metric(
+corr_data, _ = proxann.run_metric(
     tm_model_data_path.as_posix(),
-    llm_models=["Qwen/Qwen3-8B"]
+    llm_models=["gpt-4o-mini-2024-07-18"],
+    q1_temp=1.0,
+    q2_temp=0.0,
+    q3_temp=0.0,
+    custom_seed=1234
 )
 ```
 
@@ -342,7 +346,7 @@ Alternatively, use the hosted instance at:
 👉 [https://proxann.uc3m.es/](https://proxann.uc3m.es/)
 
 <div align="center">
-  <img src="figures/Rettan.png" alt="ProxAnn frontend" width="1000">
+  <img src="./figures/repo/Rettan.png" alt="ProxAnn frontend" width="1000">
 </div>
 
 ---

@@ -69,7 +69,7 @@ def main():
     # Generate user provided JSON file
     status, tm_model_data_path = proxann.generate_user_provided_json(
         path_user_study_config_file=args.user_study_config,
-        #user_provided_tpcs=[2]
+        user_provided_tpcs=[0,2,3]
     )
     
     if status == 0:
@@ -80,7 +80,11 @@ def main():
     
     corr_data, _ = proxann.run_metric(
         tm_model_data_path.as_posix(),
-        llm_models=["gpt-4o-2024-08-06"]
+        llm_models=["gpt-4o-mini-2024-07-18"],
+        q1_temp=1.0,
+        q2_temp=0.0,
+        q3_temp=0.0,
+        custom_seed=1234
     )
     
     logger.info("Evaluation completed successfully.")

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 CONFIG_FILE="src/proxann/config/config.yaml"
-TRAINER_TYPE="MalletLda"
+TRAINER_TYPE="TomotopyLda"
 NUM_TOPICS=50
 SCRIPT="python3 -m proxann.topic_models.train.tm_trainer"
 

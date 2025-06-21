@@ -390,43 +390,29 @@ class ProxAnn(object):
             cat: str,
             num_words: int = 100,
             template_name: str = "q3_mean",
-            return_raw: bool = False
         ) -> List[str]:
             """Function to handle Q3."""
 
-            # Set seed for consistent randomness
             random.seed(1234)
 
-            # Document pairs generation
+            eval_docs = sorted(text["eval_docs"], key=lambda x: x["doc_id"])
+            eval_docs = random.sample(eval_docs, len(eval_docs))
+
             doc_pairs_one, doc_pairs_two = [], []
             pair_ids_one, pair_ids_two = [], []
 
-            eval_docs = sorted(text["eval_docs"], key=lambda x: x["doc_id"])
-            # shuffle the eval docs so the "most related" ones are not shown first
-            eval_docs = random.sample(eval_docs, len(eval_docs))
             for d1, d2 in itertools.combinations(eval_docs, 2):
-                docs_list = [[d1, d2], [d2, d1]] if doing_both_ways else [
-                    random.sample([d1, d2], 2)]
-
-                for i, docs in enumerate(docs_list):
+                for i, docs in enumerate([[d1, d2], [d2, d1]]):
                     doc_a = extend_to_full_sentence(docs[0]['text'], num_words)
                     doc_b = extend_to_full_sentence(docs[1]['text'], num_words)
 
-                    if doing_both_ways:
-                        if i % 2 == 0:
-                            doc_pairs_one.append([doc_a, doc_b])
-                            pair_ids_one.append(
-                                {"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
-                        else:
-                            doc_pairs_two.append([doc_a, doc_b])
-                            pair_ids_two.append(
-                                {"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
-                    else:
+                    if i % 2 == 0:
                         doc_pairs_one.append([doc_a, doc_b])
-                        pair_ids_one.append(
-                            {"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+                        pair_ids_one.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
+                    else:
+                        doc_pairs_two.append([doc_a, doc_b])
+                        pair_ids_two.append({"A": docs[0]["doc_id"], "B": docs[1]["doc_id"]})
 
-            # Template loading and formatting
             template_path = load_template_path(template_name)
             template = load_template(template_path)
 
@@ -436,7 +422,7 @@ class ProxAnn(object):
                 [template.format(category=cat, doc_a=pair[0], doc_b=pair[1]) for pair in doc_pairs_two],
                 pair_ids_two
             )
-
+            
         question_handlers = {
             "q1": lambda text: handle_q1(text, few_shot_examples, nr_few_shot=nr_few_shot, generate_description=generate_description),
             "q2_mean": lambda text: handle_q2(text, category),
@@ -486,6 +472,7 @@ class ProxAnn(object):
             text_for_prompt=cluster_data,
             question_type="q1"
         )
+
         dft_system_prompt = pathlib.Path(__file__).parent / self._config["base_prompt_path"] / self._config["templates_q1"] / "system_prompt.txt"
         category, _ = prompter.prompt(
             dft_system_prompt, question, use_context=False, temperature=temperature)
@@ -552,6 +539,7 @@ class ProxAnn(object):
             question_type=prompt_key, 
             category=category
         )
+
         labels = [category] * len(questions)
         
         for question in questions:
@@ -616,34 +604,29 @@ class ProxAnn(object):
         )
         dft_system_prompt = pathlib.Path(__file__).parent / self._config["base_prompt_path"] / self._config["templates_q3"] / "system_prompt.txt"
 
-        if isinstance(q3_out, tuple) and len(q3_out) > 2:  # Both ways
-            questions_one, pair_ids_one, questions_two, pair_ids_two = q3_out
-            ways = [[questions_one, pair_ids_one], [questions_two, pair_ids_two]]
-        else:  # Single way
-            questions, pair_ids = q3_out
-            ways = [[questions, pair_ids]]
+        questions_one, pair_ids_one, questions_two, pair_ids_two = q3_out
+        ways = [[questions_one, pair_ids_one], [questions_two, pair_ids_two]]
 
         all_info_logprobs_one, all_info_logprobs_two = [], []
 
         for way_id, (questions, pair_ids) in enumerate(ways):
             log_or_print(
-                f"-- Executing Q3 ({'both ways' if len(ways) > 1 else 'one way'})...", logger)
+                f"-- Executing Q3...", logger)
             for question in questions:
                 _, pairwise_logprobs = prompter.prompt(
                     dft_system_prompt, question, use_context=use_context, temperature=temperature
                 )
-
                 try:
-                    if len(ways) > 1 and way_id == 0:
+                    if  way_id == 0:
                         # Way is --> (A, B)
                         all_info_logprobs_one.append(pairwise_logprobs)
-                    elif len(ways) > 1 and way_id == 1:
+                    elif way_id == 1:
                         # Way is <-- (B, A)
                         all_info_logprobs_two.append(pairwise_logprobs)
                 except Exception as e:
                     log_or_print(
                         f"-- Error executing prompt: {e}", "error", logger)   
-                    
+
         # Combine results for ranking
         orders_comb, logprobs_comb = [], []
         pair_ids_comb = ways[0][1]         
@@ -666,7 +649,7 @@ class ProxAnn(object):
         info_to_bradley_terry["pair_ids_comb"] = pair_ids_comb
         info_to_bradley_terry["orders_comb"] = orders_comb
         info_to_bradley_terry["logprobs_comb"] = logprobs_comb
-
+        
         return
     
     # this will be executed for each model the user wants to evaluate
@@ -761,7 +744,6 @@ class ProxAnn(object):
                     category=category,
                     temperature=q3_temp,
                 )
-
                 # ----------------------------------------------
                 # Q1_THEN_Q2
                 # ----------------------------------------------
@@ -774,7 +756,6 @@ class ProxAnn(object):
                     category=category, 
                     temperature=q2_temp
                 )
-            
             llm_results_q1.append({
                 "id": cluster_id,
                 "n_annotators": len(llm_models),
@@ -841,70 +822,71 @@ class ProxAnn(object):
         """
         
         model_data = []
-        
-        for topic_id, topic_data in tm_model_data.items():
-            
-            prob_data = np.array([doc["prob"] for doc in topic_data["eval_docs"]])
 
-            assign_data = np.array([doc["assigned_to_k"] for doc in topic_data["eval_docs"]])
+        for topic_id, topic_data in tm_model_data.items():
+            doc_ids = [doc["doc_id"] for doc in topic_data["eval_docs"]]
+            prob_data = {doc["doc_id"]: doc["prob"] for doc in topic_data["eval_docs"]}
+            assign_data = {doc["doc_id"]: doc["assigned_to_k"] for doc in topic_data["eval_docs"]}
             
             model_data.append({
                 "id": topic_id,
-                "prob_data": prob_data,
-                "assign_data": assign_data
-            })   
-            
+                "doc_ids": doc_ids,
+                "prob_data_dict": prob_data,
+                "assign_data_dict": assign_data
+            })
+
+        # ensure alignment
         model_data = sorted(model_data, key=lambda x: x["id"])
-        
+        rank_llm_data = sorted(rank_llm_data, key=lambda x: x["id"])
+        fit_llm_data = sorted(fit_llm_data, key=lambda x: x["id"])
+
         assert [k["id"] for k in model_data] == [k["id"] for k in rank_llm_data] == [k["id"] for k in fit_llm_data], "IDs do not match"
-        
+
+        # Rescaled NDCG
         ndcg_score_ = ndcg_score
         if rescale_ndcg:
-            n_items = len(model_data[0]["prob_data"])
-            rs = range(n_items)
+            n_items = len(model_data[0]["doc_ids"])
+            rs = list(range(n_items))
             min_ndcg = ndcg_score([rs], [rs[::-1]])
-            # rescale to be between 0 and 1
             def ndcg_score_(x, y):
                 try:
                     return (ndcg_score(x, y) - min_ndcg) / (1 - min_ndcg)
-                except TypeError as e:
+                except Exception:
                     return 0.0
-    
+
         corr_results = []
         for d_model, d_r_llm, d_f_llm in zip(model_data, rank_llm_data, fit_llm_data):
-            # from the tm model
-            if not binarize_tm_probs:
-                prob_data = d_model["prob_data"]
-            else:
-                prob_data = d_model["assign_data"]
-            assign_data = d_model["assign_data"]
-            
-            # from the LLMs        
+            doc_ids = d_model["doc_ids"]
+            prob_data = np.array([d_model["prob_data_dict"][doc_id] for doc_id in doc_ids])
+            assign_data = np.array([d_model["assign_data_dict"][doc_id] for doc_id in doc_ids])
+
             annotator_results = {}
             r_llm = d_r_llm["rank_data"]
             r_annotators = d_r_llm["annotators"]
             f_llm = d_f_llm["fit_data"]
             f_annotators = d_f_llm["annotators"]
-            
-            # f_annotators should be the same as r_annotators
+
             assert r_annotators == f_annotators, "Annotators do not match"
-            
+
             for a, r_llm_a, f_llm_a in zip(r_annotators, r_llm, f_llm):
+                # Reordenar según doc_ids si se usaran dicts por anotador, opcional
                 
-                rank_tau_gt, _ = kendalltau(prob_data, r_llm_a)
-                rank_ndcg_gt = ndcg_score_([r_llm_a], [prob_data])
-                fit_tau_tm, _ = kendalltau(prob_data, f_llm_a)
+                # Usar assign_data si binarizar
+                tm_array = assign_data if binarize_tm_probs else prob_data
+
+                rank_tau_gt, _ = kendalltau(tm_array, r_llm_a)
+                rank_ndcg_gt = ndcg_score_([r_llm_a], [tm_array])
+                fit_tau_tm, _ = kendalltau(tm_array, f_llm_a)
                 fit_agree_tm = np.mean(assign_data == f_llm_a)
-                
+
                 annotator_results[f"rank_tau_tm_{a}"] = rank_tau_gt
                 annotator_results[f"rank_ndcg_tm_{a}"] = rank_ndcg_gt
-            
                 annotator_results[f"fit_tau_tm_{a}"] = fit_tau_tm
                 annotator_results[f"fit_agree_tm_{a}"] = fit_agree_tm
-                
+
             corr_results.append({
                 "id": d_model["id"],
                 **annotator_results
             })
-            
+
         return pd.DataFrame(corr_results)

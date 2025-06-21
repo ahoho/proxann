@@ -12,7 +12,7 @@ from scipy.stats import kendalltau, pearsonr
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from proxann.utils import process_responses, collect_fit_rank_data, compute_correlations, compute_correlations_two
+from proxann.llm_annotations.utils import process_responses, collect_fit_rank_data, compute_correlations, compute_correlations_two
 
 def read_json(fpath):
     with open(fpath) as infile:

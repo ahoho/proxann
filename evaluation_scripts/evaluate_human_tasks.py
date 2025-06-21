@@ -3,7 +3,7 @@ import json
 
 import pandas as pd
 
-from proxann.utils import (
+from proxann.llm_annotations.utils import (
     process_responses,
     collect_fit_rank_data,
     compute_correlations_two,

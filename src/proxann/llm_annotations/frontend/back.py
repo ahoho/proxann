@@ -1,6 +1,6 @@
-from datetime import datetime
-import numpy as np
-from flask import Flask, render_template, request, url_for, send_file, jsonify
+from datetime import datetime, timedelta
+import time
+from flask import Flask, url_for, render_template, request, send_file, jsonify # type: ignore
 import os
 import tarfile
 import zipfile
@@ -9,24 +9,39 @@ import shutil
 import re
 from pathlib import Path
 from werkzeug.utils import secure_filename # type: ignore
+import threading
+import uuid
+import pandas as pd
 
 from proxann.llm_annotations.utils import is_openai_key_valid
 from proxann.llm_annotations.proxann import ProxAnn
 from proxann.utils.file_utils import init_logger
 
 app = Flask(__name__)
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-print(BASE_DIR)
-CONFIG_FOLDER = os.path.join(BASE_DIR, "configs")
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-CONFIG_PATH="src/proxann/config/config.yaml"
-USER_STUDY_CONFIG="data/user_study/config_pilot_test.conf"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(CONFIG_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-logger = init_logger(CONFIG_PATH, f"RunProxann-metric-mode")
+CONFIG_PATH = "src/proxann/config/config.yaml"
+logger = init_logger(CONFIG_PATH, "RunProxann-metric-mode")
 proxann = ProxAnn(logger, CONFIG_PATH)
+
+task_results = {}
+
+def cleanup_old_tasks(expiration_minutes=30):
+    while True:
+        now = datetime.utcnow()
+        to_delete = []
+        for task_id, data in task_results.items():
+            task_time = data.get("timestamp")
+            if task_time and now - task_time > timedelta(minutes=expiration_minutes):
+                to_delete.append(task_id)
+        for task_id in to_delete:
+            del task_results[task_id]
+            shutil.rmtree(os.path.join(UPLOAD_FOLDER, task_id), ignore_errors=True)
+        time.sleep(300)
 
 def format_column_label_html(col_name):
     if col_name == "id":
@@ -53,79 +68,28 @@ def format_column_label_html(col_name):
 
     return f"{prefix}{metric}{subscript}{k_rendered}"
 
-def generate_config(file_paths, trained_with_thetas_eval, column_disp):
-    """ Generates a configuration file dynamically based on uploaded files. """
-    
-    betas = np.load(file_paths['betas'], allow_pickle=True)
-    
-    if trained_with_thetas_eval:
-        config_content = f"""[all]
-method=elbow
-top_words_display=100
-ntop=7
-n_matches=-1
-text_column=tokenized_text
-text_column_disp={column_disp}
-thr=0.1,0.8
-path_json_save={UPLOAD_FOLDER}/json_out/tests
-topic_selection_method=wmd
-
-[eval]
-model_path={file_paths['model']}
-corpus_path={file_paths['corpus']}
-trained_with_thetas_eval=True
-remove_topic_ids=
-"""
-    else:
-        config_content = f"""[all]
-method=elbow
-top_words_display=100
-ntop=7
-n_matches=1
-text_column=tokenized_text
-text_column_disp={column_disp}
-thr=0.1,0.8
-path_json_save={UPLOAD_FOLDER}/json_out/tests
-topic_selection_method=wmd
-
-[eval]
-thetas_path={file_paths['thetas']}
-betas_path={file_paths['betas']}
-vocab_path={file_paths['vocab']}
-corpus_path={file_paths['corpus']}
-trained_with_thetas_eval=False
-remove_topic_ids=
-"""
-    config_path = os.path.join(CONFIG_FOLDER, "config.conf")
-    with open(config_path, "w") as conf_file:
-        conf_file.write(config_content)
-    return config_path
-
 @app.route('/')
 def index():
-    return render_template('index.html', files=[], progress=0)
+    return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    uploaded_files = {}
-    trained_with_thetas_eval = 'trained_with_thetas_eval' in request.form
-    required_files_proxann = ["model", "corpus"]
-    required_files_separate = ["thetas", "betas", "vocab", "corpus"]
-    required_files = required_files_proxann if trained_with_thetas_eval else required_files_separate
+    task_id = str(uuid.uuid4())
+    task_dir = os.path.join(app.config['UPLOAD_FOLDER'], task_id)
+    os.makedirs(task_dir, exist_ok=True)
 
+    trained_with_thetas_eval = 'trained_with_thetas_eval' in request.form
+    required_files = ["model", "corpus"] if trained_with_thetas_eval else ["thetas", "betas", "vocab", "corpus"]
+    uploaded_files = {}
     valid_file_suffixes = {"npz", "npy", "json", "parquet", "tar.gz", "tar", "zip"}
-    
+
     for file_key in required_files:
         if file_key in request.files:
             file = request.files[file_key]
             filename = secure_filename(file.filename)
-            
             if not filename:
-                return jsonify({"error": f"Error: No valid filename provided for {file_key}."}), 400
-
+                return jsonify({"error": f"No filename for {file_key}"}), 400
             file_suffix = os.path.splitext(filename)[1].lower().lstrip(".")
-
-            # Enforce file type restrictions
             file_type_map = {
                 "thetas": {"npz", "npy"},
                 "betas": "npy",
@@ -133,125 +97,160 @@ def upload():
                 "corpus": {"parquet", "json"},
                 "model": {"tar.gz", "tar", "zip"}
             }
+            expected = file_type_map[file_key]
+            if isinstance(expected, set) and file_suffix not in expected or isinstance(expected, str) and file_suffix != expected:
+                return jsonify({"error": f"Invalid file type for {file_key}."}), 400
 
-            expected_type = file_type_map.get(file_key)
-            if isinstance(expected_type, set) and file_suffix not in expected_type:
-                return jsonify({"error": f"Error: Invalid file type for {file_key}. Expected one of {expected_type}."}), 400
-            elif isinstance(expected_type, str) and file_suffix != expected_type:
-                return jsonify({"error": f"Error: Invalid file type for {file_key}. Expected '{expected_type}'."}), 400
+            final_path = os.path.join(task_dir, filename)
 
-            # Handle compressed archives
             if file_key == "model":
                 temp_dir = tempfile.mkdtemp()
-                file_path = os.path.join(temp_dir, filename)
-                file.save(file_path)
-
+                temp_path = os.path.join(temp_dir, filename)
+                file.save(temp_path)
                 try:
                     if file_suffix in {"tar.gz", "tar"}:
-                        with tarfile.open(file_path, "r:*") as tar:
-                            for member in tar.getmembers():
-                                if member.isfile():
-                                    member_suffix = os.path.splitext(member.name)[1].lower().lstrip(".")
-                                    if member_suffix not in valid_file_suffixes:
-                                        raise ValueError(f"Invalid file in archive: {member.name}")
+                        with tarfile.open(temp_path, "r:*") as tar:
+                            for m in tar.getmembers():
+                                if m.isfile():
+                                    ext = os.path.splitext(m.name)[1].lower().lstrip(".")
+                                    if ext not in valid_file_suffixes:
+                                        raise ValueError(f"Invalid file in archive: {m.name}")
                     elif file_suffix == "zip":
-                        with zipfile.ZipFile(file_path, "r") as zip_ref:
-                            for member in zip_ref.namelist():
-                                member_suffix = os.path.splitext(member)[1].lower().lstrip(".")
-                                if member_suffix not in valid_file_suffixes:
-                                    raise ValueError(f"Invalid file in archive: {member}")
-
-                    # Move to final upload directory
-                    final_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                    shutil.move(file_path, final_path)
+                        with zipfile.ZipFile(temp_path, "r") as zip_ref:
+                            for m in zip_ref.namelist():
+                                ext = os.path.splitext(m)[1].lower().lstrip(".")
+                                if ext not in valid_file_suffixes:
+                                    raise ValueError(f"Invalid file in archive: {m}")
+                    shutil.move(temp_path, final_path)
                     uploaded_files[file_key] = final_path
-
                 except Exception as e:
                     shutil.rmtree(temp_dir, ignore_errors=True)
-                    return jsonify({"error": f"Error: {str(e)}"}), 400
-
-                shutil.rmtree(temp_dir, ignore_errors=True)
-                continue
-
-            # Save non-archive files
-            final_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(final_path)
-            uploaded_files[file_key] = final_path
+                    return jsonify({"error": str(e)}), 400
+                shutil.rmtree(temp_dir)
+            else:
+                file.save(final_path)
+                uploaded_files[file_key] = final_path
 
     if set(required_files) != set(uploaded_files.keys()):
-        return jsonify({"error": "Error: Missing required files. Please upload all required files."}), 400
-    
+        return jsonify({"error": "Missing required files."}), 400
+
+    # Save config file
     text_column_disp = request.form.get("text_column_disp", "text").strip()
 
-    _ = generate_config(uploaded_files, trained_with_thetas_eval, text_column_disp)
+    config_content = f"""[all]
+method=elbow
+top_words_display=100
+ntop=7
+n_matches=-1
+text_column=tokenized_text
+text_column_disp={text_column_disp}
+thr=0.1,0.8
+path_json_save={task_dir}
+topic_selection_method=wmd
+
+[eval]
+{"model_path" if trained_with_thetas_eval else "thetas_path"}={uploaded_files['model' if trained_with_thetas_eval else 'thetas']}
+{"corpus_path" if trained_with_thetas_eval else "betas_path"}={uploaded_files['corpus' if trained_with_thetas_eval else 'betas']}
+{"vocab_path=" + uploaded_files["vocab"] if not trained_with_thetas_eval else ""}
+corpus_path={uploaded_files['corpus']}
+trained_with_thetas_eval={trained_with_thetas_eval}
+remove_topic_ids=
+"""
+    config_path = os.path.join(task_dir, "config.conf")
+    with open(config_path, "w") as f:
+        f.write(config_content)
 
     return jsonify({
-        "status": "Uploaded Successfully",
-        "config_url": url_for('download_config')
+        "status": "Uploaded",
+        "task_id": task_id,
+        "config_url": url_for('download_config', task_id=task_id)
     })
 
-@app.route('/download-config')
-def download_config():
-    config_path = os.path.join(CONFIG_FOLDER, "config.conf")
-    logger.info(f"Config file path: {config_path}")
+
+@app.route('/download-config/<task_id>')
+def download_config(task_id):
+    config_path = os.path.join(app.config['UPLOAD_FOLDER'], task_id, "config.conf")
     return send_file(config_path, as_attachment=True)
 
 @app.route('/evaluate', methods=['POST'])
 def evaluate():
-    """Evaluation process that generates a DataFrame as results with real-time progress updates."""
+    task_id = request.form.get("task_id")
+    task_dir = os.path.join(app.config['UPLOAD_FOLDER'], task_id)
+    if not os.path.exists(task_dir):
+        return jsonify({"error": "Invalid task ID"}), 400
 
     llm_model = request.form.get("llm_model")
     q1_temp = float(request.form.get("q1_temp", 0))
     q2_temp = float(request.form.get("q2_temp", 0))
     q3_temp = float(request.form.get("q3_temp", 0))
     custom_seed = int(request.form.get("custom_seed", 1234))
-    #q1_q3_prompt_mode = request.form.get("q1_q3_prompt_mode")
-    #q1_q2_prompt_mode = request.form.get("q1_q2_prompt_mode")
     openai_key = request.form.get("openai_key")
-    
+
     if not is_openai_key_valid(openai_key):
         return jsonify({"error": "Invalid OpenAI API key."}), 400
 
-    logger.info(f"llm_model: {llm_model}, q1_temp: {q1_temp}, q2_temp: {q2_temp}, q3_temp: {q3_temp}, custom_seed: {custom_seed}")
-    
-    # Topics to evaluate (comma-separated list or blank)
     topics_raw = request.form.get("topics_to_evaluate", "").strip()
-    if topics_raw:
-        try:
-            topics_to_evaluate = [int(t.strip()) for t in topics_raw.split(",") if t.strip().isdigit()]
-        except ValueError:
-            return jsonify({"error": "Invalid topic IDs. Must be comma-separated integers."}), 400
-    else:
-        topics_to_evaluate = None
+    topics_to_evaluate = [int(t.strip()) for t in topics_raw.split(",") if t.strip().isdigit()] if topics_raw else None
+
+    output_path = Path(task_dir) / "user_provided.json"
 
     status, tm_model_data_path = proxann.generate_user_provided_json(
-        path_user_study_config_file=USER_STUDY_CONFIG,
+        path_user_study_config_file="data/user_study/config_pilot_test.conf",
         user_provided_tpcs=topics_to_evaluate,
-        output_path = Path(f"{UPLOAD_FOLDER}/json_out/tests") / f"{datetime.today().strftime('%Y%m%d_%H%M%S')}_user_provided.json"
+        output_path=output_path
     )
-    print(tm_model_data_path)
 
-    if status == 0:
-        logger.info("User provided JSON file generated successfully.")
-    else:
-        logger.error("Error generating user provided JSON file.")
-        return jsonify({"error": "Failed to generate user-provided JSON file."}), 500
+    if status != 0:
+        return jsonify({"error": "Failed to generate JSON"}), 500
 
-    df, _ = proxann.run_metric(
-        tm_model_data_path.as_posix(),
-        llm_models=[llm_model],
-        q1_temp=q1_temp,
-        q2_temp=q2_temp,
-        q3_temp=q3_temp,
-        custom_seed=custom_seed,
-        openai_key=openai_key,
-    )
-    
-    print(df)
-    df.columns = [format_column_label_html(col) for col in df.columns]
-    table_html = df.to_html(escape=False, classes='table table-striped table-bordered text-center', index=False)
+    task_results[task_id] = {"status": "processing", "timestamp": datetime.utcnow()}
 
-    return jsonify({"table": table_html})
+    def run_background():
+        try:
+            df, _ = proxann.run_metric(
+                tm_model_data_path.as_posix(),
+                llm_models=[llm_model],
+                q1_temp=q1_temp,
+                q2_temp=q2_temp,
+                q3_temp=q3_temp,
+                custom_seed=custom_seed,
+                openai_key=openai_key,
+            )
+            
+            df['id'] = pd.to_numeric(df['id'], errors='coerce') 
+            df.sort_values(by='id', inplace=True)                    
+            df['id'] = df['id'].astype(str)
+            df.columns = [format_column_label_html(col) for col in df.columns]            
+            table_html = df.to_html(escape=False, classes='table table-striped table-bordered text-center', index=False)
+            task_results[task_id] = {
+                "status": "done",
+                "table": table_html,
+                "timestamp": datetime.utcnow()
+            }
+        except Exception as e:
+            task_results[task_id] = {
+                "status": "error",
+                "message": str(e),
+                "timestamp": datetime.utcnow()
+            }
+        finally:
+            # remove all information about the task after processing
+            try:
+                shutil.rmtree(task_dir)
+                logger.info(f"Deleted task directory: {task_dir}")
+            except Exception as e:
+                logger.warning(f"Could not delete task directory {task_dir}: {e}")
+
+    threading.Thread(target=run_background).start()
+    return jsonify({"task_id": task_id})
+
+@app.route('/evaluate/status/<task_id>', methods=['GET'])
+def evaluate_status(task_id):
+    result = task_results.get(task_id)
+    if not result:
+        return jsonify({"status": "not_found"}), 404
+    return jsonify(result)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=True, port=8080)
+    threading.Thread(target=cleanup_old_tasks, daemon=True).start()
+    app.run(host='0.0.0.0', port=8080, debug=True)

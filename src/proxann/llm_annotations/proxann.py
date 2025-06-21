@@ -802,6 +802,7 @@ class ProxAnn(object):
         fit_llm_data: list,
         binarize_tm_probs=False,
         rescale_ndcg=True,
+        fit_threshold_llm: int = 4
     )-> pd.DataFrame:
         """
         Compute correlation between LLM and TM data.
@@ -814,7 +815,13 @@ class ProxAnn(object):
             List of rank data for the LLM.
         fit_llm_data : list
             List of fit data for the LLM.
-            
+        binarize_tm_probs : bool, optional
+            Whether to binarize the topic modeling probabilities, by default False.
+        rescale_ndcg : bool, optional
+            Whether to rescale the NDCG scores, by default True.
+        fit_threshold_llm : int, optional
+            Threshold for the fit data from the LLM, by default 4.
+        
         Returns
         -------
         pd.DataFrame
@@ -869,16 +876,17 @@ class ProxAnn(object):
             assert r_annotators == f_annotators, "Annotators do not match"
 
             for a, r_llm_a, f_llm_a in zip(r_annotators, r_llm, f_llm):
-                # Reordenar según doc_ids si se usaran dicts por anotador, opcional
-                
-                # Usar assign_data si binarizar
+
+                # Use assign_data if binarize_tm_probs is True, otherwise use prob_data
                 tm_array = assign_data if binarize_tm_probs else prob_data
 
                 rank_tau_gt, _ = kendalltau(tm_array, r_llm_a)
                 rank_ndcg_gt = ndcg_score_([r_llm_a], [tm_array])
                 fit_tau_tm, _ = kendalltau(tm_array, f_llm_a)
-                fit_agree_tm = np.mean(assign_data == f_llm_a)
-
+                
+                f_llm_a_bin = (np.array(f_llm_a) >= fit_threshold_llm).astype(int)
+                fit_agree_tm = np.mean(assign_data == f_llm_a_bin)
+                
                 annotator_results[f"rank_tau_tm_{a}"] = rank_tau_gt
                 annotator_results[f"rank_ndcg_tm_{a}"] = rank_ndcg_gt
                 annotator_results[f"fit_tau_tm_{a}"] = fit_tau_tm

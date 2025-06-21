@@ -233,7 +233,7 @@
         </div>
         <div class="d-flex gap-2">
           <button type="submit" class="btn btn-primary btn-sm" id="upload-btn">Upload</button>
-          <a href="{{ url_for('download_config') }}" class="btn btn-success btn-sm" id="download-config" style="display: none;">Download Config File</a>
+          <a href="#" class="btn btn-success btn-sm" id="download-config" style="display: none;">Download Config File</a>
         </div>
       </div>
     </form>
@@ -334,9 +334,9 @@
       </div>
 
       <!-- Spinner -->
-      <div id="evaluation-indicator" class="mt-3 d-none">
-        <div class="spinner-border text-info me-2" role="status"></div>
-        <span class="text-info">Evaluating... please wait</span>
+      <div id="evaluation-indicator" class="mt-3 d-none text-primary d-flex align-items-center">
+        <div class="spinner-border me-2" role="status"></div>
+        <span>Evaluating... please wait</span>
       </div>
 
       <!-- Output -->
@@ -394,16 +394,18 @@
       }
     }    
 
+    let currentTaskId = null;
+
     function showUploadProgress(event) {
       event.preventDefault();
       document.getElementById("upload-indicator").classList.remove("d-none");
-    
+
       const uploadBtn = document.getElementById("upload-btn");
       uploadBtn.disabled = true;
-    
+
       const form = event.target;
       const formData = new FormData(form);
-    
+
       fetch("/upload", {
         method: "POST",
         body: formData
@@ -412,13 +414,29 @@
         .then(data => {
           document.getElementById("upload-indicator").classList.add("d-none");
           uploadBtn.disabled = false;
-    
+
           if (data.error) {
             alert(data.error);
           } else {
+            // Save the task ID for later use
+            currentTaskId = data.task_id;
+
+            // Update the evaluation form with the task ID as a hidden field
+            const evalForm = document.getElementById("evaluation-form");
+            let hiddenField = document.getElementById("task_id_hidden");
+            if (!hiddenField) {
+              hiddenField = document.createElement("input");
+              hiddenField.type = "hidden";
+              hiddenField.name = "task_id";
+              hiddenField.id = "task_id_hidden";
+              evalForm.appendChild(hiddenField);
+            }
+            hiddenField.value = currentTaskId;
+
+            // Show buttons and success message
             const toastUpload = new bootstrap.Toast(document.getElementById("toast-upload-success"));
             toastUpload.show();
-    
+
             document.getElementById("download-config").style.display = "inline-block";
             document.getElementById("download-config").href = data.config_url;
             document.getElementById("next-step-btn").style.display = "inline-block";
@@ -429,7 +447,7 @@
           uploadBtn.disabled = false;
           console.error("Error:", error);
         });
-    }    
+    }
 
     function goToStep2() {
       document.getElementById("step-1-section").classList.add("fade-hidden");
@@ -449,33 +467,67 @@
       const startBtn = document.getElementById("start-eval-btn");
       const indicator = document.getElementById("evaluation-indicator");
       const form = document.getElementById("evaluation-form");
-    
+
       startBtn.disabled = true;
       indicator.classList.remove("d-none");
       document.getElementById("results").innerHTML = "";
-    
+
       const formData = new FormData(form);
-    
+
       fetch("/evaluate", {
         method: "POST",
         body: formData
       })
         .then(response => response.json())
         .then(data => {
-          document.getElementById("results").innerHTML = data.table;
-          const toast = new bootstrap.Toast(document.getElementById("toast-success"));
-          toast.show();
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          pollForResult(data.task_id);
         })
         .catch(error => {
           console.error("Error:", error);
-          document.getElementById("results").innerHTML = "<div class='alert alert-danger'>Evaluation failed.</div>";
-        })
-        .finally(() => {
-          startBtn.disabled = false;
           indicator.classList.add("d-none");
+          startBtn.disabled = false;
+
+          // Mostrar mensaje de error arriba
+          const alertDiv = document.createElement("div");
+          alertDiv.className = "alert alert-danger";
+          alertDiv.innerText = error.message;
+
+          const results = document.getElementById("results");
+          results.innerHTML = ""; // Limpiar resultado anterior
+          results.appendChild(alertDiv);
+
+          // Scroll hacia el error
+          alertDiv.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      }
+
+    function pollForResult(taskId) {
+      fetch(`/evaluate/status/${taskId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === "done") {
+            document.getElementById("results").innerHTML = data.table;
+            const toast = new bootstrap.Toast(document.getElementById("toast-success"));
+            toast.show();
+            document.getElementById("evaluation-indicator").classList.add("d-none");
+            document.getElementById("start-eval-btn").disabled = false;
+          } else if (data.status === "error") {
+            document.getElementById("results").innerHTML = `<div class='alert alert-danger'>Evaluation failed: ${data.message}</div>`;
+            document.getElementById("evaluation-indicator").classList.add("d-none");
+            document.getElementById("start-eval-btn").disabled = false;
+          } else {
+            setTimeout(() => pollForResult(taskId), 3000);
+          }
+        })
+        .catch(err => {
+          console.error("Polling error:", err);
+          setTimeout(() => pollForResult(taskId), 3000);
         });
     }
-  
+
     document.addEventListener("DOMContentLoaded", function () {
       // Inicializar tooltips de Bootstrap
       const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));

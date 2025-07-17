@@ -214,7 +214,7 @@ To be used with ProxAnn, models must be saved as NumPy arrays (`.npy` or `.npz`)
 - A JSON file containing the model vocabulary (i.e., the words indexing the columns in $\beta_k$).
 - A plain-text corpus file (one document per line).
 
-Here, you can download examples files that meet these requirements.
+You can download examples files that meet these requirements [here](https://drive.google.com/drive/folders/14HeJKQH4eQktNP6Psf8g7qElkP7nX6xS).
 
 Alternatively, you can train topic models directly using ProxAnn's training module. In that case, only the corpus is required. See [`bash_scripts/train_models.sh`](bash_scripts/train_models.sh) for an example of how to invoke [`src/train/tm_trainer.py`](src/train/tm_trainer.py).
 

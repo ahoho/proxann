@@ -181,7 +181,7 @@
     </p>
     <p class="text-muted">
       Additionally, you must specify the <strong>Text Column</strong> parameter, which indicates
-      the name of the column in your corpus that contains the text on which the model was trained (before preprocessing).
+      the name of the column in your corpus that contains the text on which the model was trained (before preprocessing), and the <strong>Top N</strong> parameter, which specifies the number of top evaluation and exemplar documents to select.
     </p>
 
     <form action="/upload" method="post" enctype="multipart/form-data" class="mt-3" onsubmit="showUploadProgress(event)">
@@ -193,6 +193,11 @@
       <div class="mb-3">
         <label class="form-label" for="text_column_disp" data-bs-toggle="tooltip" title="Name of the column in the corpus that contains the raw text used for training.">Text Column</label>
         <input type="text" class="form-control" id="text_column_disp" name="text_column_disp" placeholder="text" required />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="topn" data-bs-toggle="tooltip" title="Number of top evaluation and exemplar documents to select.">Top N</label>
+        <input type="text" class="form-control" id="topn" name="topn" placeholder="7" required />
       </div>
 
       <div class="form-check mb-3">

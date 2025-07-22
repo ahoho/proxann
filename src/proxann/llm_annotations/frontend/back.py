@@ -136,11 +136,12 @@ def upload():
 
     # Save config file
     text_column_disp = request.form.get("text_column_disp", "text").strip()
+    topn = request.form.get("topn", "7").strip()
 
     config_content = f"""[all]
 method=elbow
 top_words_display=100
-ntop=7
+ntop={topn}
 n_matches=-1
 text_column={text_column_disp}
 text_column_disp={text_column_disp}
@@ -194,14 +195,15 @@ def evaluate():
 
     output_path = Path(task_dir) / "user_provided.json"
 
-    status, tm_model_data_path = proxann.generate_user_provided_json(
-        path_user_study_config_file=os.path.join(app.config['UPLOAD_FOLDER'], task_id, "config.conf"),
-        user_provided_tpcs=topics_to_evaluate,
-        output_path=output_path
-    )
-
-    if status != 0:
-        return jsonify({"error": "Failed to generate JSON"}), 500
+    try:
+        _, tm_model_data_path = proxann.generate_user_provided_json(
+            path_user_study_config_file=os.path.join(app.config['UPLOAD_FOLDER'], task_id, "config.conf"),
+            user_provided_tpcs=topics_to_evaluate,
+            output_path=output_path
+        )
+    except ValueError as e:
+        logger.error(f"User config generation failed: {e}")
+        return jsonify({"error": str(e)}), 400
 
     task_results[task_id] = {"status": "processing", "timestamp": datetime.utcnow()}
 

@@ -69,7 +69,7 @@ def main():
     # Generate user provided JSON file
     status, tm_model_data_path = proxann.generate_user_provided_json(
         path_user_study_config_file=args.user_study_config,
-        user_provided_tpcs=[0,2,3]
+        user_provided_tpcs=[0,1,2]
     )
     
     if status == 0:

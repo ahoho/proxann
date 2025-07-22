@@ -639,9 +639,14 @@ class DocSelector(object):
 
         exemplar_docs_probs = [[thetas.T[k][doc_id] for doc_id in id_docs]
             for k, id_docs in enumerate(most_representative_per_tpc)]
-            
-        return most_representative_per_tpc, exemplar_docs_probs
         
+        # if each list of exemplar docs per topic does not have ntop elements, return warning massage that the method did not return enough documents and choose a lower ntop
+        if any(len(id_docs) < ntop for id_docs in most_representative_per_tpc):
+            raise ValueError(
+                f"The method '{method}' did not return enough documents for some topics. Some topics have less than {ntop} documents. Consider using a lower ntop value or a different method.")
+        else:
+            return most_representative_per_tpc, exemplar_docs_probs
+
     def get_eval_docs(
         self,
         method: str,

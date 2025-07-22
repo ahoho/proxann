@@ -142,7 +142,7 @@ method=elbow
 top_words_display=100
 ntop=7
 n_matches=-1
-text_column=tokenized_text
+text_column={text_column_disp}
 text_column_disp={text_column_disp}
 thr=0.1,0.8
 path_json_save={task_dir}
@@ -195,7 +195,7 @@ def evaluate():
     output_path = Path(task_dir) / "user_provided.json"
 
     status, tm_model_data_path = proxann.generate_user_provided_json(
-        path_user_study_config_file="data/user_study/config_pilot_test.conf",
+        path_user_study_config_file=os.path.join(app.config['UPLOAD_FOLDER'], task_id, "config.conf"),
         user_provided_tpcs=topics_to_evaluate,
         output_path=output_path
     )

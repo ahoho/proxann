@@ -44,27 +44,33 @@ class Prompter:
         self.context = None
         self.params = self.config.get("parameters", {})
         
-        # We can override the temperature and seed from the config file if given as arguments
+        # set max_tokens based on the model type and configuration
+        max_tokens_from_config = self.params.get("max_tokens", 20)        
+        del self.params["max_tokens"]
+        
+        if max_tokens is None:
+            max_tokens = max_tokens_from_config
+            self._logger.info(f"Using default max_tokens from config: {max_tokens}")
+        
+        # set max_tokens based on model type
+        if model_type in self.GPT_MODELS or model_type in self.VLLM_MODELS:
+            self.params["max_completion_tokens"] = max_tokens
+            self._logger.info(f"Setting max_completion_tokens to: {max_tokens}")
+        # for ollama models, the parameter is 'num_predict'
+        # https://github.com/ollama/ollama/blob/main/docs/modelfile.md
+        elif model_type in self.OLLAMA_MODELS:
+            self.params["num_predict"] = max_tokens
+            self._logger.info(f"Setting num_predict to: {max_tokens}")
+        else:
+            raise ValueError("Unsupported model_type specified.")
+        
+        # set temperature and seed
         if temperature is not None:
             self.params["temperature"] = temperature
             self._logger.info(f"Setting temperature to: {temperature}")
         if seed is not None:
             self.params["seed"] = seed
             self._logger.info(f"Setting seed to: {seed}")
-        if max_tokens is not None:
-            # set max_tokens only if provided by the user; otherwise the default values are used
-            
-            # for gpt models, the parameter is 'max_completion_tokens'
-            if model_type in self.GPT_MODELS or model_type in self.VLLM_MODELS:
-                self.params["max_completion_tokens"] = max_tokens
-                self._logger.info(f"Setting max_completion_tokens to: {max_tokens}")
-            # for ollama models, the parameter is 'num_predict'
-            # https://github.com/ollama/ollama/blob/main/docs/modelfile.md
-            elif model_type in self.OLLAMA_MODELS:
-                self.params["num_predict"] = max_tokens
-                self._logger.info(f"Setting num_predict to: {max_tokens}")
-            else:
-                raise ValueError("Unsupported model_type specified.")
 
         if model_type in self.GPT_MODELS:
             load_dotenv(self.config.get("gpt", {}).get("path_api_key", ".env"))
@@ -192,6 +198,19 @@ class Prompter:
             )
         else:
             raise ValueError(f"Unsupported backend: {backend}")
+
+        import json
+        print(json.dumps({
+            "model": model_type,
+            "messages": messages,
+            "temperature": params["temperature"],
+            "top_p": params.get("top_p"),
+            "seed": params.get("seed"),
+            "max_completion_tokens": params.get("max_completion_tokens"),
+            "logprobs": True,
+            "top_logprobs": 20,
+        }, indent=2))
+        
         response = open_ai_client.chat.completions.create(
             model=model_type,
             messages=messages,
@@ -244,7 +263,7 @@ class Prompter:
                 {"role": "user", "content": question},
             ],
             "temperature": params.get("temperature", 0),
-            "max_tokens": params.get("max_tokens", 100),
+            "max_tokens": params.get("max_tokens", 20),
             "logprobs": 1,
             "n_probs": 1,
         }
@@ -280,6 +299,7 @@ class Prompter:
         params_tuple = tuple(sorted(self.params.items()))
         
         print("Cache key:", hash_input(system_prompt_template, question, self.model_type, self.backend, params_tuple, self.context, use_context))
+
         cached_data = self._cached_prompt_impl(
             template=system_prompt_template,
             question=question,

@@ -51,6 +51,7 @@ for s in "${seeds[@]}"; do
       --response_csv "$RESPONSE_CSV" \
       --dataset_key "$DATASET_KEY" \
       --seed "$s" \
+      --max_tokens 20 \
       --temperatures "$TEMPERATURES" 
 
     python3 proxann_user_study.py \

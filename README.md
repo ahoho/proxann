@@ -313,7 +313,8 @@ corr_data, _ = proxann.run_metric(
     q1_temp=1.0,
     q2_temp=0.0,
     q3_temp=0.0,
-    custom_seed=1234
+    custom_seeds=[122,133,144,155,166],
+    nruns=5
 )
 ```
 

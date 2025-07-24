@@ -281,11 +281,21 @@
           <div class="col-md-2">
             <label for="q3_temp" class="form-label">Q3 Temp</label>
             <input type="number" class="form-control" step="0.01" id="q3_temp" name="q3_temp" value="0.0" required>
-          </div> -->
-          <div class="col-md-2">
-            <label for="custom_seed" class="form-label">Seed</label>
-            <input type="number" class="form-control" id="custom_seed" name="custom_seed" value="1234" required>
-          </div>
+            </div> -->
+            <div class="col-md-2">
+              <label for="nruns" class="form-label" data-bs-toggle="tooltip" title="Number of times ProxAnn evaluation should run.">Number of Runs</label>
+              <input type="number" class="form-control" step="1" id="nruns" name="nruns" value="1" max="2" required>
+            </div>
+            <div class="col-md-2">
+            <label for="custom_seeds" class="form-label" data-bs-toggle="tooltip" title="List of seeds, one seed per run. Leave empty if you want randomly generated seeds.">Seeds</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="custom_seeds" 
+              name="custom_seeds"
+              placeholder="e.g. 1234, 5678, 91011 — leave blank for random seeds"
+            />
+            </div>
 
           <!-- NEW FIELD: Topics to evaluate -->
           <div class="col-md-6">

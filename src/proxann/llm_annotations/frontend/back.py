@@ -184,7 +184,21 @@ def evaluate():
     # q1_temp = float(request.form.get("q1_temp", 0))
     # q2_temp = float(request.form.get("q2_temp", 0))
     # q3_temp = float(request.form.get("q3_temp", 0))
-    custom_seed = int(request.form.get("custom_seed", 1234))
+    nruns = int(request.form.get("nruns", 1))
+    custom_seeds_input = request.form.get("custom_seeds", "").strip()
+
+    if not custom_seeds_input:
+        custom_seeds = None
+    else:
+        # keep only valid integers
+        custom_seeds = [int(seed.strip()) for seed in custom_seeds_input.split(",") if seed.strip().isdigit()]
+        
+        if not custom_seeds:
+            custom_seeds = None
+
+    if custom_seeds is not None and len(custom_seeds) > nruns:
+        return jsonify({"error": "Too many seeds provided. You should specify as many seeds as the number of runs."}), 400
+
     openai_key = request.form.get("openai_key")
 
     if not is_openai_key_valid(openai_key):
@@ -208,14 +222,15 @@ def evaluate():
     task_results[task_id] = {"status": "processing", "timestamp": datetime.utcnow()}
 
     def run_background():
-        try:
+        try:            
             df, _ = proxann.run_metric(
                 tm_model_data_path.as_posix(),
                 llm_models=[llm_model],
-                #q1_temp=q1_temp,
-                #q2_temp=q2_temp,
-                #q3_temp=q3_temp,
-                custom_seed=custom_seed,
+                q1_temp=1.0,
+                q2_temp=0.0,
+                q3_temp=0.0,
+                custom_seeds=custom_seeds,
+                nruns=nruns,
                 openai_key=openai_key,
             )
             

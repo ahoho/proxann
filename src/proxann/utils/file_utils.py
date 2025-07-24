@@ -1,3 +1,4 @@
+import json
 import logging
 import pathlib
 import pickle
@@ -405,3 +406,7 @@ def safe_load_npy(file_path, logger, description):
         logger.warning(
             f"{description} file path is missing or invalid: {file_path}")
         return None
+
+def read_json(fpath):
+    with open(fpath) as infile:
+        return json.load(infile)

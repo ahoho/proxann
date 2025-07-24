@@ -69,7 +69,7 @@ def main():
     # Generate user provided JSON file
     tm_model_data_path = proxann.generate_user_provided_json(
         path_user_study_config_file=args.user_study_config,
-        user_provided_tpcs=[0,1,2]
+        user_provided_tpcs=[0]
     )
     
     if tm_model_data_path:
@@ -84,7 +84,8 @@ def main():
         q1_temp=1.0,
         q2_temp=0.0,
         q3_temp=0.0,
-        custom_seed=1234
+        custom_seeds=[122],
+        nruns=1
     )
     
     logger.info("Evaluation completed successfully.")

@@ -5,18 +5,19 @@ import json
 import logging
 import pathlib
 import random
-import sys
+from tqdm import tqdm # type: ignore
 
 from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd  # type: ignore
-from scipy import sparse
 from scipy.stats import kendalltau
 from sklearn.metrics import ndcg_score  # type: ignore
 
 from proxann.llm_annotations.prompter import Prompter
 from proxann.llm_annotations.utils import (
+    aggregate_q2,
+    aggregate_q3,
     bradley_terry_model,
     extend_to_full_sentence,
     extract_info_mean_q2,
@@ -658,9 +659,10 @@ class ProxAnn(object):
         q1_temp=1.0,
         q2_temp=0.0,
         q3_temp=0.0,
-        custom_seed=1234,
+        custom_seeds=None,
         q1_q3_prompt_mode="q1_then_q3_mean",
         q1_q2_prompt_mode="q1_then_q2_mean",
+        nruns=1,
         openai_key=None,
     ):  
         """
@@ -674,12 +676,14 @@ class ProxAnn(object):
             List of LLM models to use.
         temperatures : float, optional
             Temperatures value for the LLM generation in Q1/Q2/Q3, separated by commas.
-        custom_seed : int, optional
-            Custom seed for the LLM, by default None.
+        custom_seeds : list, optional
+            List of custom seeds for the LLM, by default None.
         q1_q3_prompt_mode : str, optional
-            Prompting mode for Q3, by default "q1_then_q3_dspy".
+            Prompting mode for Q3, by default "q1_then_q3_mean".
         q1_q2_prompt_mode : str, optional
-            Prompting mode for Q2, by default "q1_then_q2_dspy".
+            Prompting mode for Q2, by default "q1_then_q2_mean".
+        nruns: int, optional
+            Number of runs for the evaluation, by default 5.
         openai_key : str, optional
             OpenAI API key, by default None.
             
@@ -696,100 +700,120 @@ class ProxAnn(object):
         # we retain the inner dictionary, where each key represents a topic
         tm_model_data = tm_model_data[list(tm_model_data.keys())[0]]
         
-        llm_results_q1, llm_results_q2, llm_results_q3, all_info_bradley_terry = [], [], [], []
-        # ---------------------------------------------------------
-        # For each topic ...
-        # ---------------------------------------------------------
+        all_runs_llm_results_q2 = defaultdict(list)
+        all_runs_llm_results_q3 = defaultdict(list)
+        
+        if custom_seeds is None:
+            custom_seeds = [random.randint(0, 10000) for _ in range(nruns)]
 
-        # each cluster_data is the information for a topic
-        for cluster_id, cluster_data in tm_model_data.items():
-            self._logger.info(f"Cluster: {cluster_id}")
+        for run in tqdm(range(nruns), desc="Running ProxAnn metrics"):
             
-            rank_data = []
-            info_to_bradley_terry = defaultdict(list)
-            fit_data = [] 
-            categories = []
+            custom_seed = custom_seeds[run]
             
-            for llm_model in llm_models:
-                # Create prompter for the LLM
-                prompter = Prompter(model_type=llm_model, seed=custom_seed, openai_key=openai_key)
-                # ----------------------------------------------
-                # Q1_THEN_Q3
-                # ----------------------------------------------
-                self._logger.info("-- Executing Q1 / Q3...")
-                # ==============================================
-                # Q1
-                # ==============================================                
-                self.do_q1(
-                    prompter=prompter, 
-                    cluster_data=cluster_data, 
-                    users_cats=[], 
-                    categories=categories, 
-                    temperature=q1_temp
-                )
+            self._logger.info(f"Run {run + 1}/{nruns} with custom seed {custom_seed}")
+                        
+            llm_results_q1, llm_results_q2, llm_results_q3, all_info_bradley_terry = [], [], [], []
+            
+            # ---------------------------------------------------------
+            # For each topic ...
+            # ---------------------------------------------------------
+            # each cluster_data is the information for a topic
+            for cluster_id, cluster_data in tm_model_data.items():
+                self._logger.info(f"Cluster: {cluster_id}")
                 
-                # ==============================================
-                # Q3
-                # ==============================================
-                category = categories[-1]
-                self.do_q3(
-                    prompter=prompter,
-                    prompt_mode=q1_q3_prompt_mode,
-                    cluster_data=cluster_data,
-                    rank_data=rank_data,
-                    info_to_bradley_terry=info_to_bradley_terry,
-                    users_rank=[],
-                    category=category,
-                    temperature=q3_temp,
-                )
-                # ----------------------------------------------
-                # Q1_THEN_Q2
-                # ----------------------------------------------
-                self._logger.info("-- Executing Q1 / Q2...")
-                labels = self.do_q2(
-                    prompter=prompter, 
-                    prompt_mode=q1_q2_prompt_mode, 
-                    cluster_data=cluster_data, 
-                    fit_data=fit_data, 
-                    category=category, 
-                    temperature=q2_temp
-                )
-            llm_results_q1.append({
-                "id": cluster_id,
-                "n_annotators": len(llm_models),
-                "annotators": llm_models,
-                "categories": categories,
-            })
-
-            if fit_data != []:
-                llm_results_q2.append({
+                rank_data = []
+                info_to_bradley_terry = defaultdict(list)
+                fit_data = [] 
+                categories = []
+                
+                for llm_model in llm_models:
+                    # Create prompter for the LLM
+                    prompter = Prompter(model_type=llm_model, seed=custom_seed, openai_key=openai_key)
+                    # ----------------------------------------------
+                    # Q1_THEN_Q3
+                    # ----------------------------------------------
+                    self._logger.info("-- Executing Q1 / Q3...")
+                    # ==============================================
+                    # Q1
+                    # ==============================================                
+                    self.do_q1(
+                        prompter=prompter, 
+                        cluster_data=cluster_data, 
+                        users_cats=[], 
+                        categories=categories, 
+                        temperature=q1_temp
+                    )
+                    
+                    # ==============================================
+                    # Q3
+                    # ==============================================
+                    category = categories[-1]
+                    self.do_q3(
+                        prompter=prompter,
+                        prompt_mode=q1_q3_prompt_mode,
+                        cluster_data=cluster_data,
+                        rank_data=rank_data,
+                        info_to_bradley_terry=info_to_bradley_terry,
+                        users_rank=[],
+                        category=category,
+                        temperature=q3_temp,
+                    )
+                    # ----------------------------------------------
+                    # Q1_THEN_Q2
+                    # ----------------------------------------------
+                    self._logger.info("-- Executing Q1 / Q2...")
+                    labels = self.do_q2(
+                        prompter=prompter, 
+                        prompt_mode=q1_q2_prompt_mode, 
+                        cluster_data=cluster_data, 
+                        fit_data=fit_data, 
+                        category=category, 
+                        temperature=q2_temp
+                    )
+                llm_results_q1.append({
                     "id": cluster_id,
                     "n_annotators": len(llm_models),
                     "annotators": llm_models,
-                    "labels": labels,
-                    "fit_data": [fit_data],
+                    "categories": categories,
                 })
 
-            if rank_data != []:
-                llm_results_q3.append({
-                    "id": cluster_id,
-                    "n_annotators": len(llm_models),
-                    "annotators": llm_models,
-                    "rank_data": rank_data
-                })
+                if fit_data != []:
+                    llm_results_q2.append({
+                        "id": cluster_id,
+                        "n_annotators": len(llm_models),
+                        "annotators": llm_models,
+                        "labels": labels,
+                        "fit_data": [fit_data],
+                    })
+
+                if rank_data != []:
+                    llm_results_q3.append({
+                        "id": cluster_id,
+                        "n_annotators": len(llm_models),
+                        "annotators": llm_models,
+                        "rank_data": rank_data
+                    })
+                    
+                if info_to_bradley_terry:
+                    all_info_bradley_terry.append({
+                        "id": cluster_id,
+                        "n_annotators": len(llm_models),
+                        "annotators": llm_models,
+                        "info": info_to_bradley_terry,
+                    })
+                    
+            llm_results_q2 = sorted(llm_results_q2, key=lambda x: x["id"])
+            llm_results_q3 = sorted(llm_results_q3, key=lambda x: x["id"])
+        
+            all_runs_llm_results_q2[run] = llm_results_q2
+            all_runs_llm_results_q3[run] = llm_results_q3
+        
+        # aggregate results acrros runs
+        self._logger.info("Aggregating results across runs...")
+        agg_llm_results_q2 = aggregate_q2(all_runs_llm_results_q2)
+        agg_llm_results_q3 = aggregate_q3(all_runs_llm_results_q3)
                 
-            if info_to_bradley_terry:
-                all_info_bradley_terry.append({
-                    "id": cluster_id,
-                    "n_annotators": len(llm_models),
-                    "annotators": llm_models,
-                    "info": info_to_bradley_terry,
-                })
-                
-        llm_results_q2 = sorted(llm_results_q2, key=lambda x: x["id"])
-        llm_results_q3 = sorted(llm_results_q3, key=lambda x: x["id"])
-                
-        corr_data = self.compute_llm_tm_corrs(tm_model_data, llm_results_q3, llm_results_q2)
+        corr_data = self.compute_llm_tm_corrs(tm_model_data, agg_llm_results_q3, agg_llm_results_q2)
                 
         return corr_data, info_to_bradley_terry
     

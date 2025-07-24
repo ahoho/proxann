@@ -213,15 +213,14 @@ def extract_info_mean_q2(logprobs):
         "cinco": 5
     }
 
-    print(len(logprobs[0].top_logprobs))
     for top_logprobs in logprobs[0].top_logprobs:
         raw_token = top_logprobs.token
         try:
             token_str = str(raw_token).lower()
             token = word_to_number.get(token_str, int(raw_token))
-            print(f"Token: {raw_token}, Converted: {token}")
+            #print(f"Token: {raw_token}, Converted: {token}")
         except (ValueError, TypeError):
-            print(f"Token: {raw_token} could not be converted to int")
+            #print(f"Token: {raw_token} could not be converted to int")
             continue
 
         if token in {1, 2, 3, 4, 5}:  # set is faster for membership tests
@@ -242,10 +241,10 @@ def extract_info_mean_q3(logprobs1, logprobs2, keep_only_most_top=False):
                 token_str = re.sub(r"[^\w]", "", str(raw_token)).lower()
                 if token_str in {"a", "b"}:
                     prob = math.exp(top_logprobs.logprob)
-                    print(f"Token: {token_str}, Probability: {prob}")
+                    #print(f"Token: {token_str}, Probability: {prob}")
                     # we assume the right token order is that from the first logprobs (--> way), so if we are in the second logprobs (<--) and the token is "A" we say it is "B" and vice versa
                     if i == 1:
-                        print("Switching A <-> B since we are in the second logprobs")
+                        #print("Switching A <-> B since we are in the second logprobs")
                         token_str = "a" if token_str == "b" else "b"
                     token_probs.append((token_str, prob, i))    
                      
@@ -1100,7 +1099,141 @@ def loo_from_corr_data(corr_data, seed=42, annotators_to_retain=None, keep_one=F
             topic_data["dropped"] = loo_idx
             loo_data.append(topic_data)
     return loo_data
+    
+def aggregate_q2(all_runs_q2):
+    """
+    Aggregates Q2 across multiple runs per topic and annotator.
 
-def read_json(fpath):
-    with open(fpath) as infile:
-        return json.load(infile)
+    Parameters
+    ----------
+    all_runs_q2 : dict[int, list]
+        Dictionary where each key is a run index (e.g., 0, 1, ...) and each value is a list of Q2 results from that run. Each result corresponds to one topic and includes fit_data per annotator.
+
+        Example structure:
+        {
+            0: [
+                {
+                    "id": "0", # this is the topic ID
+                    "n_annotators": 1,
+                    "annotators": ["gpt-4o-mini-2024-07-18"],
+                    "labels": [
+                        "Conflict and Violence in Global Regions",
+                        ...
+                    ],
+                    "fit_data": [
+                        [0.99, 3.92, 3.99, 3.04, 1.86]
+                    ]
+                },
+                {
+                    "id": "1",
+                    "n_annotators": 1,
+                    "annotators": ["gpt-4o-mini-2024-07-18"],
+                    "labels": [...],
+                    "fit_data": [
+                        [1.00, 2.14, 1.00, 1.81, 2.97]
+                    ]
+                },
+                ...
+            ],
+            1: [ ... ],  # same structure for another run
+        }
+
+    Returns
+    -------
+    list[dict]
+        Aggregated list of Q2 results per topic, with mean fit_data per annotator.
+    """
+
+    agg = defaultdict(list)
+    annotators_for_topic = {}
+
+    for run_data in all_runs_q2.values():
+        for entry in run_data:
+            topic_id = entry["id"]
+            for annotator, fit_vec in zip(entry["annotators"], entry["fit_data"]):
+                agg[(topic_id, annotator)].append(fit_vec)
+            annotators_for_topic[topic_id] = entry["annotators"]
+
+    # Now compute mean for each (topic, annotator)
+    topic_aggregated = defaultdict(lambda: {
+        "id": None,
+        "n_annotators": 0,
+        "annotators": [],
+        "fit_data": []
+    })
+
+    for (topic_id, annotator), fit_list in agg.items():
+        fit_data_mean = np.mean(np.array(fit_list), axis=0).tolist()
+        topic_entry = topic_aggregated[topic_id]
+        topic_entry["id"] = topic_id
+        topic_entry["n_annotators"] += 1
+        topic_entry["annotators"].append(annotator)
+        topic_entry["fit_data"].append(fit_data_mean)
+
+    return list(topic_aggregated.values())
+
+def aggregate_q3(all_runs_q3):
+    """
+    Aggregates Q3 across multiple runs per topic and annotator.
+
+    Parameters
+    ----------
+    all_runs_q3 : dict[int, list]
+        Dictionary where each key is a run index (e.g., 0, 1, ...) and each value is a list of Q3 results from that run. Each result corresponds to one topic and includes rank_data per annotator.
+
+        Example structure:
+        {
+            0: [
+                {
+                    "id": "0",
+                    "n_annotators": 1,
+                    "annotators": ["gpt-4o-mini-2024-07-18"],
+                    "rank_data": [
+                        [1, 5, 4, 3, 2]
+                    ]
+                },
+                {
+                    "id": "1",
+                    "n_annotators": 1,
+                    "annotators": ["gpt-4o-mini-2024-07-18"],
+                    "rank_data": [
+                        [1, 5, 2, 3, 4]
+                    ]
+                },
+                ...
+            ],
+            1: [ ... ],  # same structure for another run
+        }
+
+    Returns
+    -------
+    list[dict]
+        Aggregated list of Q3 results per topic, with mean rank_data per annotator.
+    """
+
+    agg = defaultdict(list)
+    annotators_for_topic = {}
+
+    for run_data in all_runs_q3.values():
+        for entry in run_data:
+            topic_id = entry["id"]
+            for annotator, rank_vec in zip(entry["annotators"], entry["rank_data"]):
+                agg[(topic_id, annotator)].append(rank_vec)
+            annotators_for_topic[topic_id] = entry["annotators"]
+
+    topic_aggregated = defaultdict(lambda: {
+        "id": None,
+        "n_annotators": 0,
+        "annotators": [],
+        "rank_data": []
+    })
+
+    for (topic_id, annotator), rank_list in agg.items():
+        rank_data_mean = np.mean(np.array(rank_list), axis=0).tolist()
+        topic_entry = topic_aggregated[topic_id]
+        topic_entry["id"] = topic_id
+        topic_entry["n_annotators"] += 1
+        topic_entry["annotators"].append(annotator)
+        topic_entry["rank_data"].append(rank_data_mean)
+
+    return list(topic_aggregated.values())

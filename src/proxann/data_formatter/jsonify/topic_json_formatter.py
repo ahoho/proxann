@@ -414,7 +414,7 @@ def main():
         type=str,
         required=False,
         default="text",
-        help="Column data to display as document' contnet in TopicJsonFormatter."
+        help="Column data to display as document' content in TopicJsonFormatter."
     )
 
     args = parser.parse_args()

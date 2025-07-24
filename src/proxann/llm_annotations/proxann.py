@@ -26,7 +26,7 @@ from proxann.llm_annotations.utils import (
 )
 from proxann.data_formatter.jsonify.topic_json_formatter import TopicJsonFormatter
 from proxann.data_formatter.topics_docs_selection.topic_selector import TopicSelector
-from proxann.utils.file_utils import init_logger, load_vocab_from_txt, load_yaml_config_file, log_or_print
+from proxann.utils.file_utils import init_logger, load_vocab_from_txt, load_yaml_config_file, log_or_print, read_dataframe, safe_load_npy
 
 class ProxAnn(object):
     def __init__(
@@ -74,12 +74,13 @@ class ProxAnn(object):
         user_provided_tpcs : Optional[List[int]], optional
             List of user-provided topics, by default None. If not provided, the function will use the topics from the configuration file.
         """
-        self._logger.info(
-            "Generating JSON file with user-provided model data starts...")
+    
+    
+        log_or_print("Generating JSON file with user-provided model data starts...", self._logger)
         
         user_config = configparser.ConfigParser()
         user_config.read(path_user_study_config_file)
-        self._logger.info(f"User study configuration read successfully")
+        log_or_print(f"User study configuration read successfully", self._logger)
         
         ############################
         # Topic selection          #
@@ -94,7 +95,7 @@ class ProxAnn(object):
             if len(user_config.sections()) > 2:
                 error_msg = f"User provided topics, but more than one model is configured. Exiting..."
                 log_or_print(error_msg, self._logger)
-                return 1, error_msg
+                raise ValueError(error_msg)
             
             selected_topics = [[(0, user_provided_tpcs[i]) for i in range(len(user_provided_tpcs))]]
             log_or_print(f"Selected topics set from user input: {selected_topics}", self._logger)
@@ -126,10 +127,9 @@ class ProxAnn(object):
                     elif vocab_path.endswith()(".txt"):
                         vocab_w2id = load_vocab_from_txt(vocab_path)
                     else:
-                        log_or_print(
-                            f"File does not have the required extension for loading the vocabulary. Exiting...", self._logger)
-                        sys.exit()
-
+                        error_msg = f"File {vocab_path} does not have the required extension for loading the vocabulary. Exiting..."
+                        log_or_print(error_msg, self._logger)
+                        raise ValueError(error_msg)
                     betas_path = model_config['betas_path']
                     betas = np.load(betas_path)
 
@@ -171,48 +171,44 @@ class ProxAnn(object):
         combined_out = {}
         for model in user_config.sections():
             model_config = user_config[model]
-            if model != 'all':  # Skip all section (configuration for all models)
-                model_config = user_config[model]
-                log_or_print(f"Obtaining output for model {model}", self._logger)
-                # if trained with this repo code, we only need the model path
-                if model_config.getboolean('trained_with_thetas_eval'):
-                    model_path = model_config['model_path']
-                    try:
-                        # Load matrices
-                        thetas = sparse.load_npz(pathlib.Path(
-                            model_path) / "thetas.npz").toarray()
-                        betas = np.load(pathlib.Path(model_path) / "betas.npy")
+            if model == 'all':  # Skip all section
+                continue
 
-                        # Load vocab dictionaries
-                        vocab_w2id = {}
-                        with (pathlib.Path(model_path)/'vocab.txt').open('r', encoding='utf8') as fin:
-                            for i, line in enumerate(fin):
-                                wd = line.strip()
-                                vocab_w2id[wd] = i
+            log_or_print(f"Obtaining output for model {model}", self._logger)
+            
+            # if trained with this repo code, we only need the model path
+            if model_config.getboolean('trained_with_thetas_eval'):
+                model_path = model_config['model_path']
 
-                    except Exception as e:
-                        log_or_print(
-                            f"Error occurred when loading info from model {model_path.as_posix(): e}", self._logger)
+                # Load matrices
+                thetas = safe_load_npy(
+                    pathlib.Path(model_path) / "thetas.npz", self._logger, "Thetas file")
+                betas = safe_load_npy(
+                    pathlib.Path(model_path) / "betas.npy", self._logger, "Betas file")
+
+                # Load vocab dictionaries
+                vocab_w2id = load_vocab_from_txt(pathlib.Path(model_path) / 'vocab.txt')
+
+            else:
+                model_path = None
+                thetas_path = model_config['thetas_path']
+                betas_path = model_config['betas_path']
+                vocab_path = model_config['vocab_path']
+
+                # Load matrices
+                thetas = np.load(thetas_path)
+                betas = np.load(betas_path)
+
+                if vocab_path.endswith(".json"):
+                    with open(vocab_path) as infile:
+                        vocab_w2id = json.load(infile)
+
+                elif vocab_path.endswith()(".txt"):
+                    vocab_w2id = load_vocab_from_txt(vocab_path)
                 else:
-                    model_path = None
-                    thetas_path = model_config['thetas_path']
-                    betas_path = model_config['betas_path']
-                    vocab_path = model_config['vocab_path']
-
-                    # Load matrices
-                    thetas = np.load(thetas_path)
-                    betas = np.load(betas_path)
-
-                    if vocab_path.endswith(".json"):
-                        with open(vocab_path) as infile:
-                            vocab_w2id = json.load(infile)
-
-                    elif vocab_path.endswith()(".txt"):
-                        vocab_w2id = load_vocab_from_txt(vocab_path)
-                    else:
-                        log_or_print(
-                            f"File does not have the required extension for loading the vocabulary. Exiting...", self._logger)
-                        sys.exit()
+                    error_msg = f"File does not have the required extension for loading the vocabulary. Exiting..."
+                    log_or_print(error_msg, self._logger)
+                    raise ValueError(error_msg)
                 
                 # check the number of topics selected for the models is less or equal to the number of topics in the model, and topics are valid IDs (all ids go from 0 to number of topics - 1)
                 this_model_tpcs = [
@@ -221,15 +217,15 @@ class ProxAnn(object):
                 if len(this_model_tpcs) > thetas.shape[0]:
                     error_msg = f"Number of topics selected for model {model} is greater than the number of topics in the model. Exiting..."
                     log_or_print(error_msg, self._logger)
-                    return 1, error_msg
+                    raise ValueError(error_msg)
                 
                 for el in this_model_tpcs:
                     if el < 0 or el >= thetas.shape[1]:
                         error_msg = f"Topic ID {el} is not valid for model {model}. Exiting..."
                         log_or_print(error_msg, self._logger)
-                        return 1, error_msg
+                        raise ValueError(error_msg)
                     
-                #  Get keys
+                # Get keys
                 vocab_id2w = dict(zip(vocab_w2id.values(), vocab_w2id.keys()))
                 keys = [
                     [vocab_id2w[idx]
@@ -243,15 +239,18 @@ class ProxAnn(object):
 
                 #  Get corpus
                 corpus_path = pathlib.Path(model_config['corpus_path'])
-                if corpus_path.suffix == ".parquet":
-                    df = pd.read_parquet(corpus_path)
-                elif corpus_path.suffix in [".json", ".jsonl"]:
-                    df = pd.read_json(corpus_path, lines=True)
-                else:
-                    log_or_print(
-                        f"Unrecognized file extension for data path: {corpus_path.suffix}. Exiting...", self._logger)
-                    sys.exit()
+                if corpus_path.suffix not in [".parquet", ".json", ".jsonl"]:
+                    error_msg = f"File {corpus_path} does not have the required extension for loading the corpus. Exiting..."
+                    log_or_print(error_msg, self._logger)
+                    raise ValueError(error_msg)
+                df = read_dataframe(corpus_path, self._logger)
 
+                if text_column not in df.columns:
+                    error_msg = f"Column {text_column} not found in the corpus file."
+                    #log_or_print(error_msg, self._logger)
+                    #return 1, error_msg
+                    raise ValueError(error_msg)
+                
                 df["text_split"] = df[text_column].apply(lambda x: x.split())
                 corpus = df["text_split"].values.tolist()
 
@@ -304,10 +303,9 @@ class ProxAnn(object):
             json.dump(combined_out, file, indent=4)    
         
         if output_path.exists():
-            return 0, output_path
-        else:
-            return 1, "Error writing JSON file"
-        
+            return output_path
+        raise RuntimeError(f"Error writing JSON file to {output_path.as_posix()}")
+            
     def get_prompt_template(
         self,
         text_for_prompt: dict,
@@ -657,9 +655,9 @@ class ProxAnn(object):
         self,
         tm_model_data_path,
         llm_models,
-        q1_temp=0,
-        q2_temp=0,
-        q3_temp=0,
+        q1_temp=1.0,
+        q2_temp=0.0,
+        q3_temp=0.0,
         custom_seed=1234,
         q1_q3_prompt_mode="q1_then_q3_mean",
         q1_q2_prompt_mode="q1_then_q2_mean",

@@ -270,7 +270,7 @@
               <option value="gpt-4o-2024-08-06">gpt-4o-2024-08-06</option>
             </select>
           </div>
-          <div class="col-md-2">
+          <!-- <div class="col-md-2">
             <label for="q1_temp" class="form-label">Q1 Temp</label>
             <input type="number" class="form-control" step="0.01" id="q1_temp" name="q1_temp" value="1.0" required>
           </div>
@@ -281,7 +281,7 @@
           <div class="col-md-2">
             <label for="q3_temp" class="form-label">Q3 Temp</label>
             <input type="number" class="form-control" step="0.01" id="q3_temp" name="q3_temp" value="0.0" required>
-          </div>
+          </div> -->
           <div class="col-md-2">
             <label for="custom_seed" class="form-label">Seed</label>
             <input type="number" class="form-control" id="custom_seed" name="custom_seed" value="1234" required>
@@ -343,6 +343,9 @@
         <div class="spinner-border me-2" role="status"></div>
         <span>Evaluating... please wait</span>
       </div>
+
+      <!-- Status message for expired/removed task -->
+      <div id="status-message" class="mt-3"></div>
 
       <!-- Output -->
       <div id="results" class="mt-4"></div>
@@ -511,16 +514,24 @@
 
     function pollForResult(taskId) {
       fetch(`/evaluate/status/${taskId}`)
-        .then(res => res.json())
+        .then(res => {
+          if (res.status === 404) {
+            throw new Error("This task has expired or was removed. Please re-upload your files.");
+          }
+          return res.json();
+        })
         .then(data => {
           if (data.status === "done") {
+            document.getElementById("status-message").innerHTML = "";
             document.getElementById("results").innerHTML = data.table;
             const toast = new bootstrap.Toast(document.getElementById("toast-success"));
             toast.show();
             document.getElementById("evaluation-indicator").classList.add("d-none");
             document.getElementById("start-eval-btn").disabled = false;
           } else if (data.status === "error") {
-            document.getElementById("results").innerHTML = `<div class='alert alert-danger'>Evaluation failed: ${data.message}</div>`;
+            document.getElementById("status-message").innerHTML = "";
+            document.getElementById("results").innerHTML = `
+              <div class='alert alert-danger'>Evaluation failed: ${data.message}</div>`;
             document.getElementById("evaluation-indicator").classList.add("d-none");
             document.getElementById("start-eval-btn").disabled = false;
           } else {
@@ -528,10 +539,19 @@
           }
         })
         .catch(err => {
-          console.error("Polling error:", err);
-          setTimeout(() => pollForResult(taskId), 3000);
+          console.warn("Polling error or task expired:", err.message);
+          document.getElementById("evaluation-indicator").classList.add("d-none");
+          document.getElementById("start-eval-btn").disabled = false;
+
+          const msg = `
+            <div class="alert alert-warning" role="alert">
+              ⚠️ ${err.message}
+            </div>`;
+          document.getElementById("status-message").innerHTML = msg;
+          document.getElementById("status-message").scrollIntoView({ behavior: "smooth", block: "center" });
         });
     }
+
 
     document.addEventListener("DOMContentLoaded", function () {
       // Inicializar tooltips de Bootstrap

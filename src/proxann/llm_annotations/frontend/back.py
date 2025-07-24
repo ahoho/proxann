@@ -30,7 +30,7 @@ proxann = ProxAnn(logger, CONFIG_PATH)
 
 task_results = {}
 
-def cleanup_old_tasks(expiration_minutes=30):
+def cleanup_old_tasks(expiration_minutes=60):
     while True:
         now = datetime.utcnow()
         to_delete = []
@@ -94,7 +94,7 @@ def upload():
                 "thetas": {"npz", "npy"},
                 "betas": "npy",
                 "vocab": "json",
-                "corpus": {"parquet", "json"},
+                "corpus": {"parquet", "json", "jsonl"},
                 "model": {"tar.gz", "tar", "zip"}
             }
             expected = file_type_map[file_key]
@@ -181,9 +181,9 @@ def evaluate():
         return jsonify({"error": "Invalid task ID"}), 400
 
     llm_model = request.form.get("llm_model")
-    q1_temp = float(request.form.get("q1_temp", 0))
-    q2_temp = float(request.form.get("q2_temp", 0))
-    q3_temp = float(request.form.get("q3_temp", 0))
+    # q1_temp = float(request.form.get("q1_temp", 0))
+    # q2_temp = float(request.form.get("q2_temp", 0))
+    # q3_temp = float(request.form.get("q3_temp", 0))
     custom_seed = int(request.form.get("custom_seed", 1234))
     openai_key = request.form.get("openai_key")
 
@@ -196,7 +196,7 @@ def evaluate():
     output_path = Path(task_dir) / "user_provided.json"
 
     try:
-        _, tm_model_data_path = proxann.generate_user_provided_json(
+        tm_model_data_path = proxann.generate_user_provided_json(
             path_user_study_config_file=os.path.join(app.config['UPLOAD_FOLDER'], task_id, "config.conf"),
             user_provided_tpcs=topics_to_evaluate,
             output_path=output_path
@@ -212,9 +212,9 @@ def evaluate():
             df, _ = proxann.run_metric(
                 tm_model_data_path.as_posix(),
                 llm_models=[llm_model],
-                q1_temp=q1_temp,
-                q2_temp=q2_temp,
-                q3_temp=q3_temp,
+                #q1_temp=q1_temp,
+                #q2_temp=q2_temp,
+                #q3_temp=q3_temp,
                 custom_seed=custom_seed,
                 openai_key=openai_key,
             )
@@ -235,13 +235,13 @@ def evaluate():
                 "message": str(e),
                 "timestamp": datetime.utcnow()
             }
-        finally:
-            # remove all information about the task after processing
-            try:
-                shutil.rmtree(task_dir)
-                logger.info(f"Deleted task directory: {task_dir}")
-            except Exception as e:
-                logger.warning(f"Could not delete task directory {task_dir}: {e}")
+        # finally:
+        #     # remove all information about the task after processing
+        #     try:
+        #         shutil.rmtree(task_dir)
+        #         logger.info(f"Deleted task directory: {task_dir}")
+        #     except Exception as e:
+        #         logger.warning(f"Could not delete task directory {task_dir}: {e}")
 
     threading.Thread(target=run_background).start()
     return jsonify({"task_id": task_id})

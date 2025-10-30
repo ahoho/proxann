@@ -199,17 +199,17 @@ class Prompter:
         else:
             raise ValueError(f"Unsupported backend: {backend}")
 
-        import json
-        print(json.dumps({
-            "model": model_type,
-            "messages": messages,
-            "temperature": params["temperature"],
-            "top_p": params.get("top_p"),
-            "seed": params.get("seed"),
-            "max_completion_tokens": params.get("max_completion_tokens"),
-            "logprobs": True,
-            "top_logprobs": 20,
-        }, indent=2))
+        # import json
+        # print(json.dumps({
+        #     "model": model_type,
+        #     "messages": messages,
+        #     "temperature": params["temperature"],
+        #     "top_p": params.get("top_p"),
+        #     "seed": params.get("seed"),
+        #     "max_completion_tokens": params.get("max_completion_tokens"),
+        #     "logprobs": True,
+        #     "top_logprobs": 20,
+        # }, indent=2))
         
         response = open_ai_client.chat.completions.create(
             model=model_type,

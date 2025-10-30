@@ -447,16 +447,16 @@ To reproduce the results from our paper using ProxAnn, ensure the following data
 #### Required Files and Directory Structure
 
 - **Datasets**
-  Preprocessed Wiki and Bills datasets (15,000-term vocabulary) from Hoyle et al. (2022).
-
-  Download: [🔗](https://drive.google.com/file/d/1qdH0rI5m24vexaF0lzo_KZQEsVD5qMQJ/view?usp=drive_link)
+  Preprocessed Wiki and Bills datasets (15,000-term vocabulary) from Hoyle et al. (2022). 
+  
+  Download: [🤗](https://huggingface.co/datasets/lcalvobartolome/proxann_data).
 
   Save to: `data/training_data/`
 
 - **Trained Topic Models**
-  Includes LDA-Mallet and CTM models from Hoyle et al., and BERTopic models trained using `proxann.topic_models.train.BERTopicTrainer`.
+  Includes LDA-Mallet and CTM models from Hoyle et al., and BERTopic models trained using `proxann.topic_models.train.BERTopicTrainer`. All models are available on 
 
-  Download: [🔗](https://drive.google.com/file/d/18TMTOoq9qwlWZtB3CSpRfv-5TaC1VzC7/view?usp=drive_link)
+  Download: [🤗](https://huggingface.co/datasets/lcalvobartolome/proxann_topic_models)
 
   Save to: `data/models/`
 
